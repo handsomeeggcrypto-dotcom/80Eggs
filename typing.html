@@ -434,9 +434,22 @@ body{
 .missrow .mbar i{display:block;height:100%;background:var(--accent);box-shadow:0 0 8px var(--accent);transition:width .4s}
 .missrow .mc{font-size:12px;color:var(--hud2);width:40px;text-align:right}
 .recempty{font-size:12px;color:var(--hud2);opacity:.6;padding:8px 0}
+#backBtn{
+  position:fixed;top:14px;left:14px;z-index:999;
+  font-family:var(--title);font-size:11px;letter-spacing:2px;
+  padding:8px 14px;border-radius:8px;cursor:pointer;
+  background:var(--panel);color:var(--hud);
+  border:1px solid var(--border);
+  box-shadow:0 0 14px -4px var(--accent);
+  text-decoration:none;
+  transition:.2s;
+  opacity:.8;
+}
+#backBtn:hover{opacity:1;box-shadow:0 0 20px -2px var(--accent)}
 </style>
 </head>
 <body>
+<a id="backBtn" href="index.html">◂ COCKPIT</a>
 <div id="app" class="theme-vice">
 
   <div class="bg">
@@ -530,6 +543,8 @@ body{
           <div class="opt sel" data-mode="words">RANDOM<span class="d">WORDS</span></div>
           <div class="opt" data-mode="sentences">SENTENCES<span class="d">REAL TEXT</span></div>
           <div class="opt" data-mode="dialog">DIALOG<span class="d">FULL PAGES</span></div>
+          <div class="opt" data-mode="affirmations">AFFIRMATIONS<span class="d">WEALTH MIND</span></div>
+          <div class="opt" data-mode="learning">LEARNING<span class="d">DAILY TIPS</span></div>
         </div>
       </div>
 
@@ -544,10 +559,10 @@ body{
       <div class="optblock">
         <div class="ol">MUSIC TRACK</div>
         <div class="opts" id="optTrack">
-          <div class="opt sel" data-track="0">NIGHT DRIVE<span class="d">112 BPM</span></div>
-          <div class="opt" data-track="1">OUTRUN<span class="d">128 · FAST</span></div>
-          <div class="opt" data-track="2">MIDNIGHT<span class="d">96 · MOODY</span></div>
-          <div class="opt" data-track="3">NEON CRUISE<span class="d">106 · BOUNCE</span></div>
+          <div class="opt sel" data-track="0">NIGHT DRIVE<span class="d">112 · DRIVE</span></div>
+          <div class="opt" data-track="1">SUNSET<span class="d">100 · WARM</span></div>
+          <div class="opt" data-track="2">STARLIGHT<span class="d">104 · DREAMY</span></div>
+          <div class="opt" data-track="auto">AUTO<span class="d">CYCLE ALL</span></div>
         </div>
       </div>
 
@@ -644,6 +659,70 @@ const DIALOG = [
 "He set the cup down and stared at the wall of monitors. Each one showed a different corner of the city, and each corner looked exactly the same after midnight. The voice on the radio was calm, too calm, the way a voice gets when it has nothing left to lose. We have until sunrise, it said, and then the line went dead. He nodded to no one and reached for the keyboard, fingers already moving before he had decided what to type.",
 "The market never closed, not really. Vendors folded their stalls into the shadows and rolled them out again an hour later under different names. A child ran past with a fistful of cables, laughing at something only she could see. Above them all the great screen turned from blue to gold to a deep and quiet red, and for a single moment the whole street stopped to watch the colors change before the noise rushed back in again.",
 "Listen, she said, and the music dropped to almost nothing. You hear that? Underneath the engines and the rain and the thousand little machines, there is a sound the city makes when it thinks no one is awake. It is not a warning and it is not a song. It is just the place breathing, slow and steady, waiting for the morning that always comes a little later than you hope. He listened, and after a while he understood, and they sat there together saying nothing at all."
+];
+
+const AFFIRMATIONS = [
+"i am building wealth with every choice i make.",
+"money flows to me easily and consistently.",
+"i am confident, capable, and in control of my future.",
+"every day i grow stronger and more disciplined.",
+"i deserve abundance and i welcome it now.",
+"my focus creates the success i desire.",
+"i am the architect of my own fortune.",
+"wealth is a tool and i use it wisely.",
+"i attract opportunities that increase my income.",
+"i am calm under pressure and sharp in my thinking.",
+"my potential is limitless and i act on it daily.",
+"i invest in myself because i am worth it.",
+"i turn every setback into a comeback.",
+"i am worthy of a rich and meaningful life.",
+"discipline today builds my freedom tomorrow.",
+"i make decisions from confidence and not from fear.",
+"i am magnetic to good ideas and good people.",
+"my mindset is my greatest asset.",
+"i create value and the world rewards me for it.",
+"i am becoming the powerful person i was meant to be.",
+"abundance is my natural state of being.",
+"i save with purpose and i spend with intention.",
+"i am grateful for the wealth already flowing to me.",
+"i lead my life with courage and clarity.",
+"success feels natural and familiar to me.",
+"i am unstoppable when i commit to my goals.",
+"every dollar i earn works to build my freedom.",
+"i trust myself to handle anything that comes.",
+"i radiate confidence, wealth, and strength."
+];
+
+const LEARNING = [
+"paying yourself first means saving before you spend.",
+"compound interest grows faster the earlier you start.",
+"an emergency fund of three to six months protects you.",
+"high interest debt often costs more than investing earns.",
+"index funds spread risk across many companies at low cost.",
+"your credit score improves when you pay bills on time.",
+"the fifty thirty twenty rule splits needs, wants, and savings.",
+"buying used cars avoids the steep early depreciation.",
+"automating savings makes building wealth almost effortless.",
+"inflation slowly lowers the value of cash you hold.",
+"drinking water before meals can help you eat less.",
+"a short walk after eating helps steady your blood sugar.",
+"sleep is when your brain stores what you learned that day.",
+"strength training keeps muscles and bones strong as you age.",
+"morning sunlight helps reset your natural sleep cycle.",
+"slow, deep breathing can calm your nervous system quickly.",
+"standing and stretching each hour eases the strain of sitting.",
+"teaching a topic is one of the best ways to learn it.",
+"spacing out study sessions beats cramming for memory.",
+"writing notes by hand helps you remember them longer.",
+"breaking big goals into small steps makes them happen.",
+"the brain tends to focus best in blocks of about ninety minutes.",
+"reading a little every day compounds into deep knowledge.",
+"repeating a name back helps you remember who you just met.",
+"a quick plan the night before saves time every morning.",
+"the two minute rule says do small tasks right away.",
+"asking questions often teaches you more than talking does.",
+"keeping receipts makes returns and warranties much easier.",
+"learning to cook a few meals saves money and improves health."
 ];
 
 /* =========================================================
@@ -751,16 +830,15 @@ const NOTE_SEMI={C:0,'C#':1,Db:1,D:2,'D#':3,Eb:3,E:4,F:5,'F#':6,Gb:6,G:7,'G#':8,
 function nf(n){ const m=/^([A-G][b#]?)(-?\d)$/.exec(n); if(!m) return 220;
   const midi=NOTE_SEMI[m[1]]+(parseInt(m[2],10)+1)*12; return 440*Math.pow(2,(midi-69)/12); }
 const TRACKS=[
-  {name:'NIGHT DRIVE', bpm:112, lead:'triangle', arp:true,  pad:0.045, kick:[0,4],     hat:[1,3,5,7],
+  {name:'NIGHT DRIVE', bpm:112, lead:'triangle', arp:true, pad:0.045, kick:[0,4], hat:[1,3,5,7],
    prog:[{bass:'A2',tones:['A3','C4','E4']},{bass:'F2',tones:['F3','A3','C4']},{bass:'C3',tones:['G3','C4','E4']},{bass:'G2',tones:['G3','B3','D4']}]},
-  {name:'OUTRUN', bpm:128, lead:'square', arp:true, pad:0.04, kick:[0,2,4,6], hat:[1,3,5,7],
-   prog:[{bass:'C2',tones:['G3','C4','Eb4']},{bass:'Ab2',tones:['Ab3','C4','Eb4']},{bass:'Eb2',tones:['G3','Bb3','Eb4']},{bass:'Bb2',tones:['Bb3','D4','F4']}]},
-  {name:'MIDNIGHT', bpm:96, lead:'sine', arp:false, pad:0.062, kick:[0], hat:[6],
-   prog:[{bass:'E2',tones:['E3','G3','B3']},{bass:'C2',tones:['E3','G3','C4']},{bass:'G2',tones:['G3','B3','D4']},{bass:'D2',tones:['D3','F#3','A3']}]},
-  {name:'NEON CRUISE', bpm:106, lead:'sawtooth', arp:true, pad:0.045, kick:[0,4], hat:[2,6],
-   prog:[{bass:'A2',tones:['A3','C4','E4']},{bass:'E2',tones:['E3','G3','B3']},{bass:'F2',tones:['F3','A3','C4']},{bass:'G2',tones:['G3','B3','D4']}]}
+  {name:'SUNSET', bpm:100, lead:'triangle', arp:true, pad:0.05, kick:[0,4], hat:[2,6],
+   prog:[{bass:'C2',tones:['E3','G3','C4']},{bass:'G2',tones:['D3','G3','B3']},{bass:'A2',tones:['E3','A3','C4']},{bass:'F2',tones:['F3','A3','C4']}]},
+  {name:'STARLIGHT', bpm:104, lead:'sine', arp:true, pad:0.05, kick:[0,4], hat:[1,3,5,7],
+   prog:[{bass:'D2',tones:['F3','A3','D4']},{bass:'Bb2',tones:['D3','F3','Bb3']},{bass:'F2',tones:['F3','A3','C4']},{bass:'C2',tones:['E3','G3','C4']}]}
 ];
-let trackIdx=0, SD=60/112/2;
+let trackIdx=0, autoMode=false, SD=60/112/2;
+const AUTO_BARS=24;                         // bars before auto-cycle advances
 let musicPlaying=false, musicTimer=null, nextNote=0, mstep=0;
 function curTrack(){ return TRACKS[trackIdx]; }
 function mGain(v,t,dur){ const g=actx.createGain(); g.gain.setValueAtTime(0.0001,t);
@@ -811,7 +889,12 @@ function scheduleStep(idx,t){
   if(tr.hat.indexOf(s)!==-1) mHat(t);
 }
 function musicScheduler(){
-  while(nextNote < actx.currentTime+0.12){ scheduleStep(mstep,nextNote); nextNote+=SD; mstep++; }
+  while(nextNote < actx.currentTime+0.12){
+    if(autoMode && mstep>0 && mstep % (AUTO_BARS*8)===0){
+      trackIdx=(trackIdx+1)%TRACKS.length; SD=60/curTrack().bpm/2; updateTrackUI();
+    }
+    scheduleStep(mstep,nextNote); nextNote+=SD; mstep++;
+  }
 }
 function startMusic(){
   if(!ensureAudio() || musicPlaying) return;
@@ -826,15 +909,29 @@ function stopMusic(){
   if(musicTimer){ clearInterval(musicTimer); musicTimer=null; }
   if(actx && musicBus) musicBus.gain.setTargetAtTime(0.0001, actx.currentTime, 0.25);
 }
-function setTrack(i){
-  trackIdx=((i%TRACKS.length)+TRACKS.length)%TRACKS.length;
+function updateTrackUI(){
+  const val = autoMode ? 'auto' : String(trackIdx);
   document.querySelectorAll('[data-track]').forEach(el=>{
-    if(el.classList.contains('opt')) el.classList.toggle('sel', Number(el.dataset.track)===trackIdx);
+    if(el.classList.contains('opt')) el.classList.toggle('sel', el.dataset.track===val);
   });
-  const b=$('trackBtn'); if(b) b.textContent='♫ '+curTrack().name;
-  if(musicPlaying){ stopMusic(); startMusic(); }
+  const b=$('trackBtn');
+  if(b) b.textContent = autoMode ? '♫ AUTO: '+curTrack().name : '♫ '+curTrack().name;
 }
-function cycleTrack(){ setTrack(trackIdx+1); }
+function setTrack(val){
+  if(val==='auto'){ autoMode=true; }
+  else{
+    const ni=((Number(val)%TRACKS.length)+TRACKS.length)%TRACKS.length;
+    const changed = autoMode || ni!==trackIdx;
+    autoMode=false; trackIdx=ni;
+    if(musicPlaying && changed){ stopMusic(); startMusic(); }
+  }
+  updateTrackUI();
+}
+function cycleTrack(){
+  const order=['auto','0','1','2'];
+  const cur = autoMode ? 'auto' : String(trackIdx);
+  setTrack(order[(order.indexOf(cur)+1)%order.length]);
+}
 function setAudio(kind,val){
   audio[kind]=val;
   document.querySelectorAll('[data-audio="'+kind+'"]').forEach(el=>{
@@ -992,26 +1089,22 @@ function genWords(n){
   for(let i=0;i<n;i++) out.push(WORDS[Math.random()*WORDS.length|0]);
   return out.join(' ');
 }
-function genSentences(n){
-  let out=[], pool=shuffle(SENTENCES);
-  for(let i=0;i<n;i++){ if(i%pool.length===0) pool=shuffle(SENTENCES); out.push(pool[i%pool.length]); }
+function genPool(pool,n){
+  let out=[], p=shuffle(pool);
+  for(let i=0;i<n;i++){ if(i%p.length===0) p=shuffle(pool); out.push(p[i%p.length]); }
   return out.join(' ');
 }
-function genDialog(n){
-  let out=[], pool=shuffle(DIALOG);
-  for(let i=0;i<n;i++){ if(i%pool.length===0) pool=shuffle(DIALOG); out.push(pool[i%pool.length]); }
-  return out.join(' ');
-}
+const MODE_POOL={sentences:SENTENCES, affirmations:AFFIRMATIONS, learning:LEARNING};
 function moreText(){
   if(cfg.mode==='words') return ' '+genWords(120);
-  if(cfg.mode==='sentences') return ' '+genSentences(14);
-  return ' '+genDialog(3);
+  if(cfg.mode==='dialog') return ' '+genPool(DIALOG,3);
+  return ' '+genPool(MODE_POOL[cfg.mode]||SENTENCES,14);
 }
 function initialText(){
   // generous buffer for up to 5 min of fast typing
   if(cfg.mode==='words') return genWords(700);
-  if(cfg.mode==='sentences') return genSentences(80);
-  return genDialog(16);
+  if(cfg.mode==='dialog') return genPool(DIALOG,16);
+  return genPool(MODE_POOL[cfg.mode]||SENTENCES,80);
 }
 
 /* =========================================================
@@ -1174,7 +1267,7 @@ function endGame(){
   $('rErr').textContent=errors;
   $('rScore').textContent=score.toLocaleString();
   $('rDur').textContent=fmt(cfg.dur);
-  $('rTag').textContent = ({words:'RANDOM WORDS',sentences:'REAL SENTENCES',dialog:'DIALOG PAGES'})[cfg.mode]+' // '+fmt(cfg.dur);
+  $('rTag').textContent = ({words:'RANDOM WORDS',sentences:'REAL SENTENCES',dialog:'DIALOG PAGES',affirmations:'AFFIRMATIONS',learning:'LEARNING'})[cfg.mode]+' // '+fmt(cfg.dur);
 
   // --- commit to persistent records ---
   const g=loadMissed();
@@ -1189,7 +1282,7 @@ function endGame(){
   $('resultOverlay').classList.remove('hidden');
 }
 
-const MODE_LABEL={words:'WORDS',sentences:'SENT',dialog:'DIALOG'};
+const MODE_LABEL={words:'WORDS',sentences:'SENT',dialog:'DIALOG',affirmations:'AFFIRM',learning:'LEARN'};
 function renderRecords(container, highlight){
   const scores=loadScores().slice(0,10);
   const missed=Object.entries(loadMissed()).sort((a,b)=>b[1]-a[1]).slice(0,5);
@@ -1274,7 +1367,7 @@ $('optVoice').addEventListener('click',e=>{
 });
 $('trackBtn').addEventListener('click',cycleTrack);
 $('optTrack').addEventListener('click',e=>{
-  const o=e.target.closest('[data-track]'); if(o) setTrack(Number(o.dataset.track));
+  const o=e.target.closest('[data-track]'); if(o) setTrack(o.dataset.track);
 });
 $('startBtn').addEventListener('click',startGame);
 $('againBtn').addEventListener('click',startGame);

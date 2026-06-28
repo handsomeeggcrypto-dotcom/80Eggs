@@ -417,9 +417,22 @@ body{background:#000;font-family:var(--mono);color:var(--hud);-webkit-font-smoot
   .logo{min-width:140px}
   .controls{grid-template-columns:1fr 46px}
 }
+#backBtn{
+  position:fixed;top:14px;left:14px;z-index:999;
+  font-family:var(--title);font-size:11px;letter-spacing:2px;
+  padding:8px 14px;border-radius:8px;cursor:pointer;
+  background:var(--panel);color:var(--hud);
+  border:1px solid var(--border);
+  box-shadow:0 0 14px -4px var(--accent);
+  text-decoration:none;
+  transition:.2s;
+  opacity:.8;
+}
+#backBtn:hover{opacity:1;box-shadow:0 0 20px -2px var(--accent)}
 </style>
 </head>
 <body>
+<a id="backBtn" href="index.html">◂ COCKPIT</a>
 <div id="app" class="theme-mech off">
 
   <div class="bg">

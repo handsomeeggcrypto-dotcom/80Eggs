@@ -1014,8 +1014,23 @@
             }
         }
     </style>
+    <style>
+        #backBtn{
+            position:fixed;top:14px;left:14px;z-index:999;
+            font-family:'Courier New',monospace;font-size:11px;letter-spacing:2px;
+            padding:8px 14px;border-radius:6px;cursor:pointer;
+            background:rgba(0,0,0,0.6);color:#ff2d9b;
+            border:1px solid #ff2d9b;
+            box-shadow:0 0 12px -4px #ff2d9b;
+            text-decoration:none;
+            transition:.2s;
+            opacity:.8;
+        }
+        #backBtn:hover{opacity:1;box-shadow:0 0 20px -2px #ff2d9b}
+    </style>
 </head>
 <body class="theme-system80">
+<a id="backBtn" href="index.html">◂ COCKPIT</a>
     <div class="container">
         <div class="header">
             <div class="title">SUDOKU</div>
