@@ -1,0 +1,869 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="referrer" content="strict-origin-when-cross-origin">
+<title>EGG CONTROL PANEL</title>
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@500;700;900&family=VT323&display=swap" rel="stylesheet">
+<style>
+:root{
+  --mono:'Share Tech Mono','Courier New',monospace;
+  --title:'Orbitron','Share Tech Mono',sans-serif;
+}
+
+/* ===================== THEMES (from the typing terminal) ===================== */
+.theme-vice{
+  --bg:#0a0612; --bg2:#160a22;
+  --accent:#ff2d9b; --accent2:#2de2e6;
+  --panel:rgba(10,8,24,.55); --border:#ff2d9b;
+  --hud:#2de2e6; --hud2:#ff2d9b;
+  --text-dim:#1d7e84; --text-on:#7ff7ff; --text-glow:#2de2e6;
+  --error:#ff305f; --up:#3dff9e; --down:#ff305f;
+  --key-face:rgba(20,12,36,.5); --key-edge:#19505a; --key-text:#34c6d0;
+  --key-press:#2de2e6; --key-hint:#ff2d9b;
+  --sun1:#ff2d9b; --sun2:#ff7a3c; --grid:#ff2d9b;
+  --title-font:var(--title);
+}
+.theme-tron{
+  --bg:#000305; --bg2:#02080d;
+  --accent:#00e5ff; --accent2:#00b0d4;
+  --panel:rgba(0,12,18,.5); --border:#00c8e6;
+  --hud:#46e8ff; --hud2:#00c8e6;
+  --text-dim:#0c6a78; --text-on:#cdf8ff; --text-glow:#7df0ff;
+  --error:#ff4d4d; --up:#3dff9e; --down:#ff4d4d;
+  --key-face:rgba(2,14,20,.55); --key-edge:#0a5566; --key-text:#3fd6ef;
+  --key-press:#00e5ff; --key-hint:#ffcf3a;
+  --sun1:#00e5ff; --sun2:#0090c0; --grid:#00b8de;
+  --title-font:var(--title);
+}
+.theme-runner{
+  --bg:#04080a; --bg2:#06110f;
+  --accent:#ff7a18; --accent2:#42b9c7;
+  --panel:rgba(4,12,14,.5); --border:#ff7a18;
+  --hud:#ff8a2a; --hud2:#42b9c7;
+  --text-dim:#2c7480; --text-on:#cdf3f7; --text-glow:#6fdfe9;
+  --error:#ff3b3b; --up:#42d6e6; --down:#ff3b3b;
+  --key-face:rgba(8,16,18,.55); --key-edge:#1a5a60; --key-text:#3fb0bd;
+  --key-press:#42d6e6; --key-hint:#ff7a18;
+  --sun1:#ff7a18; --sun2:#ff3d00; --grid:#1a5a60;
+  --title-font:var(--title);
+}
+.theme-phosphor{
+  --bg:#020a04; --bg2:#041206;
+  --accent:#33ff77; --accent2:#9dff5a;
+  --panel:rgba(4,16,8,.45); --border:#1fae4f;
+  --hud:#5dff8e; --hud2:#33ff77;
+  --text-dim:#176b34; --text-on:#d6ffe2; --text-glow:#7dffa4;
+  --error:#ff5a4d; --up:#7dffa4; --down:#ff5a4d;
+  --key-face:rgba(6,20,10,.5); --key-edge:#15622f; --key-text:#3ec96a;
+  --key-press:#5dff8e; --key-hint:#d6ff33;
+  --sun1:#33ff77; --sun2:#0c6b2a; --grid:#176b34;
+  --title-font:'VT323',var(--title);
+}
+.theme-mech{
+  --bg:#02060f; --bg2:#061226;
+  --accent:#2b9cff; --accent2:#ff7a1e;
+  --panel:rgba(8,24,48,.5); --border:#2b9cff;
+  --hud:#ff8a2e; --hud2:#5fb6ff;
+  --text-dim:#7a4a1e; --text-on:#fff0dc; --text-glow:#ff9a3c;
+  --error:#ff4d4d; --up:#42d6a0; --down:#ff5a4d;
+  --key-face:rgba(10,28,54,.5); --key-edge:#1d4f86; --key-text:#ff9a3c;
+  --key-press:#ff7a1e; --key-hint:#ff7a1e;
+  --sun1:#2b9cff; --sun2:#0a3a6b; --grid:#1d4f86;
+  --title-font:var(--title);
+}
+
+/* ===================== BASE ===================== */
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{min-height:100%}
+body{background:#000;font-family:var(--mono);color:var(--hud);-webkit-font-smoothing:antialiased}
+#app{
+  position:relative;min-height:100vh;width:100vw;overflow:hidden;
+  background:radial-gradient(120% 90% at 50% 8%, var(--bg2), var(--bg) 70%);
+  display:flex;flex-direction:column;transition:background .5s ease;
+}
+
+/* ===================== DECORATIVE BACKGROUND ===================== */
+.bg{position:absolute;inset:0;overflow:hidden;pointer-events:none;z-index:0}
+.bg-sun{
+  position:absolute;top:5%;right:5%;width:300px;height:300px;border-radius:50%;
+  background:radial-gradient(circle at 50% 40%, var(--sun1), var(--sun2) 60%, transparent 72%);
+  filter:blur(2px);opacity:.5;
+  -webkit-mask-image:repeating-linear-gradient(180deg,#000 0 10px,transparent 10px 16px);
+  mask-image:repeating-linear-gradient(180deg,#000 0 10px,transparent 10px 16px);
+  animation:sunpulse 5s ease-in-out infinite;
+}
+.theme-tron .bg-sun,.theme-phosphor .bg-sun,.theme-mech .bg-sun{display:none}
+@keyframes sunpulse{0%,100%{opacity:.45;transform:scale(1)}50%{opacity:.65;transform:scale(1.03)}}
+.bg-grid{
+  position:absolute;left:-20%;right:-20%;bottom:-10%;height:55%;
+  background-image:linear-gradient(var(--grid) 1px,transparent 1px),linear-gradient(90deg,var(--grid) 1px,transparent 1px);
+  background-size:60px 60px;transform:perspective(420px) rotateX(68deg);transform-origin:bottom;opacity:.16;
+  -webkit-mask-image:linear-gradient(transparent,#000 60%);mask-image:linear-gradient(transparent,#000 60%);
+  animation:gridrun 6s linear infinite;
+}
+@keyframes gridrun{0%{background-position:0 0,0 0}100%{background-position:0 60px,0 0}}
+.bg-radar{
+  position:absolute;left:3%;top:26%;width:150px;height:150px;border-radius:50%;
+  border:1px solid var(--accent);
+  background:radial-gradient(circle,transparent 60%,rgba(0,229,255,.04)),repeating-radial-gradient(circle,transparent 0 18px,rgba(0,229,255,.10) 18px 19px);
+  opacity:0;display:none;
+}
+.theme-tron .bg-radar{display:block;opacity:.22;animation:spin 12s linear infinite}
+.theme-mech .bg-radar{display:block;opacity:.14;animation:spin 18s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.bg-rain{position:absolute;inset:0;opacity:0;display:none}
+.theme-runner .bg-rain{display:block;opacity:.4;
+  background-image:repeating-linear-gradient(100deg,transparent 0 6px,rgba(120,200,210,.10) 6px 7px);
+  background-size:14px 100%;animation:rain .5s linear infinite;
+}
+@keyframes rain{to{background-position:-40px 200px}}
+.bg-glass{position:absolute;inset:0;display:none}
+.theme-mech .bg-glass{display:block;
+  background:linear-gradient(125deg,transparent 0 30%,rgba(95,182,255,.07) 32% 39%,transparent 41%),
+  linear-gradient(125deg,transparent 0 58%,rgba(95,182,255,.05) 60% 66%,transparent 68%),
+  radial-gradient(80% 60% at 50% 0%,rgba(43,156,255,.12),transparent 60%);
+}
+.bg-scan{position:absolute;inset:0;background:repeating-linear-gradient(180deg,rgba(0,0,0,0) 0 2px,rgba(0,0,0,.22) 2px 4px);opacity:.5;mix-blend-mode:multiply}
+.bg-vignette{position:absolute;inset:0;box-shadow:inset 0 0 180px 40px rgba(0,0,0,.9)}
+.theme-phosphor .bg-vignette{box-shadow:inset 0 0 220px 70px rgba(0,0,0,.95);animation:flicker 6s steps(60) infinite}
+@keyframes flicker{0%,100%{opacity:1}97%{opacity:.92}98%{opacity:1}}
+
+/* ===================== ENHANCED THEME BACKDROPS ===================== */
+.theme-runner .bg-sun{display:none}
+
+/* atmospheric sky */
+.bg-sky{position:absolute;inset:0;opacity:0;transition:opacity .5s}
+.theme-vice .bg-sky{opacity:1;background:linear-gradient(180deg,#1a0830 0%,#48124e 22%,#a21f78 38%,#ff3d8b 50%,#ff7a3c 60%,transparent 72%)}
+.theme-tron .bg-sky{opacity:1;background:radial-gradient(140% 70% at 50% 108%,rgba(0,200,230,.22),transparent 55%),linear-gradient(180deg,#001016 0%,transparent 40%)}
+.theme-runner .bg-sky{opacity:1;background:linear-gradient(180deg,#1e0e04 0%,#5a2a0c 26%,#b5500f 46%,#ff7a18 58%,transparent 74%)}
+.theme-phosphor .bg-sky{opacity:1;background:radial-gradient(100% 90% at 50% 50%,rgba(51,255,119,.12),rgba(8,40,20,.25) 70%)}
+.theme-mech .bg-sky{opacity:1;background:linear-gradient(180deg,rgba(43,156,255,.16),transparent 42%),radial-gradient(90% 55% at 50% 102%,rgba(255,122,30,.12),transparent 62%)}
+
+/* hazy sun orb (runner) */
+.bg-orb{position:absolute;left:50%;top:28%;width:280px;height:280px;margin-left:-140px;border-radius:50%;display:none;
+  background:radial-gradient(circle at 50% 50%,#ffb066,#ff6a1e 45%,transparent 70%);filter:blur(6px);opacity:.5}
+.theme-runner .bg-orb{display:block;animation:sunpulse 7s ease-in-out infinite}
+
+/* horizon glow line */
+.bg-horizon{position:absolute;left:0;right:0;bottom:44%;height:2px;display:none}
+.theme-vice .bg-horizon,.theme-tron .bg-horizon,.theme-runner .bg-horizon{display:block;background:var(--accent);box-shadow:0 0 18px 5px var(--accent);opacity:.7}
+.theme-tron .bg-grid{opacity:.30}
+
+/* city skyline (vice + runner) */
+.bg-skyline{position:absolute;left:0;right:0;bottom:33%;height:170px;display:none;opacity:.85}
+.bg-skyline svg{width:100%;height:100%}
+.bg-skyline .blds rect{fill:var(--bld)}
+.bg-skyline .win{fill:var(--win)}
+.bg-skyline .win.lit{fill:var(--winlit);animation:twinkle 4s steps(2) infinite}
+@keyframes twinkle{0%,100%{opacity:1}50%{opacity:.35}}
+.theme-vice .bg-skyline{display:block;--bld:#1c0c33;--win:#36204f;--winlit:#ff7ad1}
+.theme-runner .bg-skyline{display:block;bottom:30%;height:215px;opacity:.6;--bld:#0d0907;--win:#241608;--winlit:#ff9a3c}
+
+/* palms (vice) */
+.bg-palms{position:absolute;inset:0;display:none}
+.theme-vice .bg-palms{display:block}
+.bg-palms .palm{position:absolute;bottom:0;width:130px;height:230px;opacity:.92}
+.bg-palms .pl{left:1%}
+.bg-palms .pr{right:1%;transform:scaleX(-1)}
+.bg-palms .frond{fill:#190a2b}
+.bg-palms .trunk{fill:#0c0418}
+
+/* light beams (tron columns / runner searchlights) */
+.bg-beams{position:absolute;inset:0;display:none;overflow:hidden}
+.theme-tron .bg-beams,.theme-runner .bg-beams{display:block}
+.beam{position:absolute;opacity:0}
+.theme-tron .beam{bottom:0;width:3px;background:linear-gradient(180deg,transparent,var(--accent));box-shadow:0 0 14px var(--accent);animation:beampulse 4s ease-in-out infinite}
+.theme-tron .beam:nth-child(1){left:18%;height:60%;animation-delay:.2s}
+.theme-tron .beam:nth-child(2){left:38%;height:78%;animation-delay:1.1s}
+.theme-tron .beam:nth-child(3){left:64%;height:54%;animation-delay:.6s}
+.theme-tron .beam:nth-child(4){left:82%;height:70%;animation-delay:1.6s}
+@keyframes beampulse{0%,100%{opacity:.10}50%{opacity:.30}}
+.theme-runner .beam{top:-20%;width:120px;height:120%;transform-origin:top center;
+  background:linear-gradient(180deg,rgba(255,160,80,.18),transparent 70%);clip-path:polygon(45% 0,55% 0,90% 100%,10% 100%);opacity:.5}
+.theme-runner .beam:nth-child(1){left:22%;animation:sweepA 9s ease-in-out infinite}
+.theme-runner .beam:nth-child(2){left:60%;animation:sweepB 11s ease-in-out infinite}
+.theme-runner .beam:nth-child(3),.theme-runner .beam:nth-child(4){display:none}
+@keyframes sweepA{0%,100%{transform:rotate(8deg)}50%{transform:rotate(20deg)}}
+@keyframes sweepB{0%,100%{transform:rotate(-6deg)}50%{transform:rotate(-18deg)}}
+
+/* CRT curvature + roll bar (phosphor) */
+.bg-crtcurve{position:absolute;inset:0;display:none;
+  box-shadow:inset 0 0 120px 36px rgba(0,0,0,.85),inset 0 0 40px 8px rgba(51,255,119,.06);
+  background:radial-gradient(120% 120% at 50% 50%,transparent 60%,rgba(0,0,0,.45) 100%)}
+.theme-phosphor .bg-crtcurve{display:block}
+.bg-crtroll{position:absolute;left:0;right:0;top:0;height:90px;display:none;
+  background:linear-gradient(180deg,transparent,rgba(140,255,170,.07),transparent)}
+.theme-phosphor .bg-crtroll{display:block;animation:roll 7s linear infinite}
+@keyframes roll{0%{top:-90px}100%{top:100%}}
+
+/* MECH cockpit frame */
+.bg-cockpit{position:absolute;inset:0;display:none}
+.theme-mech .bg-cockpit{display:block}
+.ck{position:absolute}
+.bg-cockpit .c-tl,.bg-cockpit .c-tr,.bg-cockpit .c-bl,.bg-cockpit .c-br{width:78px;height:78px;opacity:.6}
+.bg-cockpit .c-tl{top:14px;left:14px;border-left:3px solid var(--accent);border-top:3px solid var(--accent);box-shadow:-2px -2px 16px -4px var(--accent)}
+.bg-cockpit .c-tr{top:14px;right:14px;border-right:3px solid var(--accent);border-top:3px solid var(--accent)}
+.bg-cockpit .c-bl{bottom:14px;left:14px;border-left:3px solid var(--accent);border-bottom:3px solid var(--accent)}
+.bg-cockpit .c-br{bottom:14px;right:14px;border-right:3px solid var(--accent);border-bottom:3px solid var(--accent)}
+.bg-cockpit .strut-l,.bg-cockpit .strut-r{top:0;left:50%;width:3px;height:130%;background:linear-gradient(180deg,rgba(43,156,255,.45),rgba(43,156,255,.08));transform-origin:top center;opacity:.5}
+.bg-cockpit .strut-l{transform:rotate(26deg)}
+.bg-cockpit .strut-r{transform:rotate(-26deg)}
+.bg-cockpit .hazard{top:42%;width:16px;height:90px;opacity:.4;background:repeating-linear-gradient(45deg,#ffb300 0 9px,#181206 9px 18px)}
+.bg-cockpit .hz-l{left:0}
+.bg-cockpit .hz-r{right:0}
+.bg-cockpit .reticle{top:50%;left:50%;width:120px;height:120px;margin:-60px 0 0 -60px;border-radius:50%;border:1px solid var(--accent);opacity:.18}
+.bg-cockpit .reticle::before,.bg-cockpit .reticle::after{content:"";position:absolute;background:var(--accent)}
+.bg-cockpit .reticle::before{left:50%;top:-16px;bottom:-16px;width:1px;margin-left:-.5px}
+.bg-cockpit .reticle::after{top:50%;left:-16px;right:-16px;height:1px;margin-top:-.5px}
+
+/* universal HUD corner ticks (non-mech themes) */
+.bg-hud{position:absolute;inset:0;display:none}
+.theme-vice .bg-hud,.theme-tron .bg-hud,.theme-runner .bg-hud,.theme-phosphor .bg-hud{display:block}
+.bg-hud .hc{position:absolute;width:40px;height:40px;opacity:.4}
+.bg-hud .tl{top:12px;left:12px;border-left:2px solid var(--accent);border-top:2px solid var(--accent)}
+.bg-hud .tr{top:12px;right:12px;border-right:2px solid var(--accent);border-top:2px solid var(--accent)}
+.bg-hud .bl{bottom:12px;left:12px;border-left:2px solid var(--accent);border-bottom:2px solid var(--accent)}
+.bg-hud .br{bottom:12px;right:12px;border-right:2px solid var(--accent);border-bottom:2px solid var(--accent)}
+
+/* powered-off dims the whole scene */
+#app.off .bg{opacity:.16;filter:grayscale(1) brightness(.45);transition:opacity .5s,filter .5s}
+
+/* ===================== SCREEN ===================== */
+.screen{position:relative;z-index:2;flex:1;display:flex;flex-direction:column;
+  padding:clamp(10px,1.6vw,22px);gap:clamp(8px,1.4vh,16px);min-height:0}
+
+/* TOP BAR */
+.topbar{display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+.logo{display:flex;flex-direction:column;justify-content:center;min-width:190px}
+.logo h1{font-family:var(--title-font);font-weight:900;font-size:clamp(22px,3vw,34px);letter-spacing:1px;
+  color:var(--accent);text-shadow:0 0 8px var(--accent),0 0 18px var(--accent);line-height:1}
+.logo h1 .slash{color:var(--accent2);text-shadow:0 0 8px var(--accent2)}
+.logo .sub{font-size:11px;letter-spacing:3px;color:var(--hud2);opacity:.8;margin-top:4px}
+.spacer{flex:1}
+.themebar{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.themebar button{font-family:var(--mono);font-size:11px;letter-spacing:1px;cursor:pointer;
+  padding:7px 11px;border-radius:6px;background:transparent;color:var(--hud2);
+  border:1px solid var(--border);opacity:.55;transition:.2s}
+.themebar button:hover{opacity:1}
+.themebar button.on{opacity:1;background:var(--accent);color:#000;box-shadow:0 0 12px var(--accent)}
+
+/* MAIN GRID */
+.grid3{flex:1;min-height:0;display:grid;grid-template-columns:230px 1fr 230px;gap:clamp(10px,1.4vw,18px)}
+
+/* generic panel */
+.panel{position:relative;border:1.5px solid var(--border);border-radius:14px;background:var(--panel);
+  box-shadow:0 0 26px -8px var(--accent),inset 0 0 40px -18px var(--accent)}
+.theme-mech .panel{border-radius:4px;
+  clip-path:polygon(0 0,calc(100% - 18px) 0,100% 18px,100% 100%,18px 100%,0 calc(100% - 18px))}
+.panel .ptitle{font-size:11px;letter-spacing:3px;color:var(--hud2);opacity:.9;padding:10px 14px 0}
+.panel .ptitle::before{content:"> "}
+
+/* ---- CRYPTO RAIL ---- */
+.rail{display:flex;flex-direction:column;padding:0 0 12px}
+.coins{display:flex;flex-direction:column;gap:10px;padding:10px 12px;flex:1}
+.coin{border:1px solid var(--key-edge);border-radius:10px;background:var(--key-face);
+  box-shadow:inset 0 0 18px -10px var(--accent2);padding:11px 13px;display:flex;flex-direction:column;gap:3px}
+.theme-mech .coin{border-radius:3px;clip-path:polygon(6px 0,100% 0,100% calc(100% - 6px),calc(100% - 6px) 100%,0 100%,0 6px)}
+.coin .crow{display:flex;align-items:baseline;justify-content:space-between}
+.coin .csym{font-family:var(--title-font);font-size:18px;color:var(--accent);letter-spacing:1px;text-shadow:0 0 8px var(--accent)}
+.coin .cname{font-size:9px;letter-spacing:2px;color:var(--hud2);opacity:.7}
+.coin .cprice{font-family:var(--title-font);font-size:clamp(17px,1.5vw,22px);color:var(--text-on);
+  text-shadow:0 0 8px var(--accent2);line-height:1.2}
+.coin .cchg{font-size:11px;letter-spacing:1px;display:flex;align-items:center;gap:5px}
+.coin .cchg.up{color:var(--up)}
+.coin .cchg.down{color:var(--down)}
+.coin .cspark{height:3px;border-radius:2px;background:rgba(255,255,255,.07);overflow:hidden;margin-top:4px}
+.coin .cspark i{display:block;height:100%;width:50%;background:var(--accent2);box-shadow:0 0 6px var(--accent2);transition:width .6s}
+.railfoot{font-size:9px;letter-spacing:2px;color:var(--hud2);opacity:.6;text-align:center;padding-top:6px}
+
+/* ---- BROADCAST ---- */
+.broadcast{display:flex;flex-direction:column;padding:0 0 12px;min-width:0}
+.screenwrap{position:relative;flex:1;margin:10px 12px 0;border:1px solid var(--key-edge);border-radius:10px;
+  overflow:hidden;background:#000;min-height:200px}
+.theme-mech .screenwrap{border-radius:3px}
+.screenwrap iframe{position:absolute;inset:0;width:100%;height:100%;border:0;display:none}
+#app.live .screenwrap iframe{display:block}
+.deadscreen{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:8px;
+  background:radial-gradient(circle at 50% 50%,#0c0c0c,#000 80%);color:#2a2a2a;
+  font-family:var(--title-font);letter-spacing:4px;font-size:13px}
+.deadscreen::after{content:"";position:absolute;inset:0;background:repeating-linear-gradient(180deg,transparent 0 3px,rgba(255,255,255,.02) 3px 4px)}
+.deadscreen .dot{width:6px;height:6px;border-radius:50%;background:#333}
+#app.live .deadscreen{display:none}
+.chanbar{display:flex;gap:8px;padding:10px 12px 0}
+.chanbtn{flex:1;cursor:pointer;border:1px solid var(--key-edge);border-radius:9px;background:var(--key-face);
+  color:var(--hud);font-family:var(--mono);font-size:11px;letter-spacing:1px;padding:10px 6px;text-align:center;transition:.18s}
+.theme-mech .chanbtn{border-radius:3px;clip-path:polygon(6px 0,100% 0,100% calc(100% - 6px),calc(100% - 6px) 100%,0 100%,0 6px)}
+.chanbtn .cd{display:block;font-size:8px;letter-spacing:1px;opacity:.6;margin-top:3px}
+.chanbtn:hover{border-color:var(--accent2)}
+.chanbtn.on{border-color:var(--accent);color:#000;background:var(--accent);box-shadow:0 0 16px var(--accent)}
+.chanbtn.on .cd{color:#000;opacity:.75}
+.chanfoot{text-align:center;padding:8px 12px 0}
+.chanfoot a{font-size:10px;letter-spacing:1px;color:var(--hud2);opacity:.6;text-decoration:none;transition:.2s}
+.chanfoot a:hover{opacity:1;color:var(--accent);text-shadow:0 0 8px var(--accent)}
+
+/* ---- CONTROL PANEL ---- */
+.controls{display:grid;grid-template-columns:1fr 52px;gap:12px;min-height:0}
+.ctrlstack{display:flex;flex-direction:column;gap:12px;min-height:0}
+.ctrl{border:1.5px solid var(--border);border-radius:12px;background:var(--panel);
+  box-shadow:0 0 22px -8px var(--accent),inset 0 0 30px -16px var(--accent);
+  padding:12px 10px;display:flex;flex-direction:column;align-items:center;gap:9px;flex:1;justify-content:center}
+.theme-mech .ctrl{border-radius:4px;clip-path:polygon(0 0,calc(100% - 12px) 0,100% 12px,100% 100%,12px 100%,0 calc(100% - 12px))}
+.ctrl .clabel{font-family:var(--title-font);font-size:13px;letter-spacing:2px;color:var(--hud)}
+.ctrl .cstate{font-size:9px;letter-spacing:2px;color:var(--hud2);opacity:.75;min-height:11px}
+
+/* the switch */
+.switch{position:relative;width:46px;height:76px;border:2px solid var(--border);border-radius:10px;
+  background:var(--key-face);cursor:pointer;box-shadow:inset 0 0 16px -8px var(--accent2);transition:.2s}
+.theme-mech .switch{border-radius:4px}
+.switch .slot{position:absolute;inset:5px;border-radius:7px;background:rgba(0,0,0,.35);overflow:hidden}
+.switch .knob{position:absolute;left:7px;right:7px;height:30px;bottom:7px;border-radius:6px;
+  background:var(--key-text);box-shadow:0 2px 0 rgba(0,0,0,.4),inset 0 0 8px rgba(255,255,255,.25);
+  transition:bottom .22s cubic-bezier(.5,.05,.3,1.4),background .22s,box-shadow .22s}
+.switch.on .knob{bottom:39px;background:var(--key-press);box-shadow:0 0 20px var(--key-press),0 0 40px var(--key-press)}
+.switch .tick{position:absolute;left:50%;transform:translateX(-50%);font-size:8px;letter-spacing:1px;color:var(--hud2);opacity:.6}
+.switch .tick.t-on{top:4px}.switch .tick.t-off{bottom:4px}
+
+/* power switch always glows */
+.ctrl.power{border-color:var(--accent);box-shadow:0 0 28px -4px var(--accent),inset 0 0 30px -12px var(--accent)}
+.ctrl.power .clabel{color:var(--accent);text-shadow:0 0 10px var(--accent)}
+#app.live .ctrl.power .cstate{color:var(--up)}
+
+/* ---- COOLANT TANK ---- */
+.tank{position:relative;border:2px solid var(--border);border-radius:12px;background:var(--key-face);
+  overflow:hidden;box-shadow:inset 0 0 22px -8px var(--accent2),0 0 18px -8px var(--accent)}
+.theme-mech .tank{border-radius:4px;clip-path:polygon(0 0,calc(100% - 9px) 0,100% 9px,100% 100%,9px 100%,0 calc(100% - 9px))}
+.tank .tlabel{position:absolute;top:8px;left:0;right:0;text-align:center;font-size:8px;letter-spacing:1px;
+  color:var(--hud2);opacity:.7;writing-mode:vertical-rl;margin:0 auto;z-index:3;height:60px}
+.tank .marks{position:absolute;inset:0;z-index:2;background:repeating-linear-gradient(0deg,transparent 0 24px,rgba(255,255,255,.06) 24px 25px)}
+.fluid{position:absolute;left:0;right:0;bottom:0;height:0;transition:height 1.3s cubic-bezier(.4,0,.2,1);
+  background:linear-gradient(180deg,color-mix(in srgb,var(--accent2) 70%,transparent),color-mix(in srgb,var(--accent) 80%,transparent));
+  box-shadow:0 0 24px var(--accent2)}
+.tank.full .fluid{height:100%}
+.fluid .surf{position:absolute;top:-3px;left:0;right:0;height:6px;background:var(--text-on);opacity:.55;
+  border-radius:50%;filter:blur(1px);animation:slosh 2.2s ease-in-out infinite}
+@keyframes slosh{0%,100%{transform:translateX(-2px) scaleY(1)}50%{transform:translateX(2px) scaleY(1.4)}}
+.bubbles{position:absolute;inset:0;overflow:hidden;z-index:1;opacity:0;transition:opacity .4s}
+.tank.full .bubbles,.tank.filling .bubbles{opacity:1}
+.bubble{position:absolute;bottom:-12px;width:7px;height:7px;border-radius:50%;
+  background:radial-gradient(circle at 35% 30%,rgba(255,255,255,.9),color-mix(in srgb,var(--accent2) 60%,transparent));
+  animation:rise linear infinite}
+@keyframes rise{0%{transform:translateY(0) scale(.6);opacity:0}
+  10%{opacity:.9}90%{opacity:.7}100%{transform:translateY(-260px) scale(1.1);opacity:0}}
+
+/* ---- FOOTER ---- */
+.footer{display:flex;justify-content:space-between;font-size:11px;letter-spacing:2px;color:var(--hud2);opacity:.7;padding:0 6px}
+.footer .blink{animation:bk 1.1s steps(2) infinite}
+@keyframes bk{50%{opacity:.2}}
+
+/* ===================== POWERED-OFF STATE ===================== */
+#app.off .dimzone{opacity:.2;filter:grayscale(1) brightness(.5);pointer-events:none;transition:opacity .5s,filter .5s}
+#app.off .themebar{opacity:.32;filter:grayscale(1) brightness(.6);transition:.5s}
+#app:not(.off) .dimzone{transition:opacity .6s,filter .6s}
+#app.off{background:radial-gradient(120% 90% at 50% 8%,#0a0a0c,#020203 70%)}
+
+/* ===================== FIRE OVERLAY ===================== */
+.fire{position:absolute;inset:0;z-index:40;pointer-events:none;display:none;overflow:hidden}
+.fire.run{display:block}
+/* radar sweep */
+.fx-radar{position:absolute;left:50%;top:50%;width:520px;height:520px;margin:-260px 0 0 -260px;border-radius:50%;
+  border:2px solid var(--accent);opacity:0}
+.fx-radar::before{content:"";position:absolute;inset:0;border-radius:50%;
+  background:conic-gradient(from 0deg,color-mix(in srgb,var(--accent2) 55%,transparent),transparent 25%)}
+.fire.fx-is-radar .fx-radar{animation:radarShow 1.6s ease-out forwards}
+.fire.fx-is-radar .fx-radar::before{animation:spin 1.1s linear 2}
+@keyframes radarShow{0%{opacity:0;transform:scale(.4)}15%{opacity:.85}85%{opacity:.85}100%{opacity:0;transform:scale(1.05)}}
+/* targeting reticle */
+.fx-reticle{position:absolute;left:50%;top:50%;width:220px;height:220px;margin:-110px 0 0 -110px;opacity:0}
+.fx-reticle .ring{position:absolute;inset:0;border:2px solid var(--accent2);border-radius:50%}
+.fx-reticle .cross-h,.fx-reticle .cross-v{position:absolute;background:var(--accent2);box-shadow:0 0 8px var(--accent2)}
+.fx-reticle .cross-h{left:0;right:0;top:50%;height:2px}
+.fx-reticle .cross-v{top:0;bottom:0;left:50%;width:2px}
+.fx-reticle .corner{position:absolute;width:26px;height:26px;border:3px solid var(--accent)}
+.fx-reticle .c1{top:-14px;left:-14px;border-right:0;border-bottom:0}
+.fx-reticle .c2{top:-14px;right:-14px;border-left:0;border-bottom:0}
+.fx-reticle .c3{bottom:-14px;left:-14px;border-right:0;border-top:0}
+.fx-reticle .c4{bottom:-14px;right:-14px;border-left:0;border-top:0}
+.fx-reticle .lock{position:absolute;left:50%;top:-30px;transform:translateX(-50%);font-family:var(--title-font);
+  font-size:13px;letter-spacing:3px;color:var(--accent);text-shadow:0 0 10px var(--accent);opacity:0}
+.fire.fx-is-reticle .fx-reticle{animation:reticleShow 1.5s ease-out forwards}
+.fire.fx-is-reticle .fx-reticle .lock{animation:lockOn 1.5s steps(1) forwards}
+@keyframes reticleShow{0%{opacity:0;transform:scale(1.6) rotate(8deg)}25%{opacity:1;transform:scale(1) rotate(0)}
+  70%{opacity:1}100%{opacity:0;transform:scale(.9)}}
+@keyframes lockOn{0%,30%{opacity:0}40%{opacity:1}70%{opacity:1}71%{opacity:.2}80%{opacity:1}100%{opacity:0}}
+/* klaxon */
+.fx-klaxon{position:absolute;inset:0;opacity:0;box-shadow:inset 0 0 200px 60px var(--error);
+  display:flex;align-items:center;justify-content:center}
+.fx-klaxon span{font-family:var(--title-font);font-size:clamp(28px,6vw,60px);letter-spacing:8px;
+  color:var(--error);text-shadow:0 0 20px var(--error)}
+.fire.fx-is-klaxon .fx-klaxon{animation:klaxon 1.5s steps(1) forwards}
+@keyframes klaxon{0%,100%{opacity:0}10%{opacity:.85}20%{opacity:.15}30%{opacity:.85}40%{opacity:.15}
+  50%{opacity:.85}60%{opacity:.15}70%{opacity:.85}80%{opacity:.2}90%{opacity:.7}}
+
+@media (prefers-reduced-motion:reduce){
+  .bg-sun,.bg-grid,.bg-radar,.bg-rain,.bg-orb,.fx-radar::before,.surf,.bubble,
+  .beam,.bg-crtroll,.bg-skyline .win.lit{animation:none !important}
+}
+
+/* ===================== RESPONSIVE ===================== */
+@media (max-width:920px){
+  #app{overflow:auto}
+  .grid3{grid-template-columns:1fr;}
+  .controls{grid-template-columns:1fr 52px}
+  .screenwrap{min-height:240px}
+}
+@media (max-width:560px){
+  .logo{min-width:140px}
+  .controls{grid-template-columns:1fr 46px}
+}
+</style>
+</head>
+<body>
+<div id="app" class="theme-mech off">
+
+  <div class="bg">
+    <div class="bg-sky"></div>
+    <div class="bg-orb"></div>
+    <div class="bg-beams"><span class="beam"></span><span class="beam"></span><span class="beam"></span><span class="beam"></span></div>
+    <div class="bg-sun"></div>
+    <div class="bg-grid"></div>
+    <div class="bg-horizon"></div>
+    <div class="bg-skyline" id="skyline"><svg viewBox="0 0 1200 200" preserveAspectRatio="none"><g class="blds"></g><g class="wins"></g></svg></div>
+    <div class="bg-palms">
+      <svg class="palm pl" viewBox="0 0 120 230">
+        <path class="frond" d="M60 72 C40 54 22 52 6 60 C26 58 42 64 58 80 Z"/>
+        <path class="frond" d="M60 72 C42 86 28 102 18 124 C34 104 48 92 60 86 Z"/>
+        <path class="frond" d="M60 72 C80 54 98 52 114 60 C94 58 78 64 62 80 Z"/>
+        <path class="frond" d="M60 72 C78 86 92 102 102 124 C86 104 72 92 60 86 Z"/>
+        <path class="frond" d="M60 72 C54 50 56 30 60 14 C64 30 66 50 60 86 Z"/>
+        <path class="trunk" d="M57 228 C55 168 52 120 60 78 C63 120 65 168 64 228 Z"/>
+      </svg>
+      <svg class="palm pr" viewBox="0 0 120 230">
+        <path class="frond" d="M60 72 C40 54 22 52 6 60 C26 58 42 64 58 80 Z"/>
+        <path class="frond" d="M60 72 C42 86 28 102 18 124 C34 104 48 92 60 86 Z"/>
+        <path class="frond" d="M60 72 C80 54 98 52 114 60 C94 58 78 64 62 80 Z"/>
+        <path class="frond" d="M60 72 C78 86 92 102 102 124 C86 104 72 92 60 86 Z"/>
+        <path class="frond" d="M60 72 C54 50 56 30 60 14 C64 30 66 50 60 86 Z"/>
+        <path class="trunk" d="M57 228 C55 168 52 120 60 78 C63 120 65 168 64 228 Z"/>
+      </svg>
+    </div>
+    <div class="bg-radar"></div>
+    <div class="bg-rain"></div>
+    <div class="bg-glass"></div>
+    <div class="bg-cockpit">
+      <span class="ck c-tl"></span><span class="ck c-tr"></span><span class="ck c-bl"></span><span class="ck c-br"></span>
+      <span class="ck strut-l"></span><span class="ck strut-r"></span>
+      <span class="ck hazard hz-l"></span><span class="ck hazard hz-r"></span>
+      <span class="ck reticle"></span>
+    </div>
+    <div class="bg-crtcurve"></div>
+    <div class="bg-crtroll"></div>
+    <div class="bg-scan"></div>
+    <div class="bg-vignette"></div>
+    <div class="bg-hud"><span class="hc tl"></span><span class="hc tr"></span><span class="hc bl"></span><span class="hc br"></span></div>
+  </div>
+
+  <div class="screen">
+    <!-- TOP BAR -->
+    <div class="topbar">
+      <div class="logo">
+        <h1>EGG<span class="slash">//</span>CTRL</h1>
+        <div class="sub">EGG CONTROL PANEL</div>
+      </div>
+      <div class="spacer"></div>
+      <div class="themebar" id="themebar">
+        <button data-theme="theme-vice">VICE</button>
+        <button data-theme="theme-tron">TRON</button>
+        <button data-theme="theme-runner">RUNNER</button>
+        <button data-theme="theme-phosphor">CRT-80</button>
+        <button data-theme="theme-mech" class="on">MECH</button>
+      </div>
+    </div>
+
+    <!-- MAIN GRID -->
+    <div class="grid3">
+
+      <!-- CRYPTO RAIL -->
+      <div class="panel rail dimzone">
+        <div class="ptitle">CRYPTO FEED</div>
+        <div class="coins" id="coins">
+          <div class="coin" data-coin="bitcoin">
+            <div class="crow"><span class="csym">BTC</span><span class="cname">BITCOIN</span></div>
+            <div class="cprice">----</div>
+            <div class="cchg">--</div>
+            <div class="cspark"><i></i></div>
+          </div>
+          <div class="coin" data-coin="ethereum">
+            <div class="crow"><span class="csym">ETH</span><span class="cname">ETHEREUM</span></div>
+            <div class="cprice">----</div>
+            <div class="cchg">--</div>
+            <div class="cspark"><i></i></div>
+          </div>
+          <div class="coin" data-coin="ripple">
+            <div class="crow"><span class="csym">XRP</span><span class="cname">XRP</span></div>
+            <div class="cprice">----</div>
+            <div class="cchg">--</div>
+            <div class="cspark"><i></i></div>
+          </div>
+          <div class="coin" data-coin="solana">
+            <div class="crow"><span class="csym">SOL</span><span class="cname">SOLANA</span></div>
+            <div class="cprice">----</div>
+            <div class="cchg">--</div>
+            <div class="cspark"><i></i></div>
+          </div>
+        </div>
+        <div class="railfoot" id="railfoot">AWAITING POWER</div>
+      </div>
+
+      <!-- BROADCAST -->
+      <div class="panel broadcast dimzone">
+        <div class="ptitle">BROADCAST</div>
+        <div class="screenwrap">
+          <iframe id="player" referrerpolicy="strict-origin-when-cross-origin" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowfullscreen></iframe>
+          <div class="deadscreen"><div class="dot"></div>NO SIGNAL</div>
+        </div>
+        <div class="chanbar" id="chanbar">
+          <button class="chanbtn on" data-chan="bbg">BLOOMBERG<span class="cd">MARKETS LIVE</span></button>
+          <button class="chanbtn" data-chan="yf">YAHOO FIN<span class="cd">24/7 STREAM</span></button>
+          <button class="chanbtn" data-chan="ads">COMMERCIALS<span class="cd">RETRO ADS</span></button>
+        </div>
+        <div class="chanfoot"><a id="ytlink" href="#" target="_blank" rel="noopener">OPEN CURRENT CHANNEL ON YOUTUBE ↗</a></div>
+      </div>
+
+      <!-- CONTROLS -->
+      <div class="controls">
+        <div class="ctrlstack">
+          <div class="ctrl power">
+            <div class="clabel">POWER</div>
+            <div class="switch" id="swPower" role="switch" aria-checked="false" tabindex="0">
+              <span class="tick t-on">ON</span><span class="tick t-off">OFF</span>
+              <div class="slot"></div><div class="knob"></div>
+            </div>
+            <div class="cstate" id="stPower">STANDBY</div>
+          </div>
+          <div class="ctrl dimzone">
+            <div class="clabel">HYDRATION</div>
+            <div class="switch" id="swHydra" role="switch" aria-checked="false" tabindex="0">
+              <span class="tick t-on">ON</span><span class="tick t-off">OFF</span>
+              <div class="slot"></div><div class="knob"></div>
+            </div>
+            <div class="cstate" id="stHydra">EMPTY</div>
+          </div>
+          <div class="ctrl dimzone">
+            <div class="clabel">FIRE</div>
+            <div class="switch" id="swFire" role="switch" aria-checked="false" tabindex="0">
+              <span class="tick t-on">FIRE</span><span class="tick t-off">ARM</span>
+              <div class="slot"></div><div class="knob"></div>
+            </div>
+            <div class="cstate" id="stFire">READY</div>
+          </div>
+        </div>
+
+        <!-- COOLANT TANK -->
+        <div class="tank dimzone" id="tank">
+          <div class="tlabel">COOLANT</div>
+          <div class="marks"></div>
+          <div class="bubbles" id="bubbles"></div>
+          <div class="fluid"><div class="surf"></div></div>
+        </div>
+      </div>
+
+    </div>
+
+    <div class="footer">
+      <span id="fLeft">SYS: STANDBY</span>
+      <span class="blink">● REC</span>
+      <span id="fRight">EGG CONTROL PANEL</span>
+    </div>
+  </div>
+
+  <!-- FIRE OVERLAY -->
+  <div class="fire" id="fire">
+    <div class="fx-radar"></div>
+    <div class="fx-reticle">
+      <div class="lock">LOCK</div>
+      <div class="ring"></div><div class="cross-h"></div><div class="cross-v"></div>
+      <div class="corner c1"></div><div class="corner c2"></div><div class="corner c3"></div><div class="corner c4"></div>
+    </div>
+    <div class="fx-klaxon"><span>ALERT</span></div>
+  </div>
+</div>
+
+<script>
+(function(){
+  const app = document.getElementById('app');
+
+  /* ---------- SOUND ENGINE (Web Audio — synthesized, no files) ---------- */
+  let AC = null;
+  function audio(){
+    if(!AC){ try{ AC = new (window.AudioContext||window.webkitAudioContext)(); }catch(e){ return null; } }
+    if(AC && AC.state==='suspended') AC.resume();
+    return AC;
+  }
+  function tone(o){
+    const ac = audio(); if(!ac) return;
+    const t0 = ac.currentTime + (o.delay||0);
+    const osc = ac.createOscillator(), g = ac.createGain();
+    osc.type = o.type||'sine';
+    osc.frequency.setValueAtTime(o.f0, t0);
+    if(o.f1) osc.frequency.exponentialRampToValueAtTime(Math.max(1,o.f1), t0 + o.dur);
+    g.gain.setValueAtTime(0.0001, t0);
+    g.gain.exponentialRampToValueAtTime(o.gain||0.18, t0 + (o.atk||0.01));
+    g.gain.exponentialRampToValueAtTime(0.0001, t0 + o.dur);
+    osc.connect(g).connect(ac.destination);
+    osc.start(t0); osc.stop(t0 + o.dur + 0.03);
+  }
+  function noiseHit(o){
+    const ac = audio(); if(!ac) return;
+    const t0 = ac.currentTime + (o.delay||0), dur = o.dur;
+    const buf = ac.createBuffer(1, Math.max(1, ac.sampleRate*dur), ac.sampleRate);
+    const d = buf.getChannelData(0); for(let i=0;i<d.length;i++) d[i] = Math.random()*2-1;
+    const src = ac.createBufferSource(); src.buffer = buf;
+    const f = ac.createBiquadFilter(); f.type = o.filter||'bandpass';
+    f.frequency.value = o.freq||800; f.Q.value = o.q||1;
+    const g = ac.createGain();
+    g.gain.setValueAtTime(0.0001, t0);
+    g.gain.exponentialRampToValueAtTime(o.gain||0.12, t0+0.02);
+    g.gain.exponentialRampToValueAtTime(0.0001, t0+dur);
+    src.connect(f).connect(g).connect(ac.destination);
+    src.start(t0); src.stop(t0+dur+0.03);
+  }
+  /* power up — mech suit booting: rising hum + servo whir + ascending beeps + confirm */
+  function sndPowerUp(){
+    tone({type:'sawtooth', f0:55,  f1:165, dur:1.0, gain:.13});
+    tone({type:'triangle', f0:110, f1:330, dur:1.0, gain:.07, delay:.05});
+    noiseHit({filter:'bandpass', freq:1200, q:.7, dur:.9, gain:.05});
+    [[0.30,520],[0.48,680],[0.66,860]].forEach(([d,f])=> tone({type:'square', f0:f, dur:.10, gain:.09, delay:d}));
+    tone({type:'sine', f0:880,  dur:.16, gain:.13, delay:.92});
+    tone({type:'sine', f0:1320, dur:.32, gain:.11, delay:1.02});
+  }
+  /* power down — descending spin-down */
+  function sndPowerDown(){
+    tone({type:'sawtooth', f0:180, f1:48, dur:.8, gain:.12});
+    tone({type:'square',   f0:600, f1:120, dur:.5, gain:.06, delay:.05});
+    noiseHit({filter:'lowpass', freq:600, dur:.6, gain:.04, delay:.1});
+  }
+  /* hydration fill — bubbly blips rising in pitch */
+  function sndBubbles(){
+    for(let i=0;i<8;i++){
+      const f = 200 + Math.random()*520;
+      tone({type:'sine', f0:f, f1:f*2.3, dur:.12+Math.random()*.06, gain:.085, delay:i*0.09+Math.random()*.04});
+    }
+    noiseHit({filter:'bandpass', freq:1700, q:1.6, dur:.75, gain:.025});
+  }
+  /* hydration drain — downward gurgle */
+  function sndDrain(){
+    tone({type:'sine', f0:420, f1:120, dur:.5, gain:.10});
+    noiseHit({filter:'lowpass', freq:500, dur:.5, gain:.035});
+  }
+  /* FIRE: radar — sonar pings with echo */
+  function sndRadar(){
+    [0,0.35,0.70].forEach((d,i)=> tone({type:'sine', f0:1450, f1:880, dur:.5, gain:.13-i*0.03, delay:d}));
+  }
+  /* FIRE: reticle — ascending lock beeps, rapid chirps, confirm */
+  function sndLock(){
+    [[0,700],[0.12,900],[0.24,1100]].forEach(([d,f])=> tone({type:'square', f0:f, dur:.07, gain:.10, delay:d}));
+    for(let i=0;i<5;i++) tone({type:'square', f0:1300, dur:.04, gain:.08, delay:0.45+i*0.07});
+    tone({type:'sine', f0:1600, dur:.26, gain:.13, delay:0.9});
+  }
+  /* FIRE: klaxon — harsh alternating alarm */
+  function sndKlaxon(){
+    let t=0;
+    for(let i=0;i<5;i++){
+      tone({type:'square', f0:440, dur:.13, gain:.11, delay:t}); t+=0.14;
+      tone({type:'square', f0:300, dur:.13, gain:.11, delay:t}); t+=0.14;
+    }
+  }
+
+  /* ---------- THEME SWITCHER ---------- */
+  const themebar = document.getElementById('themebar');
+  themebar.addEventListener('click', e=>{
+    const b = e.target.closest('button'); if(!b) return;
+    app.className = app.className.replace(/theme-\w+/, b.dataset.theme);
+    themebar.querySelectorAll('button').forEach(x=>x.classList.toggle('on', x===b));
+  });
+
+  /* ---------- YOUTUBE CHANNELS ----------
+     Easy to swap: edit id (live = channel ID, video = video ID) below. */
+  const CHANNELS = {
+    bbg: {type:'live',  id:'UCIALMKvObZNtJ6AmdCLP7Lg'},   // Bloomberg Television
+    yf:  {type:'live',  id:'UCEAZeUIeJs0IjQiqTCdVSIg'},   // Yahoo Finance
+    ads: {type:'video', id:'YkC2cckZck8'}                 // retro commercials compilation (loops)
+  };
+  let currentChan = 'bbg';
+  const player = document.getElementById('player');
+
+  function embedURL(key){
+    const ch = CHANNELS[key];
+    if(ch.type==='live')
+      return 'https://www.youtube-nocookie.com/embed/live_stream?channel='+ch.id+'&autoplay=1&mute=1&rel=0';
+    return 'https://www.youtube-nocookie.com/embed/'+ch.id+'?autoplay=1&mute=1&rel=0&modestbranding=1&loop=1&playlist='+ch.id;
+  }
+  function ytWatchURL(key){
+    const ch = CHANNELS[key];
+    return ch.type==='live' ? 'https://www.youtube.com/channel/'+ch.id+'/live'
+                            : 'https://www.youtube.com/watch?v='+ch.id;
+  }
+  function updateYtLink(key){ document.getElementById('ytlink').href = ytWatchURL(key); }
+  function loadChannel(key){
+    currentChan = key;
+    if(app.classList.contains('live')) player.src = embedURL(key);
+    updateYtLink(key);
+    document.querySelectorAll('.chanbtn').forEach(b=>b.classList.toggle('on', b.dataset.chan===key));
+  }
+  document.getElementById('chanbar').addEventListener('click', e=>{
+    const b = e.target.closest('.chanbtn'); if(!b) return;
+    loadChannel(b.dataset.chan);
+  });
+
+  /* ---------- CRYPTO (CoinGecko) ---------- */
+  const COIN_URL = 'https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,ethereum,ripple,solana&vs_currencies=usd&include_24hr_change=true';
+  let priceTimer = null;
+
+  function fmtPrice(v){
+    if(v>=1000) return '$'+v.toLocaleString('en-US',{maximumFractionDigits:0});
+    if(v>=1)    return '$'+v.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
+    return '$'+v.toLocaleString('en-US',{minimumFractionDigits:4,maximumFractionDigits:4});
+  }
+  async function fetchPrices(){
+    const foot = document.getElementById('railfoot');
+    try{
+      const r = await fetch(COIN_URL,{cache:'no-store'});
+      if(!r.ok) throw new Error(r.status);
+      const d = await r.json();
+      document.querySelectorAll('.coin').forEach(el=>{
+        const k = el.dataset.coin, c = d[k]; if(!c) return;
+        el.querySelector('.cprice').textContent = fmtPrice(c.usd);
+        const chg = c.usd_24h_change ?? 0, up = chg>=0;
+        const ce = el.querySelector('.cchg');
+        ce.className = 'cchg '+(up?'up':'down');
+        ce.textContent = (up?'▲ +':'▼ ')+chg.toFixed(2)+'%';
+        const w = Math.max(8, Math.min(100, 50 + chg*4));
+        el.querySelector('.cspark i').style.width = w+'%';
+      });
+      const t = new Date();
+      foot.textContent = 'LIVE · '+t.toLocaleTimeString('en-US',{hour12:false});
+    }catch(err){
+      foot.textContent = 'FEED ERROR · RETRYING';
+    }
+  }
+  function startPrices(){ fetchPrices(); priceTimer = setInterval(fetchPrices, 30000); }
+  function stopPrices(){ clearInterval(priceTimer); priceTimer=null;
+    document.querySelectorAll('.coin .cprice').forEach(e=>e.textContent='----');
+    document.querySelectorAll('.coin .cchg').forEach(e=>{e.textContent='--';e.className='cchg';});
+    document.getElementById('railfoot').textContent='AWAITING POWER';
+  }
+
+  /* ---------- POWER ---------- */
+  const swPower = document.getElementById('swPower');
+  function setPower(on){
+    swPower.classList.toggle('on', on);
+    swPower.setAttribute('aria-checked', on);
+    app.classList.toggle('off', !on);
+    app.classList.toggle('live', on);
+    document.getElementById('stPower').textContent = on ? 'ONLINE' : 'STANDBY';
+    document.getElementById('fLeft').textContent = on ? 'SYS: ONLINE' : 'SYS: STANDBY';
+    if(on){ player.src = embedURL(currentChan); startPrices(); sndPowerUp(); }
+    else  { player.src = 'about:blank'; stopPrices(); sndPowerDown(); }
+  }
+  bindSwitch(swPower, ()=> setPower(!swPower.classList.contains('on')));
+
+  /* ---------- HYDRATION ---------- */
+  const swHydra = document.getElementById('swHydra');
+  const tank = document.getElementById('tank');
+  const bubbles = document.getElementById('bubbles');
+  function buildBubbles(){
+    for(let i=0;i<14;i++){
+      const b=document.createElement('span'); b.className='bubble';
+      b.style.left = (5+Math.random()*82)+'%';
+      const dur = 2.4+Math.random()*2.6;
+      b.style.animationDuration = dur+'s';
+      b.style.animationDelay = (-Math.random()*dur)+'s';
+      const s = .5+Math.random()*0.9;
+      b.style.width = b.style.height = (5*s+3)+'px';
+      bubbles.appendChild(b);
+    }
+  }
+  buildBubbles();
+  function setHydra(on){
+    swHydra.classList.toggle('on', on);
+    swHydra.setAttribute('aria-checked', on);
+    const st = document.getElementById('stHydra');
+    if(on){
+      tank.classList.add('filling');
+      tank.classList.add('full');
+      st.textContent='FILLING';
+      sndBubbles();
+      setTimeout(()=>{ if(tank.classList.contains('full')){ st.textContent='100% · COOLED'; tank.classList.remove('filling'); } },1400);
+    }else{
+      tank.classList.remove('full');
+      tank.classList.remove('filling');
+      st.textContent='EMPTY';
+      sndDrain();
+    }
+  }
+  bindSwitch(swHydra, ()=> setHydra(!swHydra.classList.contains('on')));
+
+  /* ---------- FIRE (random one-shot) ---------- */
+  const swFire = document.getElementById('swFire');
+  const fire = document.getElementById('fire');
+  const FX = ['radar','reticle','klaxon'];
+  let firing = false;
+  function doFire(){
+    if(firing) return; firing = true;
+    swFire.classList.add('on'); swFire.setAttribute('aria-checked', true);
+    const pick = FX[Math.floor(Math.random()*FX.length)];
+    document.getElementById('stFire').textContent = pick.toUpperCase();
+    fire.className = 'fire run fx-is-'+pick;
+    if(pick==='radar') sndRadar(); else if(pick==='reticle') sndLock(); else sndKlaxon();
+    setTimeout(()=>{
+      fire.className = 'fire';
+      swFire.classList.remove('on'); swFire.setAttribute('aria-checked', false);
+      document.getElementById('stFire').textContent = 'READY';
+      firing = false;
+    }, 1650);
+  }
+  bindSwitch(swFire, doFire);
+
+  /* ---------- switch input helper (click + keyboard) ---------- */
+  function bindSwitch(el, fn){
+    el.addEventListener('click', fn);
+    el.addEventListener('keydown', e=>{
+      if(e.key===' '||e.key==='Enter'){ e.preventDefault(); fn(); }
+    });
+  }
+
+  /* ---------- SKYLINE GENERATOR (vice + runner) ---------- */
+  (function buildSkyline(){
+    const wrap = document.getElementById('skyline'); if(!wrap) return;
+    const ns = 'http://www.w3.org/2000/svg';
+    const blds = wrap.querySelector('.blds'), wins = wrap.querySelector('.wins');
+    let x = 0;
+    while(x < 1200){
+      const w = 32 + Math.random()*64, h = 55 + Math.random()*120, y = 200 - h;
+      const r = document.createElementNS(ns,'rect');
+      r.setAttribute('x', x.toFixed(1)); r.setAttribute('y', y.toFixed(1));
+      r.setAttribute('width', w.toFixed(1)); r.setAttribute('height', h.toFixed(1));
+      blds.appendChild(r);
+      for(let wy = y + 9; wy < 192; wy += 12){
+        for(let wx = x + 6; wx < x + w - 6; wx += 11){
+          if(Math.random() < 0.30){
+            const win = document.createElementNS(ns,'rect');
+            win.setAttribute('x', wx.toFixed(1)); win.setAttribute('y', wy.toFixed(1));
+            win.setAttribute('width','4'); win.setAttribute('height','5');
+            win.setAttribute('class', 'win' + (Math.random()<0.18 ? ' lit' : ''));
+            wins.appendChild(win);
+          }
+        }
+      }
+      x += w + 5 + Math.random()*14;
+    }
+  })();
+
+  /* start powered-off; user flips POWER to wake it */
+  updateYtLink(currentChan);
+})();
+</script>
+</body>
+</html>

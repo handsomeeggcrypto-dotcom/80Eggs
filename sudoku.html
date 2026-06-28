@@ -1,0 +1,1609 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SUDOKU 数独 - Retro 80's Edition</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Courier New', monospace;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            transition: all 0.3s ease;
+        }
+
+        .container {
+            padding: 20px;
+            border-radius: 15px;
+            box-shadow: 0 0 30px rgba(0, 0, 0, 0.7);
+            max-width: 900px;
+            width: 100%;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+            letter-spacing: 3px;
+        }
+
+        .title {
+            font-size: 48px;
+            font-weight: bold;
+            margin-bottom: 10px;
+            text-shadow: 0 0 10px currentColor;
+            font-style: italic;
+        }
+
+        .subtitle {
+            font-size: 14px;
+            opacity: 0.7;
+            letter-spacing: 2px;
+        }
+
+        .main-content {
+            display: flex;
+            gap: 30px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        .game-section {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .board {
+            display: grid;
+            grid-template-columns: repeat(9, 1fr);
+            gap: 0px;
+            padding: 4px;
+            background-color: currentColor;
+            border: 4px solid currentColor;
+            border-radius: 8px;
+            box-shadow: 0 8px 16px rgba(0, 0, 0, 0.5), inset 0 2px 4px rgba(255, 255, 255, 0.1);
+        }
+
+        .cell {
+            width: 45px;
+            height: 45px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            font-weight: bold;
+            cursor: pointer;
+            border: 1px solid currentColor;
+            border-radius: 2px;
+            transition: all 0.1s ease;
+            user-select: none;
+            position: relative;
+        }
+
+        .cell:nth-child(3n) {
+            border-right: 4px double currentColor;
+            box-shadow: inset -3px 0 0 -2px rgba(0, 0, 0, 0.3);
+        }
+
+        .cell:nth-child(n+19):nth-child(-n+27),
+        .cell:nth-child(n+46):nth-child(-n+54),
+        .cell:nth-child(n+73):nth-child(-n+81) {
+            border-bottom: 4px double currentColor;
+            box-shadow: inset 0 -3px 0 -2px rgba(0, 0, 0, 0.3);
+        }
+
+        .cell:nth-child(27),
+        .cell:nth-child(54),
+        .cell:nth-child(81) {
+            border-right: 4px double currentColor;
+            border-bottom: 4px double currentColor;
+            box-shadow: inset -3px 0 0 -2px rgba(0, 0, 0, 0.3), 
+                        inset 0 -3px 0 -2px rgba(0, 0, 0, 0.3);
+        }
+
+        .cell:hover {
+            transform: scale(1.05);
+        }
+
+        .cell.selected {
+            position: relative;
+            z-index: 10;
+        }
+
+        .cell.error {
+            animation: shake 0.3s;
+        }
+
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            25% { transform: translateX(-5px); }
+            75% { transform: translateX(5px); }
+        }
+
+        .cell.mistake::after {
+            content: '✗';
+            position: absolute;
+            font-size: 30px;
+            color: #ff0000;
+            font-weight: bold;
+            opacity: 0.8;
+            text-shadow: 0 0 5px rgba(255, 0, 0, 0.8);
+        }
+
+        .sidebar {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            min-width: 280px;
+        }
+
+        .info-panel, .difficulty-panel, .commands-panel, .numbers-panel {
+            padding: 15px;
+            border: 2px solid currentColor;
+            border-radius: 8px;
+            font-size: 11px;
+        }
+
+        .info-panel h3, .difficulty-panel h3, .commands-panel h3, .numbers-panel h3 {
+            margin-bottom: 10px;
+            font-size: 14px;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+        }
+
+        .info-row {
+            display: flex;
+            justify-content: space-between;
+            margin: 5px 0;
+            font-size: 12px;
+            line-height: 1.6;
+            letter-spacing: 1px;
+        }
+
+        .difficulty-selector {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+        }
+
+        .difficulty-btn {
+            padding: 10px 5px;
+            font-size: 11px;
+            border-radius: 4px;
+        }
+
+        .difficulty-btn.active {
+            transform: scale(1.05);
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
+        }
+
+        .command-item {
+            margin: 5px 0;
+            letter-spacing: 1px;
+        }
+
+        .number-tracker {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 8px;
+        }
+
+        .tracker-item {
+            padding: 8px;
+            text-align: center;
+            font-size: 14px;
+            font-weight: bold;
+            border: 1px solid currentColor;
+            border-radius: 4px;
+            transition: all 0.3s ease;
+            opacity: 1;
+        }
+
+        .tracker-item.completed {
+            opacity: 0.2;
+            text-decoration: line-through;
+        }
+
+        .theme-selector {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 8px;
+        }
+
+        .theme-btn {
+            padding: 10px 5px;
+            font-size: 11px;
+            border-radius: 4px;
+        }
+
+        .theme-btn.active {
+            transform: scale(1.05);
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
+        }
+
+        .buttons-container {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+        }
+
+        button {
+            padding: 12px 20px;
+            font-size: 14px;
+            font-weight: bold;
+            border: 2px solid currentColor;
+            border-radius: 6px;
+            cursor: pointer;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            transition: all 0.2s ease;
+            font-family: 'Courier New', monospace;
+        }
+
+        button:hover {
+            transform: scale(1.05);
+            box-shadow: 0 0 15px rgba(0, 0, 0, 0.3);
+        }
+
+        button:active {
+            transform: scale(0.98);
+        }
+
+        /* THEME: System-80 */
+        body.theme-system80 {
+            background: linear-gradient(135deg, #0a0e27 0%, #1a1a3e 100%);
+            color: #00d9ff;
+        }
+
+        .theme-system80 .container {
+            background: linear-gradient(135deg, #1a1a4a 0%, #2d1b4e 100%);
+            border: 3px solid #00d9ff;
+            box-shadow: 0 0 30px rgba(0, 217, 255, 0.3), inset 0 0 20px rgba(255, 20, 147, 0.1);
+        }
+
+        .theme-system80 .title {
+            color: #ff1493;
+        }
+
+        .theme-system80 .cell {
+            background: #0a0e27;
+            color: #00d9ff;
+        }
+
+        .theme-system80 .cell.given {
+            color: #00d9ff;
+            font-weight: bold;
+        }
+
+        .theme-system80 .cell.user-input {
+            color: #ffff00;
+        }
+
+        .theme-system80 .cell.selected {
+            background: rgba(0, 217, 255, 0.2);
+            color: #ffff00;
+            box-shadow: 0 0 10px #ff1493;
+        }
+
+        .theme-system80 .cell.selected.given,
+        .theme-system80 .cell.selected.user-input {
+            color: #ffff00;
+        }
+
+        .theme-system80 .cell.hint-glow {
+            background: rgba(0, 217, 255, 0.15);
+            box-shadow: inset 0 0 10px rgba(0, 217, 255, 0.3);
+        }
+
+        .theme-system80 .info-panel,
+        .theme-system80 .commands-panel,
+        .theme-system80 .numbers-panel,
+        .theme-system80 .difficulty-panel {
+            background: rgba(10, 14, 39, 0.8);
+            border-color: #00d9ff;
+            color: #00d9ff;
+        }
+
+        .theme-system80 .cell:nth-child(3n) {
+            border-right-color: #ff1493;
+            box-shadow: inset -3px 0 0 -2px rgba(255, 20, 147, 0.5);
+        }
+
+        .theme-system80 .cell:nth-child(n+19):nth-child(-n+27),
+        .theme-system80 .cell:nth-child(n+46):nth-child(-n+54),
+        .theme-system80 .cell:nth-child(n+73):nth-child(-n+81) {
+            border-bottom-color: #ff1493;
+            box-shadow: inset 0 -3px 0 -2px rgba(255, 20, 147, 0.5);
+        }
+
+        .theme-system80 .cell:nth-child(27),
+        .theme-system80 .cell:nth-child(54),
+        .theme-system80 .cell:nth-child(81) {
+            border-right-color: #ff1493;
+            border-bottom-color: #ff1493;
+            box-shadow: inset -3px 0 0 -2px rgba(255, 20, 147, 0.5), 
+                        inset 0 -3px 0 -2px rgba(255, 20, 147, 0.5);
+        }
+
+        .theme-system80 button {
+            background: rgba(0, 217, 255, 0.1);
+            color: #ff1493;
+            border-color: #ff1493;
+        }
+
+        .theme-system80 button:hover {
+            background: rgba(255, 20, 147, 0.2);
+            box-shadow: 0 0 15px #ff1493;
+        }
+
+        .theme-system80 .theme-btn {
+            background: rgba(0, 217, 255, 0.1);
+            color: #ff1493;
+            border-color: #ff1493;
+        }
+
+        .theme-system80 .difficulty-btn {
+            background: rgba(0, 217, 255, 0.1);
+            color: #ff1493;
+            border-color: #ff1493;
+        }
+
+        /* THEME: Gundam */
+        body.theme-gundam {
+            background: linear-gradient(135deg, #1a1f0f 0%, #0f1f0f 100%);
+            color: #7fff00;
+        }
+
+        .theme-gundam .container {
+            background: linear-gradient(135deg, #1a2818 0%, #1f1f0f 100%);
+            border: 3px solid #7fff00;
+            box-shadow: 0 0 30px rgba(127, 255, 0, 0.3), inset 0 0 20px rgba(255, 165, 0, 0.1);
+        }
+
+        .theme-gundam .title {
+            color: #ff9900;
+        }
+
+        .theme-gundam .cell {
+            background: #0f1f0f;
+            color: #7fff00;
+            border-color: #7fff00;
+        }
+
+        .theme-gundam .cell.given {
+            color: #7fff00;
+            font-weight: bold;
+        }
+
+        .theme-gundam .cell.user-input {
+            color: #ffff00;
+        }
+
+        .theme-gundam .cell.selected {
+            background: rgba(127, 255, 0, 0.2);
+            color: #ffff00;
+            box-shadow: 0 0 10px #ff9900;
+        }
+
+        .theme-gundam .cell.selected.given,
+        .theme-gundam .cell.selected.user-input {
+            color: #ffff00;
+        }
+
+        .theme-gundam .cell.hint-glow {
+            background: rgba(127, 255, 0, 0.15);
+            box-shadow: inset 0 0 10px rgba(127, 255, 0, 0.3);
+        }
+
+        .theme-gundam .info-panel,
+        .theme-gundam .commands-panel,
+        .theme-gundam .numbers-panel,
+        .theme-gundam .difficulty-panel {
+            background: rgba(15, 31, 15, 0.8);
+            border-color: #7fff00;
+            color: #7fff00;
+        }
+
+        .theme-gundam .cell:nth-child(3n) {
+            border-right-color: #ff9900;
+            box-shadow: inset -3px 0 0 -2px rgba(255, 153, 0, 0.5);
+        }
+
+        .theme-gundam .cell:nth-child(n+19):nth-child(-n+27),
+        .theme-gundam .cell:nth-child(n+46):nth-child(-n+54),
+        .theme-gundam .cell:nth-child(n+73):nth-child(-n+81) {
+            border-bottom-color: #ff9900;
+            box-shadow: inset 0 -3px 0 -2px rgba(255, 153, 0, 0.5);
+        }
+
+        .theme-gundam .cell:nth-child(27),
+        .theme-gundam .cell:nth-child(54),
+        .theme-gundam .cell:nth-child(81) {
+            border-right-color: #ff9900;
+            border-bottom-color: #ff9900;
+            box-shadow: inset -3px 0 0 -2px rgba(255, 153, 0, 0.5), 
+                        inset 0 -3px 0 -2px rgba(255, 153, 0, 0.5);
+        }
+
+        .theme-gundam button {
+            background: rgba(127, 255, 0, 0.1);
+            color: #ff9900;
+            border-color: #ff9900;
+        }
+
+        .theme-gundam button:hover {
+            background: rgba(255, 153, 0, 0.2);
+            box-shadow: 0 0 15px #ff9900;
+        }
+
+        .theme-gundam .theme-btn {
+            background: rgba(127, 255, 0, 0.1);
+            color: #ff9900;
+            border-color: #ff9900;
+        }
+
+        .theme-gundam .difficulty-btn {
+            background: rgba(127, 255, 0, 0.1);
+            color: #ff9900;
+            border-color: #ff9900;
+        }
+
+        /* THEME: Miami */
+        body.theme-miami {
+            background: linear-gradient(135deg, #1a0033 0%, #2d0052 100%);
+            color: #ff1493;
+        }
+
+        .theme-miami .container {
+            background: linear-gradient(135deg, #2d0052 0%, #1a0033 100%);
+            border: 3px solid #ff1493;
+            box-shadow: 0 0 30px rgba(255, 20, 147, 0.4), inset 0 0 20px rgba(255, 105, 180, 0.1);
+        }
+
+        .theme-miami .title {
+            color: #ff1493;
+            text-shadow: 0 0 20px #ff1493, 0 0 40px #ff69b4, 0 0 60px #da70d6;
+        }
+
+        .theme-miami .cell {
+            background: #1a0033;
+            color: #ff1493;
+            border-color: #ff1493;
+        }
+
+        .theme-miami .cell.given {
+            color: #ff1493;
+            font-weight: bold;
+        }
+
+        .theme-miami .cell.user-input {
+            color: #ff69b4;
+        }
+
+        .theme-miami .cell.selected {
+            background: rgba(255, 20, 147, 0.3);
+            color: #ffff00;
+            box-shadow: 0 0 20px #ff1493, 0 0 30px #da70d6;
+        }
+
+        .theme-miami .cell.selected.given,
+        .theme-miami .cell.selected.user-input {
+            color: #ffff00;
+        }
+
+        .theme-miami .cell.hint-glow {
+            background: rgba(255, 105, 180, 0.15);
+            box-shadow: inset 0 0 10px rgba(255, 105, 180, 0.3);
+        }
+
+        .theme-miami .info-panel,
+        .theme-miami .commands-panel,
+        .theme-miami .numbers-panel,
+        .theme-miami .difficulty-panel {
+            background: rgba(45, 0, 82, 0.8);
+            border-color: #ff1493;
+            color: #ff1493;
+        }
+
+        .theme-miami .cell:nth-child(3n) {
+            border-right-color: #00ffdd;
+            box-shadow: inset -3px 0 0 -2px rgba(0, 255, 221, 0.5);
+        }
+
+        .theme-miami .cell:nth-child(n+19):nth-child(-n+27),
+        .theme-miami .cell:nth-child(n+46):nth-child(-n+54),
+        .theme-miami .cell:nth-child(n+73):nth-child(-n+81) {
+            border-bottom-color: #00ffdd;
+            box-shadow: inset 0 -3px 0 -2px rgba(0, 255, 221, 0.5);
+        }
+
+        .theme-miami .cell:nth-child(27),
+        .theme-miami .cell:nth-child(54),
+        .theme-miami .cell:nth-child(81) {
+            border-right-color: #00ffdd;
+            border-bottom-color: #00ffdd;
+            box-shadow: inset -3px 0 0 -2px rgba(0, 255, 221, 0.5), 
+                        inset 0 -3px 0 -2px rgba(0, 255, 221, 0.5);
+        }
+
+        .theme-miami button {
+            background: rgba(255, 20, 147, 0.1);
+            color: #ff1493;
+            border-color: #ff1493;
+        }
+
+        .theme-miami button:hover {
+            background: rgba(255, 20, 147, 0.2);
+            box-shadow: 0 0 15px #ff1493, 0 0 25px #da70d6;
+        }
+
+        .theme-miami .theme-btn {
+            background: rgba(255, 20, 147, 0.1);
+            color: #00ffdd;
+            border-color: #00ffdd;
+        }
+
+        .theme-miami .difficulty-btn {
+            background: rgba(255, 20, 147, 0.1);
+            color: #ff1493;
+            border-color: #ff1493;
+        }
+
+        /* THEME: Cyberpunk Terminal */
+        body.theme-cyberpunk {
+            background: linear-gradient(135deg, #0a0d10 0%, #111518 100%);
+            color: #00ffff;
+            position: relative;
+        }
+
+        body.theme-cyberpunk::before {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: repeating-linear-gradient(
+                0deg,
+                rgba(0, 0, 0, 0.15),
+                rgba(0, 0, 0, 0.15) 1px,
+                transparent 1px,
+                transparent 2px
+            );
+            pointer-events: none;
+            z-index: 9999;
+            animation: scanlines 8s linear infinite;
+        }
+
+        @keyframes scanlines {
+            0% { transform: translateY(0); }
+            100% { transform: translateY(10px); }
+        }
+
+        body.theme-cyberpunk::after {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: radial-gradient(ellipse at center, transparent 0%, rgba(0, 0, 0, 0.3) 100%);
+            pointer-events: none;
+            z-index: 9998;
+        }
+
+        .theme-cyberpunk .container {
+            background: linear-gradient(135deg, #0a0d10 0%, #151b20 100%);
+            border: 3px solid #00ffff;
+            box-shadow: 0 0 60px rgba(0, 255, 255, 0.6), 
+                        inset 0 0 60px rgba(255, 0, 150, 0.1),
+                        0 0 100px rgba(255, 165, 0, 0.2);
+            position: relative;
+            backdrop-filter: blur(0.5px);
+        }
+
+        .theme-cyberpunk .title {
+            color: #00ffff;
+            text-shadow: 0 0 20px #00ffff, 0 0 40px #ff00ff, 0 0 60px #00ffff;
+            letter-spacing: 4px;
+            font-weight: 900;
+        }
+
+        .theme-cyberpunk .cell {
+            background: rgba(10, 13, 16, 0.9);
+            color: #00ffff;
+            border-color: #333;
+            text-shadow: 0 0 5px #00ffff;
+            transition: all 0.1s ease;
+        }
+
+        .theme-cyberpunk .cell.given {
+            color: #ffff00;
+            font-weight: bold;
+            text-shadow: 0 0 8px #ffff00;
+        }
+
+        .theme-cyberpunk .cell.user-input {
+            color: #00ffff;
+            text-shadow: 0 0 8px #00ffff;
+            animation: cellGlow 0.6s ease-out;
+        }
+
+        @keyframes cellGlow {
+            0% { 
+                background: rgba(0, 255, 255, 0.3);
+                box-shadow: 0 0 15px rgba(0, 255, 255, 0.8);
+            }
+            100% { 
+                background: rgba(10, 13, 16, 0.9);
+                box-shadow: none;
+            }
+        }
+
+        .theme-cyberpunk .cell.selected {
+            background: rgba(0, 255, 255, 0.25);
+            color: #00ffff;
+            box-shadow: 0 0 25px #00ffff, 0 0 50px rgba(255, 0, 150, 0.3), inset 0 0 10px rgba(0, 255, 255, 0.2);
+            text-shadow: 0 0 10px #00ffff;
+        }
+
+        .theme-cyberpunk .cell.selected.given,
+        .theme-cyberpunk .cell.selected.user-input {
+            color: #00ffff;
+        }
+
+        .theme-cyberpunk .cell.hint-glow {
+            background: rgba(0, 255, 255, 0.15);
+            box-shadow: inset 0 0 10px rgba(0, 255, 255, 0.3), 0 0 15px rgba(0, 255, 255, 0.2);
+        }
+
+        .theme-cyberpunk .cell.mistake::after {
+            text-shadow: 0 0 10px #ff0000;
+        }
+
+        .theme-cyberpunk .cell:nth-child(3n) {
+            border-right-color: #00ffff;
+            box-shadow: inset -3px 0 0 -2px rgba(0, 255, 255, 0.6);
+        }
+
+        .theme-cyberpunk .cell:nth-child(n+19):nth-child(-n+27),
+        .theme-cyberpunk .cell:nth-child(n+46):nth-child(-n+54),
+        .theme-cyberpunk .cell:nth-child(n+73):nth-child(-n+81) {
+            border-bottom-color: #00ffff;
+            box-shadow: inset 0 -3px 0 -2px rgba(0, 255, 255, 0.6);
+        }
+
+        .theme-cyberpunk .cell:nth-child(27),
+        .theme-cyberpunk .cell:nth-child(54),
+        .theme-cyberpunk .cell:nth-child(81) {
+            border-right-color: #ff00ff;
+            border-bottom-color: #ff00ff;
+            box-shadow: inset -3px 0 0 -2px rgba(255, 0, 255, 0.6), 
+                        inset 0 -3px 0 -2px rgba(255, 0, 255, 0.6);
+        }
+
+        .theme-cyberpunk .info-panel,
+        .theme-cyberpunk .commands-panel,
+        .theme-cyberpunk .numbers-panel,
+        .theme-cyberpunk .difficulty-panel {
+            background: linear-gradient(135deg, rgba(10, 13, 16, 0.9) 0%, rgba(25, 30, 35, 0.8) 100%);
+            border-color: #00ffff;
+            color: #00ffff;
+            box-shadow: inset 0 0 20px rgba(0, 255, 255, 0.1), 0 0 15px rgba(0, 255, 255, 0.2);
+            text-shadow: 0 0 3px #00ffff;
+        }
+
+        .theme-cyberpunk .info-panel h3,
+        .theme-cyberpunk .commands-panel h3,
+        .theme-cyberpunk .numbers-panel h3,
+        .theme-cyberpunk .difficulty-panel h3 {
+            color: #00ffff;
+            text-shadow: 0 0 5px #00ffff;
+            text-transform: uppercase;
+            letter-spacing: 3px;
+        }
+
+        .theme-cyberpunk .difficulty-panel {
+            border-color: #ff00ff;
+        }
+
+        .theme-cyberpunk .difficulty-panel h3 {
+            color: #ff00ff;
+            text-shadow: 0 0 5px #ff00ff;
+        }
+
+        .theme-cyberpunk .difficulty-btn {
+            background: rgba(255, 0, 255, 0.1);
+            color: #ff00ff;
+            border-color: #ff00ff;
+            text-shadow: 0 0 3px #ff00ff;
+            box-shadow: inset 0 0 10px rgba(255, 0, 255, 0.1);
+        }
+
+        .theme-cyberpunk .difficulty-btn:hover {
+            background: rgba(255, 0, 255, 0.2);
+            box-shadow: 0 0 15px #ff00ff, inset 0 0 10px rgba(255, 0, 255, 0.2);
+        }
+
+        .theme-cyberpunk .difficulty-btn.active {
+            background: rgba(255, 0, 255, 0.3);
+            box-shadow: 0 0 25px #ff00ff, inset 0 0 15px rgba(255, 0, 255, 0.3);
+        }
+
+        .theme-cyberpunk button {
+            background: rgba(0, 255, 255, 0.1);
+            color: #00ffff;
+            border-color: #00ffff;
+            text-shadow: 0 0 3px #00ffff;
+            box-shadow: inset 0 0 10px rgba(0, 255, 255, 0.1);
+        }
+
+        .theme-cyberpunk button:hover {
+            background: rgba(0, 255, 255, 0.2);
+            box-shadow: 0 0 15px #00ffff, inset 0 0 10px rgba(0, 255, 255, 0.2);
+        }
+
+        .theme-cyberpunk .theme-btn {
+            background: rgba(0, 255, 255, 0.1);
+            color: #00ffff;
+            border-color: #00ffff;
+            text-shadow: 0 0 3px #00ffff;
+        }
+
+        .theme-cyberpunk .tracker-item {
+            background: rgba(0, 255, 255, 0.1);
+            border-color: #00ffff;
+            color: #00ffff;
+            text-shadow: 0 0 5px #00ffff;
+            box-shadow: inset 0 0 5px rgba(0, 255, 255, 0.1);
+        }
+
+        .theme-cyberpunk .tracker-item.completed {
+            background: rgba(255, 0, 150, 0.1);
+            border-color: #ff00ff;
+            color: #ff00ff;
+            text-shadow: 0 0 5px #ff00ff;
+            opacity: 0.5;
+        }
+
+        /* Modal Styles */
+        .modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            backdrop-filter: blur(4px);
+        }
+
+        .modal.hidden {
+            display: none;
+        }
+
+        .modal-content {
+            background: linear-gradient(135deg, #1a1a3e 0%, #2d1b4e 100%);
+            border: 3px solid #00d9ff;
+            border-radius: 15px;
+            box-shadow: 0 0 50px rgba(0, 217, 255, 0.5);
+            padding: 0;
+            max-width: 500px;
+            width: 90%;
+            color: #00d9ff;
+            font-family: 'Courier New', monospace;
+            animation: slideIn 0.4s ease-out;
+        }
+
+        @keyframes slideIn {
+            from {
+                transform: translateY(-50px);
+                opacity: 0;
+            }
+            to {
+                transform: translateY(0);
+                opacity: 1;
+            }
+        }
+
+        .modal-header {
+            background: linear-gradient(90deg, #ff1493 0%, #00d9ff 100%);
+            padding: 20px;
+            border-bottom: 2px solid #00d9ff;
+            text-align: center;
+        }
+
+        .modal-header h2 {
+            font-size: 28px;
+            color: #fff;
+            text-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
+            letter-spacing: 2px;
+        }
+
+        .modal-body {
+            padding: 30px;
+        }
+
+        .completion-stats {
+            margin-bottom: 30px;
+            padding: 15px;
+            border: 2px solid #ff1493;
+            border-radius: 8px;
+            background: rgba(255, 20, 147, 0.1);
+        }
+
+        .stat-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 10px 0;
+            font-size: 16px;
+            letter-spacing: 2px;
+        }
+
+        .stat-label {
+            color: #ff1493;
+            font-weight: bold;
+        }
+
+        .stat-value {
+            color: #ffff00;
+            font-weight: bold;
+        }
+
+        .initials-input {
+            margin-bottom: 30px;
+            text-align: center;
+        }
+
+        .initials-input label {
+            display: block;
+            margin-bottom: 10px;
+            font-size: 14px;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            color: #ff1493;
+        }
+
+        .initials-input input {
+            padding: 10px;
+            font-size: 20px;
+            width: 120px;
+            text-align: center;
+            text-transform: uppercase;
+            background: rgba(0, 217, 255, 0.1);
+            border: 2px solid #00d9ff;
+            color: #ffff00;
+            font-family: 'Courier New', monospace;
+            border-radius: 4px;
+            letter-spacing: 4px;
+        }
+
+        .initials-input input::placeholder {
+            color: #00d9ff;
+            opacity: 0.5;
+        }
+
+        .initials-input input:focus {
+            outline: none;
+            box-shadow: 0 0 20px #00d9ff;
+        }
+
+        .leaderboard {
+            border: 2px solid #7fff00;
+            border-radius: 8px;
+            padding: 15px;
+            background: rgba(127, 255, 0, 0.05);
+        }
+
+        .leaderboard h3 {
+            color: #7fff00;
+            text-align: center;
+            margin-bottom: 15px;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            font-size: 14px;
+        }
+
+        .leaderboard-list {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .leaderboard-entry {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px 10px;
+            background: rgba(127, 255, 0, 0.1);
+            border-left: 3px solid #7fff00;
+            border-radius: 2px;
+            font-size: 12px;
+        }
+
+        .leaderboard-entry.new-entry {
+            background: rgba(255, 255, 0, 0.2);
+            border-left-color: #ffff00;
+            font-weight: bold;
+        }
+
+        .entry-rank {
+            color: #7fff00;
+            font-weight: bold;
+            min-width: 25px;
+        }
+
+        .entry-initials {
+            color: #ff1493;
+            font-weight: bold;
+            min-width: 50px;
+        }
+
+        .entry-time {
+            color: #00d9ff;
+            font-weight: bold;
+            min-width: 80px;
+            text-align: right;
+        }
+
+        .entry-difficulty {
+            color: #ffff00;
+            font-size: 10px;
+            min-width: 60px;
+            text-align: right;
+        }
+
+        .modal-footer {
+            display: flex;
+            gap: 10px;
+            padding: 20px;
+            border-top: 2px solid #00d9ff;
+            background: rgba(0, 0, 0, 0.2);
+        }
+
+        .modal-footer button {
+            flex: 1;
+            padding: 12px;
+            font-size: 14px;
+            font-weight: bold;
+            border: 2px solid #ff1493;
+            background: rgba(255, 20, 147, 0.1);
+            color: #ff1493;
+            border-radius: 6px;
+            cursor: pointer;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            font-family: 'Courier New', monospace;
+            transition: all 0.2s ease;
+        }
+
+        .modal-footer button:hover {
+            background: rgba(255, 20, 147, 0.2);
+            box-shadow: 0 0 15px #ff1493;
+        }
+
+        .modal-footer button:active {
+            transform: scale(0.98);
+        }
+
+        @media (max-width: 800px) {
+            .main-content {
+                flex-direction: column;
+                gap: 20px;
+            }
+
+            .sidebar {
+                min-width: auto;
+            }
+
+            .cell {
+                width: 35px;
+                height: 35px;
+                font-size: 18px;
+            }
+        }
+    </style>
+</head>
+<body class="theme-system80">
+    <div class="container">
+        <div class="header">
+            <div class="title">SUDOKU</div>
+            <div class="subtitle">数独 RETRO 80's EDITION</div>
+        </div>
+
+        <div class="main-content">
+            <div class="game-section">
+                <div class="board" id="board"></div>
+            </div>
+
+            <div class="sidebar">
+                <div class="info-panel">
+                    <h3>STATUS</h3>
+                    <div class="info-row">
+                        <span>TIME:</span>
+                        <span id="timer">00:00:00</span>
+                    </div>
+                    <div class="info-row">
+                        <span>FILLED:</span>
+                        <span id="filled">0/81</span>
+                    </div>
+                    <div class="info-row">
+                        <span>DIFFICULTY:</span>
+                        <span id="difficulty">MEDIUM</span>
+                    </div>
+                </div>
+
+                <div class="difficulty-panel">
+                    <h3>SELECT DIFFICULTY</h3>
+                    <div class="difficulty-selector">
+                        <button class="difficulty-btn" data-difficulty="easy" onclick="game.setDifficulty('easy')">Easy</button>
+                        <button class="difficulty-btn active" data-difficulty="medium" onclick="game.setDifficulty('medium')">Medium</button>
+                        <button class="difficulty-btn" data-difficulty="hard" onclick="game.setDifficulty('hard')">Hard</button>
+                        <button class="difficulty-btn" data-difficulty="extreme" onclick="game.setDifficulty('extreme')">Extreme</button>
+                    </div>
+                </div>
+
+                <div class="commands-panel">
+                    <h3>COMMANDS</h3>
+                    <div class="command-item">1-9: INPUT NUMBER</div>
+                    <div class="command-item">0: ERASE</div>
+                    <div class="command-item">↑↓←→: MOVE</div>
+                </div>
+
+                <div class="numbers-panel">
+                    <h3>NUMBERS</h3>
+                    <div class="number-tracker">
+                        <div class="tracker-item" id="num-tracker-1">1</div>
+                        <div class="tracker-item" id="num-tracker-2">2</div>
+                        <div class="tracker-item" id="num-tracker-3">3</div>
+                        <div class="tracker-item" id="num-tracker-4">4</div>
+                        <div class="tracker-item" id="num-tracker-5">5</div>
+                        <div class="tracker-item" id="num-tracker-6">6</div>
+                        <div class="tracker-item" id="num-tracker-7">7</div>
+                        <div class="tracker-item" id="num-tracker-8">8</div>
+                        <div class="tracker-item" id="num-tracker-9">9</div>
+                    </div>
+                </div>
+
+                <div class="theme-selector">
+                    <button class="theme-btn active" onclick="setTheme('system80')">System-80</button>
+                    <button class="theme-btn" onclick="setTheme('gundam')">Gundam</button>
+                    <button class="theme-btn" onclick="setTheme('miami')">Miami</button>
+                    <button class="theme-btn" onclick="setTheme('cyberpunk')">Cyberpunk</button>
+                </div>
+
+                <div class="buttons-container">
+                    <button onclick="newGame()">NEW GAME</button>
+                    <button onclick="clearBoard()">CLEAR</button>
+                    <button onclick="resetGame()">RESET</button>
+                    <button onclick="viewScores()">VIEW SCORES</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Completion Modal -->
+    <div id="completionModal" class="modal hidden">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>🎉 PUZZLE SOLVED! 🎉</h2>
+            </div>
+            <div class="modal-body">
+                <div class="completion-stats">
+                    <div class="stat-row">
+                        <span class="stat-label">TIME:</span>
+                        <span class="stat-value" id="completionTime">00:00:00</span>
+                    </div>
+                    <div class="stat-row">
+                        <span class="stat-label">DIFFICULTY:</span>
+                        <span class="stat-value" id="completionDifficulty">MEDIUM</span>
+                    </div>
+                </div>
+
+                <div class="initials-input">
+                    <label>ENTER INITIALS:</label>
+                    <input type="text" id="initialsInput" maxlength="3" placeholder="AAA" />
+                </div>
+
+                <div class="leaderboard">
+                    <h3>TOP 10 TIMES</h3>
+                    <div id="leaderboardList" class="leaderboard-list">
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button onclick="submitScore()">SUBMIT SCORE</button>
+                <button onclick="closeCompletion()">NEW GAME</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        class SudokuGame {
+            constructor() {
+                this.board = [];
+                this.solution = [];
+                this.originalGiven = new Set();
+                this.selectedCell = null;
+                this.startTime = null;
+                this.timerInterval = null;
+                this.difficulty = 'medium';
+                this.initialize();
+            }
+
+            initialize() {
+                this.generateNewGame();
+                this.renderBoard();
+                this.startTimer();
+                this.setupKeyboardListeners();
+                this.updateStats();
+            }
+
+            generateNewGame() {
+                this.solution = this.generateSolution();
+                this.board = JSON.parse(JSON.stringify(this.solution));
+                this.originalGiven = new Set();
+
+                const difficultyLevels = {
+                    'easy': 20,
+                    'medium': 40,
+                    'hard': 55,
+                    'extreme': 65
+                };
+
+                const difficulty = difficultyLevels[this.difficulty] || 40;
+                let removed = 0;
+
+                while (removed < difficulty) {
+                    const row = Math.floor(Math.random() * 9);
+                    const col = Math.floor(Math.random() * 9);
+
+                    if (this.board[row][col] !== 0) {
+                        this.board[row][col] = 0;
+                        removed++;
+                    }
+                }
+
+                for (let row = 0; row < 9; row++) {
+                    for (let col = 0; col < 9; col++) {
+                        if (this.board[row][col] !== 0) {
+                            this.originalGiven.add(`${row},${col}`);
+                        }
+                    }
+                }
+
+                this.startTime = Date.now();
+            }
+
+            generateSolution() {
+                const board = Array(9).fill().map(() => Array(9).fill(0));
+                this.fillDiagonal(board);
+                this.solveSudoku(board);
+                return board;
+            }
+
+            fillDiagonal(board) {
+                for (let i = 0; i < 9; i += 3) {
+                    let nums = [1, 2, 3, 4, 5, 6, 7, 8, 9].sort(() => Math.random() - 0.5);
+                    let idx = 0;
+                    for (let row = i; row < i + 3; row++) {
+                        for (let col = i; col < i + 3; col++) {
+                            board[row][col] = nums[idx++];
+                        }
+                    }
+                }
+            }
+
+            isValid(board, row, col, num) {
+                for (let i = 0; i < 9; i++) {
+                    if (board[row][i] === num) return false;
+                }
+
+                for (let i = 0; i < 9; i++) {
+                    if (board[i][col] === num) return false;
+                }
+
+                const boxRow = Math.floor(row / 3) * 3;
+                const boxCol = Math.floor(col / 3) * 3;
+                for (let i = boxRow; i < boxRow + 3; i++) {
+                    for (let j = boxCol; j < boxCol + 3; j++) {
+                        if (board[i][j] === num) return false;
+                    }
+                }
+
+                return true;
+            }
+
+            solveSudoku(board) {
+                for (let row = 0; row < 9; row++) {
+                    for (let col = 0; col < 9; col++) {
+                        if (board[row][col] === 0) {
+                            for (let num = 1; num <= 9; num++) {
+                                if (this.isValid(board, row, col, num)) {
+                                    board[row][col] = num;
+                                    if (this.solveSudoku(board)) return true;
+                                    board[row][col] = 0;
+                                }
+                            }
+                            return false;
+                        }
+                    }
+                }
+                return true;
+            }
+
+            renderBoard() {
+                const boardElement = document.getElementById('board');
+                boardElement.innerHTML = '';
+
+                for (let row = 0; row < 9; row++) {
+                    for (let col = 0; col < 9; col++) {
+                        const cell = document.createElement('div');
+                        cell.className = 'cell';
+                        cell.dataset.row = row;
+                        cell.dataset.col = col;
+
+                        const value = this.board[row][col];
+                        const isOriginalGiven = this.originalGiven.has(`${row},${col}`);
+                        const correctValue = this.solution[row][col];
+
+                        if (value !== 0) {
+                            cell.textContent = value;
+                            if (isOriginalGiven) {
+                                cell.classList.add('given');
+                            } else {
+                                cell.classList.add('user-input');
+                                if (value !== correctValue) {
+                                    cell.classList.add('mistake');
+                                }
+                            }
+                        }
+
+                        cell.addEventListener('click', (e) => this.selectCell(row, col, e));
+                        boardElement.appendChild(cell);
+                    }
+                }
+            }
+
+            selectCell(row, col, e) {
+                document.querySelectorAll('.cell').forEach(c => {
+                    c.classList.remove('selected');
+                    c.classList.remove('hint-glow');
+                });
+
+                e.target.classList.add('selected');
+                this.selectedCell = { row, col };
+
+                const selectedValue = this.board[row][col];
+
+                if (selectedValue !== 0) {
+                    this.highlightConflictingCells(row, col, selectedValue);
+                }
+            }
+
+            highlightConflictingCells(row, col, value) {
+                for (let c = 0; c < 9; c++) {
+                    if (c !== col) {
+                        const cell = document.querySelector(`[data-row="${row}"][data-col="${c}"]`);
+                        if (cell) cell.classList.add('hint-glow');
+                    }
+                }
+
+                for (let r = 0; r < 9; r++) {
+                    if (r !== row) {
+                        const cell = document.querySelector(`[data-row="${r}"][data-col="${col}"]`);
+                        if (cell) cell.classList.add('hint-glow');
+                    }
+                }
+
+                const boxRow = Math.floor(row / 3) * 3;
+                const boxCol = Math.floor(col / 3) * 3;
+                for (let r = boxRow; r < boxRow + 3; r++) {
+                    for (let c = boxCol; c < boxCol + 3; c++) {
+                        if (r !== row || c !== col) {
+                            const cell = document.querySelector(`[data-row="${r}"][data-col="${c}"]`);
+                            if (cell) cell.classList.add('hint-glow');
+                        }
+                    }
+                }
+            }
+
+            setCellValue(row, col, value) {
+                if (this.originalGiven.has(`${row},${col}`)) {
+                    return;
+                }
+
+                this.board[row][col] = value;
+                this.renderBoard();
+                this.updateStats();
+                this.checkCompletion();
+            }
+
+            checkCompletion() {
+                let isComplete = true;
+                let isCorrect = true;
+
+                for (let row = 0; row < 9; row++) {
+                    for (let col = 0; col < 9; col++) {
+                        if (this.board[row][col] === 0) {
+                            isComplete = false;
+                            break;
+                        }
+                        if (this.board[row][col] !== this.solution[row][col]) {
+                            isCorrect = false;
+                        }
+                    }
+                    if (!isComplete) break;
+                }
+
+                if (isComplete && isCorrect) {
+                    this.completePuzzle();
+                }
+            }
+
+            completePuzzle() {
+                clearInterval(this.timerInterval);
+                const elapsed = Math.floor((Date.now() - this.startTime) / 1000);
+                showCompletionScreen(elapsed, this.difficulty);
+            }
+
+            setupKeyboardListeners() {
+                document.addEventListener('keydown', (e) => {
+                    if (!this.selectedCell) return;
+
+                    const { row, col } = this.selectedCell;
+
+                    if (e.key >= '1' && e.key <= '9') {
+                        this.setCellValue(row, col, parseInt(e.key));
+                    }
+                    else if (e.key === '0' || e.key === 'Backspace') {
+                        this.setCellValue(row, col, 0);
+                    }
+                    else if (e.key === 'ArrowUp' && row > 0) {
+                        this.selectCellByCoords(row - 1, col);
+                    } else if (e.key === 'ArrowDown' && row < 8) {
+                        this.selectCellByCoords(row + 1, col);
+                    } else if (e.key === 'ArrowLeft' && col > 0) {
+                        this.selectCellByCoords(row, col - 1);
+                    } else if (e.key === 'ArrowRight' && col < 8) {
+                        this.selectCellByCoords(row, col + 1);
+                    }
+                });
+            }
+
+            selectCellByCoords(row, col) {
+                const cell = document.querySelector(`[data-row="${row}"][data-col="${col}"]`);
+                if (cell) cell.click();
+            }
+
+            updateStats() {
+                let filled = 0;
+                for (let row = 0; row < 9; row++) {
+                    for (let col = 0; col < 9; col++) {
+                        if (this.board[row][col] !== 0) filled++;
+                    }
+                }
+                document.getElementById('filled').textContent = `${filled}/81`;
+                this.updateNumberTracker();
+            }
+
+            getCompletedNumbers() {
+                const count = {};
+                for (let num = 1; num <= 9; num++) {
+                    count[num] = 0;
+                }
+
+                for (let row = 0; row < 9; row++) {
+                    for (let col = 0; col < 9; col++) {
+                        const value = this.board[row][col];
+                        if (value !== 0) {
+                            count[value]++;
+                        }
+                    }
+                }
+
+                return count;
+            }
+
+            updateNumberTracker() {
+                const count = this.getCompletedNumbers();
+                for (let num = 1; num <= 9; num++) {
+                    const tracker = document.getElementById(`num-tracker-${num}`);
+                    if (tracker) {
+                        if (count[num] === 9) {
+                            tracker.classList.add('completed');
+                        } else {
+                            tracker.classList.remove('completed');
+                        }
+                    }
+                }
+            }
+
+            startTimer() {
+                if (this.timerInterval) clearInterval(this.timerInterval);
+
+                this.timerInterval = setInterval(() => {
+                    const elapsed = Math.floor((Date.now() - this.startTime) / 1000);
+                    const hours = Math.floor(elapsed / 3600);
+                    const minutes = Math.floor((elapsed % 3600) / 60);
+                    const seconds = elapsed % 60;
+
+                    document.getElementById('timer').textContent =
+                        `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+                }, 1000);
+            }
+
+            clearBoard() {
+                for (let row = 0; row < 9; row++) {
+                    for (let col = 0; col < 9; col++) {
+                        if (!this.originalGiven.has(`${row},${col}`)) {
+                            this.board[row][col] = 0;
+                        }
+                    }
+                }
+                this.renderBoard();
+                this.updateStats();
+            }
+
+            setDifficulty(level) {
+                this.difficulty = level;
+                this.reset();
+
+                document.querySelectorAll('.difficulty-btn').forEach(btn => btn.classList.remove('active'));
+                const activeBtn = document.querySelector(`[data-difficulty="${level}"]`);
+                if (activeBtn) activeBtn.classList.add('active');
+
+                document.getElementById('difficulty').textContent = level.toUpperCase();
+            }
+
+            reset() {
+                clearInterval(this.timerInterval);
+                this.generateNewGame();
+                this.renderBoard();
+                this.startTimer();
+                this.updateStats();
+            }
+        }
+
+        let game = new SudokuGame();
+        let lastCompletionTime = 0;
+        let lastCompletionDifficulty = '';
+
+        function getLeaderboard() {
+            const stored = localStorage.getItem('sudokuLeaderboard');
+            return stored ? JSON.parse(stored) : [];
+        }
+
+        function saveLeaderboard(scores) {
+            localStorage.setItem('sudokuLeaderboard', JSON.stringify(scores));
+        }
+
+        function formatTime(seconds) {
+            const hours = Math.floor(seconds / 3600);
+            const minutes = Math.floor((seconds % 3600) / 60);
+            const secs = seconds % 60;
+            return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+        }
+
+        function displayLeaderboard(highlightIndex = -1) {
+            const leaderboard = getLeaderboard();
+            const leaderboardList = document.getElementById('leaderboardList');
+
+            if (!leaderboardList) return;
+
+            leaderboardList.innerHTML = '';
+
+            if (leaderboard.length === 0) {
+                leaderboardList.innerHTML = '<div style="text-align: center; color: #7fff00; padding: 20px;">NO SCORES YET</div>';
+                return;
+            }
+
+            leaderboard.forEach((entry, index) => {
+                const entryEl = document.createElement('div');
+                entryEl.className = 'leaderboard-entry';
+
+                if (index === highlightIndex) {
+                    entryEl.classList.add('new-entry');
+                }
+
+                entryEl.innerHTML = `
+                    <span class="entry-rank">#${index + 1}</span>
+                    <span class="entry-initials">${entry.initials}</span>
+                    <span class="entry-time">${entry.time}</span>
+                    <span class="entry-difficulty">${entry.difficulty}</span>
+                `;
+                leaderboardList.appendChild(entryEl);
+            });
+        }
+
+        function showCompletionScreen(elapsed, difficulty) {
+            lastCompletionTime = elapsed;
+            lastCompletionDifficulty = difficulty;
+
+            const isCyberpunk = document.body.classList.contains('theme-cyberpunk');
+            const headerText = isCyberpunk ? '⚡ SYSTEM SYNCHRONIZED ⚡' : '🎉 PUZZLE SOLVED! 🎉';
+            
+            document.querySelector('.modal-header h2').textContent = headerText;
+            document.getElementById('completionTime').textContent = formatTime(elapsed);
+            document.getElementById('completionDifficulty').textContent = difficulty.toUpperCase();
+            document.getElementById('initialsInput').value = '';
+            document.getElementById('initialsInput').focus();
+
+            displayLeaderboard();
+
+            const modal = document.getElementById('completionModal');
+            modal.classList.remove('hidden');
+        }
+
+        function submitScore() {
+            const initials = document.getElementById('initialsInput').value.toUpperCase().padEnd(3, ' ');
+
+            if (initials.trim().length === 0) {
+                alert('ENTER INITIALS');
+                return;
+            }
+
+            const leaderboard = getLeaderboard();
+            const newScore = {
+                initials: initials,
+                seconds: lastCompletionTime,
+                time: formatTime(lastCompletionTime),
+                difficulty: lastCompletionDifficulty
+            };
+
+            leaderboard.push(newScore);
+            leaderboard.sort((a, b) => a.seconds - b.seconds);
+
+            const top10 = leaderboard.slice(0, 10);
+            const newIndex = top10.findIndex(entry => entry.initials === initials && entry.seconds === lastCompletionTime);
+
+            saveLeaderboard(top10);
+            displayLeaderboard(newIndex);
+
+            const submitBtn = document.querySelector('.modal-footer button:first-child');
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'SCORE SAVED!';
+        }
+
+        function closeCompletion() {
+            document.getElementById('completionModal').classList.add('hidden');
+            newGame();
+        }
+
+        function newGame() {
+            game.reset();
+        }
+
+        function resetGame() {
+            game.reset();
+        }
+
+        function clearBoard() {
+            game.clearBoard();
+        }
+
+        function setTheme(themeName) {
+            document.body.className = `theme-${themeName}`;
+
+            document.querySelectorAll('.theme-btn').forEach(btn => btn.classList.remove('active'));
+            event.target.classList.add('active');
+        }
+
+        function viewScores() {
+            displayLeaderboard();
+            document.getElementById('completionModal').classList.remove('hidden');
+        }
+    </script>
+</body>
+</html>

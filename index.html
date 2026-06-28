@@ -1,0 +1,822 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>80EGGS — SYSTEM-80</title>
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@500;700;900&family=VT323&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;overflow:hidden;background:#000}
+body{font-family:'Share Tech Mono','Courier New',monospace;-webkit-font-smoothing:antialiased}
+
+/* ===== FULL VIEWPORT COCKPIT ===== */
+#cockpit{
+  position:fixed;inset:0;
+  display:flex;flex-direction:column;
+}
+
+/* ===== TOP: CANOPY / VIEWPORT (city view) ===== */
+#canopy{
+  flex:1 1 0;
+  position:relative;
+  overflow:hidden;
+  /* angled bottom edge via clip-path */
+  clip-path:polygon(0 0, 100% 0, 100% 85%, 55% 100%, 45% 100%, 0 85%);
+}
+
+/* sky gradient */
+.sky{
+  position:absolute;inset:0;
+  background:linear-gradient(180deg,
+    #080018 0%, #1a0040 18%, #4a0088 34%,
+    #8010a0 46%, #c040b0 55%,
+    #ff5090 64%, #ff8050 73%,
+    #ffb060 80%, rgba(255,180,80,.15) 90%, transparent 100%
+  );
+}
+
+/* stars */
+.star{position:absolute;border-radius:50%;background:#fff;animation:twinkle 3s ease-in-out infinite}
+@keyframes twinkle{0%,100%{opacity:.9}50%{opacity:.15}}
+
+/* distant cityscape */
+#city{position:absolute;bottom:0;left:0;right:0;height:58%}
+#city svg{width:100%;height:100%}
+
+/* ZENITH sign in sky */
+.sky-sign{
+  position:absolute;top:34%;left:50%;transform:translateX(-50%);
+  font-family:'Orbitron',sans-serif;font-weight:900;font-size:clamp(22px,4vw,48px);
+  letter-spacing:8px;color:#ff1493;
+  text-shadow:0 0 10px #ff1493,0 0 30px #ff1493,0 0 80px #c00;
+  animation:signglow 2.2s ease-in-out infinite;
+  pointer-events:none;
+}
+@keyframes signglow{0%,100%{opacity:1}50%{opacity:.65}}
+
+/* EGG CORP sign */
+.sky-sign2{
+  position:absolute;top:30%;right:12%;
+  font-family:'Orbitron',sans-serif;font-weight:900;font-size:clamp(12px,2vw,22px);
+  letter-spacing:4px;color:#ffdd00;
+  text-shadow:0 0 8px #ffdd00,0 0 20px #ff9900;
+  animation:signglow 3.1s ease-in-out infinite;
+  pointer-events:none;
+}
+
+/* horizon glow */
+.horizon{
+  position:absolute;bottom:24%;left:0;right:0;height:3px;
+  background:linear-gradient(90deg,transparent 0%,#ff1493 20%,#ff69b4 50%,#ff1493 80%,transparent 100%);
+  box-shadow:0 0 24px 6px rgba(255,20,147,.7);opacity:.75;
+}
+
+/* flying ships */
+.ship{position:absolute;opacity:.75;animation:flyship linear infinite}
+@keyframes flyship{from{transform:translateX(-200px)}to{transform:translateX(110vw)}}
+
+/* canopy frame struts — two diagonal lines from top corners converging down */
+.strut{
+  position:absolute;bottom:0;width:4px;height:92%;
+  background:linear-gradient(180deg,rgba(43,156,255,.0),rgba(43,156,255,.7) 40%,rgba(43,156,255,.9));
+  box-shadow:0 0 14px rgba(43,156,255,.5);
+}
+.strut-l{left:22%;transform-origin:bottom center;transform:rotate(14deg)}
+.strut-r{right:22%;transform-origin:bottom center;transform:rotate(-14deg)}
+
+/* scan lines over canopy */
+.scanlines{
+  position:absolute;inset:0;pointer-events:none;
+  background:repeating-linear-gradient(180deg,rgba(0,0,0,0) 0 3px,rgba(0,0,0,.12) 3px 4px);
+}
+.vignette{position:absolute;inset:0;pointer-events:none;
+  box-shadow:inset 0 0 160px 50px rgba(0,0,0,.8)}
+
+/* canopy top status bar */
+.canopy-hud{
+  position:absolute;top:0;left:0;right:0;
+  display:flex;justify-content:space-between;align-items:center;
+  padding:10px 24px;
+  background:linear-gradient(180deg,rgba(0,0,0,.75),transparent);
+}
+.brand{
+  font-family:'Orbitron',sans-serif;font-weight:900;
+  font-size:clamp(16px,2.5vw,28px);letter-spacing:6px;
+  color:#2b9cff;text-shadow:0 0 10px #2b9cff,0 0 28px #2b9cff;
+}
+.brand em{color:#ff7a1e;text-shadow:0 0 10px #ff7a1e;font-style:normal}
+.hud-center{font-size:10px;letter-spacing:3px;color:#2b9cff;opacity:.7;text-align:center}
+.pilot-badge{
+  display:flex;align-items:center;gap:10px;
+  font-family:'Orbitron',sans-serif;font-size:10px;letter-spacing:2px;color:#2b9cff;
+  border:1px solid rgba(255,122,30,.5);padding:6px 12px;border-radius:6px;
+  background:rgba(0,0,0,.5);
+}
+.egg-icon{
+  width:38px;height:38px;border-radius:50%;border:2px solid #ff7a1e;
+  background:radial-gradient(circle at 40% 35%,#fff8e0,#f5d060 60%,#e8a020);
+  display:flex;align-items:center;justify-content:center;font-size:22px;
+  box-shadow:0 0 14px rgba(255,122,30,.6);
+}
+
+/* top-left system status panel (in canopy) */
+.sys-status{
+  position:absolute;top:10px;left:10px;
+  border:1.5px solid rgba(43,156,255,.5);border-radius:6px;
+  background:rgba(0,0,0,.65);backdrop-filter:blur(2px);
+  padding:10px 14px;font-size:10px;letter-spacing:2px;color:#2b9cff;
+  min-width:160px;
+}
+.sys-status .stitle{
+  font-family:'Orbitron',sans-serif;font-size:9px;letter-spacing:3px;
+  color:#ff7a1e;margin-bottom:8px;
+}
+.sys-row{display:flex;justify-content:space-between;gap:16px;margin:3px 0;opacity:.8}
+.sys-bar{flex:1;height:5px;background:rgba(43,156,255,.15);border-radius:3px;overflow:hidden;align-self:center}
+.sys-fill{height:100%;background:#3dff9e;box-shadow:0 0 6px #3dff9e;border-radius:3px}
+
+/* top-right pilot ID panel */
+.pilot-panel{
+  position:absolute;top:10px;right:10px;
+  border:1.5px solid rgba(255,122,30,.5);border-radius:6px;
+  background:rgba(0,0,0,.65);backdrop-filter:blur(2px);
+  padding:10px 14px;font-size:10px;letter-spacing:2px;
+  text-align:center;min-width:110px;
+}
+.pilot-panel .ptitle{font-family:'Orbitron',sans-serif;font-size:8px;letter-spacing:3px;color:#2b9cff;margin-bottom:8px}
+.pilot-panel .pegg{
+  width:52px;height:52px;border-radius:50%;margin:0 auto 6px;
+  border:2px solid #ff7a1e;
+  background:radial-gradient(circle at 40% 35%,#fff8e0,#f5d060 60%,#e8a020);
+  display:flex;align-items:center;justify-content:center;font-size:30px;
+  box-shadow:0 0 18px rgba(255,122,30,.7);
+}
+.pilot-panel .pname{font-family:'Orbitron',sans-serif;font-size:16px;font-weight:900;letter-spacing:4px;color:#ff7a1e;text-shadow:0 0 10px #ff7a1e}
+
+/* ===== DASHBOARD (bottom) ===== */
+#dashboard{
+  flex:0 0 auto;
+  position:relative;
+  background:linear-gradient(180deg,#05080f 0%,#080c18 40%,#060a14 100%);
+  border-top:3px solid #2b9cff;
+  box-shadow:0 -8px 40px rgba(43,156,255,.3), 0 -2px 0 rgba(43,156,255,.15);
+  padding:0 0 22px;
+  overflow:hidden;
+}
+
+/* dashboard inner layout */
+.dash-inner{
+  display:grid;
+  grid-template-columns: 56px 1fr 56px;
+  gap:0;
+  align-items:start;
+}
+
+/* side button columns */
+.dash-side{
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:8px;padding:10px 6px;
+  border-right:1px solid rgba(43,156,255,.15);
+}
+.dash-side.right{border-right:none;border-left:1px solid rgba(43,156,255,.15)}
+
+.side-btn{
+  width:32px;height:32px;border-radius:4px;
+  border:1px solid rgba(43,156,255,.4);
+  background:rgba(43,156,255,.05);
+  cursor:pointer;display:flex;align-items:center;justify-content:center;
+  font-size:8px;letter-spacing:1px;color:#2b9cff;opacity:.6;
+  transition:.15s;
+}
+.side-btn:hover{opacity:1;border-color:#ff7a1e;box-shadow:0 0 8px #ff7a1e}
+.side-btn.red{border-color:rgba(255,50,50,.4);color:#ff3232}
+.side-btn.red:hover{border-color:#ff3232;box-shadow:0 0 8px #ff3232}
+.side-btn.orange{border-color:rgba(255,140,0,.4);color:#ff8c00}
+.side-btn.green{border-color:rgba(61,255,158,.4);color:#3dff9e}
+
+/* main 3 screens area */
+.dash-screens{
+  display:grid;
+  grid-template-columns: 1fr 18px 1.5fr 18px 1fr;
+  gap:0;
+  padding:8px 8px 0;
+  align-items:start;
+  flex-shrink:0;
+}
+
+/* the divider struts between screens */
+.screen-strut{
+  display:flex;align-items:center;justify-content:center;
+  padding-top:12px;
+}
+.screen-strut-inner{
+  width:6px;height:80%;min-height:120px;
+  background:linear-gradient(180deg,rgba(43,156,255,.0),rgba(43,156,255,.5),rgba(43,156,255,.0));
+  border-radius:3px;
+  box-shadow:0 0 8px rgba(43,156,255,.4);
+}
+
+/* ===== CLICKABLE SCREEN ===== */
+.screen{
+  position:relative;
+  border:2px solid #1a3a5c;
+  border-radius:8px 8px 4px 4px;
+  background:#020810;
+  overflow:hidden;
+  cursor:pointer;
+  text-decoration:none;
+  display:block;
+  height:220px;
+  transition:border-color .2s, box-shadow .2s, transform .15s;
+}
+.screen:hover{
+  border-color:#ff7a1e;
+  box-shadow:0 0 30px rgba(255,122,30,.5), inset 0 0 30px rgba(255,122,30,.05);
+  transform:translateY(-3px);
+  z-index:10;
+}
+
+/* bezel / monitor frame effect */
+.screen-bezel{
+  position:absolute;inset:0;border-radius:6px;pointer-events:none;z-index:5;
+  box-shadow:inset 0 0 20px rgba(0,0,0,.6);
+}
+/* scan lines on each screen */
+.screen::before{
+  content:'';position:absolute;inset:0;z-index:4;pointer-events:none;
+  background:repeating-linear-gradient(180deg,rgba(0,0,0,0) 0 2px,rgba(0,0,0,.2) 2px 3px);
+  border-radius:6px;
+}
+/* corner brackets */
+.screen::after{
+  content:'';position:absolute;top:5px;right:5px;width:12px;height:12px;z-index:6;
+  border-top:2px solid rgba(255,122,30,.7);border-right:2px solid rgba(255,122,30,.7);
+}
+.c-bl{
+  position:absolute;bottom:5px;left:5px;width:12px;height:12px;z-index:6;pointer-events:none;
+  border-bottom:2px solid rgba(255,122,30,.7);border-left:2px solid rgba(255,122,30,.7);
+}
+
+/* screen content */
+.screen-content{
+  position:relative;z-index:3;
+  padding:14px 12px 12px;
+  display:flex;flex-direction:column;align-items:center;
+  min-height:0;
+  max-height:calc(100% - 28px);
+  overflow:hidden;
+}
+.screen-label{
+  position:absolute;top:0;left:0;right:0;
+  background:rgba(0,0,0,.6);
+  border-bottom:1px solid rgba(43,156,255,.2);
+  padding:4px 10px;
+  display:flex;justify-content:space-between;align-items:center;
+  z-index:6;
+}
+.screen-label .sl-title{
+  font-family:'Orbitron',sans-serif;font-size:clamp(8px,1.2vw,11px);
+  letter-spacing:3px;color:#ff7a1e;
+  text-shadow:0 0 8px rgba(255,122,30,.6);
+}
+.screen-label .sl-status{font-size:8px;letter-spacing:2px;color:#2b9cff;opacity:.6}
+
+/* "click to enter" overlay that appears on hover */
+.enter-overlay{
+  position:absolute;inset:0;z-index:7;
+  background:rgba(255,122,30,.08);
+  display:flex;align-items:center;justify-content:center;
+  opacity:0;transition:opacity .2s;
+  border-radius:6px;
+}
+.screen:hover .enter-overlay{opacity:1}
+.enter-text{
+  font-family:'Orbitron',sans-serif;font-weight:700;font-size:clamp(10px,1.4vw,14px);
+  letter-spacing:4px;color:#ff7a1e;
+  text-shadow:0 0 16px #ff7a1e;
+  border:1px solid rgba(255,122,30,.6);padding:6px 14px;border-radius:4px;
+  background:rgba(0,0,0,.6);
+}
+
+/* ---- SCREEN CONTENT: CRYPTO ---- */
+.crypto-display{
+  width:100%;padding-top:30px;
+}
+.cp-coin{
+  display:flex;justify-content:space-between;align-items:center;
+  padding:5px 4px;margin-bottom:3px;
+  border-bottom:1px solid rgba(43,156,255,.1);
+  font-size:clamp(8px,1vw,11px);
+}
+.cp-sym{color:#ff7a1e;font-weight:bold;letter-spacing:1px;width:32px;flex-shrink:0}
+.cp-price{color:#2b9cff;letter-spacing:.5px;flex:1;text-align:right}
+.cp-chg{font-size:clamp(7px,.9vw,9px);letter-spacing:.5px;width:52px;text-align:right;flex-shrink:0}
+.cp-up{color:#3dff9e}.cp-dn{color:#ff305f}
+.crypto-foot{font-size:8px;letter-spacing:2px;color:#2b9cff;opacity:.4;text-align:center;padding-top:6px}
+
+/* ---- SCREEN CONTENT: TYPING ---- */
+.type-display{
+  width:100%;padding-top:30px;font-size:clamp(9px,1.2vw,13px);line-height:1.9;
+}
+.td-done{color:#ff7a1e;text-shadow:0 0 6px rgba(255,122,30,.5)}
+.td-cur{
+  background:#2b9cff;color:#000;padding:0 1px;
+  animation:cblink 1s steps(2) infinite;
+}
+@keyframes cblink{50%{opacity:0}}
+.td-rest{color:rgba(43,156,255,.3)}
+.td-line2{color:rgba(43,156,255,.2);font-size:clamp(8px,1vw,11px)}
+.type-stats{
+  display:flex;gap:clamp(8px,1.5vw,18px);
+  font-size:clamp(7px,.9vw,10px);letter-spacing:2px;color:#2b9cff;opacity:.5;
+  margin-top:10px;
+}
+
+/* ---- SCREEN CONTENT: SUDOKU ---- */
+.sudoku-display{
+  padding-top:30px;
+  display:flex;flex-direction:column;align-items:center;gap:8px;
+  width:100%;
+}
+.sdk-grid{
+  display:grid;grid-template-columns:repeat(9,1fr);
+  border:1px solid rgba(255,20,147,.4);
+  padding:2px;gap:1px;
+  width:min(150px,90%);
+}
+.sdk-cell{
+  aspect-ratio:1;font-size:clamp(5px,.9vw,10px);font-weight:bold;
+  display:flex;align-items:center;justify-content:center;
+  color:#2b9cff;border:1px solid rgba(43,156,255,.1);
+}
+.sdk-cell:nth-child(3n){border-right:2px solid rgba(255,20,147,.5)}
+.sdk-cell:nth-child(n+19):nth-child(-n+27),
+.sdk-cell:nth-child(n+46):nth-child(-n+54){border-bottom:2px solid rgba(255,20,147,.5)}
+.sdk-nav{
+  font-size:clamp(7px,.9vw,9px);letter-spacing:2px;color:#2b9cff;opacity:.5;
+  text-align:right;align-self:flex-end;padding-right:4px;
+}
+
+/* below-screen label tabs */
+.screen-tab{
+  background:linear-gradient(180deg,rgba(43,156,255,.08),rgba(43,156,255,.03));
+  border:1px solid rgba(43,156,255,.2);
+  border-top:none;border-radius:0 0 6px 6px;
+  padding:5px 8px;text-align:center;
+  font-size:clamp(7px,.9vw,9px);letter-spacing:3px;color:#2b9cff;opacity:.5;
+}
+
+/* keyboard row (decorative) */
+.keyboard-row{
+  display:flex;justify-content:center;gap:2px;padding:2px 8px 0;
+  opacity:.35;
+}
+.key{
+  height:12px;min-width:15px;
+  border:1px solid rgba(43,156,255,.5);border-radius:2px;
+  background:rgba(0,6,20,.9);
+  display:flex;align-items:center;justify-content:center;
+  font-size:5px;color:#2b9cff;letter-spacing:.3px;
+  box-shadow:inset 0 -1px 0 rgba(0,0,0,.6);padding:0 2px;
+}
+.key.wide{min-width:28px}
+.key.space{min-width:90px}
+
+/* joystick (decorative center) */
+.joystick-wrap{
+  display:flex;justify-content:center;padding:3px 0 2px;
+}
+.joystick{
+  width:20px;height:20px;
+  border-radius:50%;border:2px solid rgba(43,156,255,.4);
+  background:radial-gradient(circle at 35% 35%,#1a2a40,#060c18);
+  box-shadow:0 0 8px rgba(43,156,255,.2);
+  display:flex;align-items:center;justify-content:center;
+}
+.joystick-dot{
+  width:6px;height:6px;border-radius:50%;
+  background:radial-gradient(circle at 35% 35%,#fff,#999);
+  box-shadow:0 0 3px rgba(255,255,255,.3);
+}
+
+/* status bar */
+#statusbar{
+  position:absolute;bottom:0;left:0;right:0;
+  display:flex;justify-content:space-between;align-items:center;
+  padding:2px 16px;
+  border-top:1px solid rgba(43,156,255,.15);
+  font-size:9px;letter-spacing:2px;color:#2b9cff;opacity:.6;
+  background:rgba(0,0,0,.4);
+}
+.blink{animation:bk 1.1s steps(2) infinite}
+@keyframes bk{50%{opacity:.2}}
+
+/* ===== HOVER CLICK CURSOR ===== */
+.screen{cursor:pointer}
+
+@media(max-width:800px){
+  #cockpit{overflow-y:auto}
+  #canopy{clip-path:none;min-height:200px}
+  .sys-status,.pilot-panel{display:none}
+  .strut{display:none}
+  .dash-screens{grid-template-columns:1fr;gap:12px;padding:8px}
+  .screen-strut{display:none}
+  .dash-side{display:none}
+  .dash-inner{grid-template-columns:1fr}
+}
+</style>
+</head>
+<body>
+<div id="cockpit">
+
+  <!-- ===== CANOPY / CITY VIEW ===== -->
+  <div id="canopy">
+    <div class="sky"></div>
+    <div id="starfield"></div>
+
+    <div id="city">
+      <svg viewBox="0 0 1400 400" preserveAspectRatio="none">
+        <defs>
+          <linearGradient id="bldg" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#2a0850"/>
+            <stop offset="100%" stop-color="#0d0020"/>
+          </linearGradient>
+          <linearGradient id="bldg2" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#380860"/>
+            <stop offset="100%" stop-color="#100028"/>
+          </linearGradient>
+        </defs>
+        <g id="city-blds"></g>
+        <g id="city-wins"></g>
+      </svg>
+    </div>
+
+    <div class="horizon"></div>
+    <div class="sky-sign">ZENITH</div>
+    <div class="sky-sign2">EGG<br>CORP</div>
+    <div id="shipzone"></div>
+
+    <!-- structural struts -->
+    <div class="strut strut-l"></div>
+    <div class="strut strut-r"></div>
+
+    <!-- top-left system status -->
+    <div class="sys-status">
+      <div class="stitle">SYSTEM STATUS</div>
+      <div class="sys-row">
+        <span style="width:90px">WEAPONS</span>
+        <div class="sys-bar"><div class="sys-fill" style="width:100%"></div></div>
+      </div>
+      <div class="sys-row">
+        <span style="width:90px">SHIELDS</span>
+        <div class="sys-bar"><div class="sys-fill" style="width:100%"></div></div>
+      </div>
+      <div class="sys-row">
+        <span style="width:90px">ENGINES</span>
+        <div class="sys-bar"><div class="sys-fill" style="width:100%"></div></div>
+      </div>
+      <div class="sys-row">
+        <span style="width:90px">LIFE SUPPORT</span>
+        <div class="sys-bar"><div class="sys-fill" style="width:100%"></div></div>
+      </div>
+      <div class="sys-row">
+        <span style="width:90px">COMMS</span>
+        <div class="sys-bar"><div class="sys-fill" style="width:92%"></div></div>
+      </div>
+      <div class="sys-row">
+        <span style="width:90px">NAVIGATION</span>
+        <div class="sys-bar"><div class="sys-fill" style="width:100%"></div></div>
+      </div>
+    </div>
+
+    <!-- top-right pilot ID -->
+    <div class="pilot-panel">
+      <div class="ptitle">— PILOT ID —</div>
+      <div class="pegg">🥚</div>
+      <div class="pname">EGG</div>
+    </div>
+
+    <!-- top center HUD -->
+    <div class="canopy-hud" style="top:0;left:50%;transform:translateX(-50%);width:auto;background:none;padding:8px 20px">
+      <div style="text-align:center">
+        <div style="font-family:'Orbitron',sans-serif;font-size:10px;letter-spacing:4px;color:#2b9cff;opacity:.7;
+          background:rgba(0,0,0,.5);border:1px solid rgba(43,156,255,.3);padding:3px 14px;border-radius:3px;">
+          SYSTEM-80
+        </div>
+      </div>
+    </div>
+
+    <!-- brand top-left -->
+    <div style="position:absolute;top:8px;left:10px;z-index:10">
+      <div class="brand">80<em>EGGS</em></div>
+    </div>
+
+    <div class="scanlines"></div>
+    <div class="vignette"></div>
+  </div>
+
+  <!-- ===== DASHBOARD ===== -->
+  <div id="dashboard">
+
+    <!-- top edge highlight of dashboard -->
+    <div style="position:absolute;top:0;left:0;right:0;height:2px;
+      background:linear-gradient(90deg,transparent,#2b9cff 20%,#2b9cff 80%,transparent);
+      box-shadow:0 0 14px #2b9cff;z-index:10"></div>
+
+    <div class="dash-inner">
+
+      <!-- left side buttons -->
+      <div class="dash-side">
+        <div class="side-btn green">ON</div>
+        <div class="side-btn">↑</div>
+        <div class="side-btn">↓</div>
+        <div class="side-btn orange">!</div>
+        <div class="side-btn red">⬛</div>
+        <div class="side-btn">≡</div>
+      </div>
+
+      <!-- screens + keyboard area -->
+      <div style="display:flex;flex-direction:column;min-height:0;justify-content:flex-start;overflow:hidden">
+
+        <!-- three screens -->
+        <div class="dash-screens">
+
+          <!-- LEFT: EGG CONTROL / CRYPTO -->
+          <div style="display:flex;flex-direction:column;gap:4px;align-self:start">
+            <a class="screen" href="crypto.html">
+              <div class="screen-label">
+                <span class="sl-title">SYSTEM MONITOR</span>
+                <span class="sl-status blink">● LIVE</span>
+              </div>
+              <div class="c-bl"></div>
+              <div class="screen-content">
+                <div class="crypto-display">
+                  <div class="cp-coin"><span class="cp-sym">BTC</span><span class="cp-price" id="p-btc">LOADING</span><span class="cp-chg" id="c-btc">--</span></div>
+                  <div class="cp-coin"><span class="cp-sym">ETH</span><span class="cp-price" id="p-eth">LOADING</span><span class="cp-chg" id="c-eth">--</span></div>
+                  <div class="cp-coin"><span class="cp-sym">SOL</span><span class="cp-price" id="p-sol">LOADING</span><span class="cp-chg" id="c-sol">--</span></div>
+                  <div class="cp-coin"><span class="cp-sym">XRP</span><span class="cp-price" id="p-xrp">LOADING</span><span class="cp-chg" id="c-xrp">--</span></div>
+                  <div class="crypto-foot" id="cfoot">CONNECTING...</div>
+                </div>
+              </div>
+              <div class="enter-overlay"><div class="enter-text">ENTER ▸</div></div>
+              <div class="screen-bezel"></div>
+            </a>
+            <div class="screen-tab">> EGG CONTROL PANEL</div>
+          </div>
+
+          <div class="screen-strut"><div class="screen-strut-inner"></div></div>
+
+          <!-- CENTER: TYPING GAME -->
+          <div style="display:flex;flex-direction:column;gap:4px;align-self:start">
+            <a class="screen" href="typing.html">
+              <div class="screen-label">
+                <span class="sl-title">TYPING GAME</span>
+                <span class="sl-status">READY</span>
+              </div>
+              <div class="c-bl"></div>
+              <div class="screen-content">
+                <div class="type-display">
+                  <div>
+                    <span class="td-done">the quick brown fox</span>
+                  </div>
+                  <div>
+                    <span class="td-done">jumps over the </span><span class="td-cur">l</span><span class="td-rest">azy dog</span>
+                  </div>
+                  <div class="td-line2" style="margin-top:4px">the electric city never sleeps_</div>
+                </div>
+                <div class="type-stats">
+                  <span>WPM: 080</span>
+                  <span>ACC: 100%</span>
+                  <span>TIME: 60</span>
+                </div>
+              </div>
+              <div class="enter-overlay"><div class="enter-text">ENTER ▸</div></div>
+              <div class="screen-bezel"></div>
+            </a>
+            <div class="screen-tab">> TYPING GAME</div>
+          </div>
+
+          <div class="screen-strut"><div class="screen-strut-inner"></div></div>
+
+          <!-- RIGHT: SUDOKU -->
+          <div style="display:flex;flex-direction:column;gap:4px;align-self:start">
+            <a class="screen" href="sudoku.html">
+              <div class="screen-label">
+                <span class="sl-title">SUDOKU 数独</span>
+                <span class="sl-status">NAVIGATION</span>
+              </div>
+              <div class="c-bl"></div>
+              <div class="screen-content">
+                <div class="sudoku-display">
+                  <div class="sdk-grid" id="sdkGrid"></div>
+                  <div class="sdk-nav">NAV SYS ●</div>
+                </div>
+              </div>
+              <div class="enter-overlay"><div class="enter-text">ENTER ▸</div></div>
+              <div class="screen-bezel"></div>
+            </a>
+            <div class="screen-tab">> SUDOKU · NAVIGATION</div>
+          </div>
+
+        </div><!-- /dash-screens -->
+
+        <!-- keyboard row -->
+        <div class="keyboard-row">
+          <div class="key wide">TAB</div>
+          <div class="key">Q</div><div class="key">W</div><div class="key">E</div>
+          <div class="key">R</div><div class="key">T</div><div class="key">Y</div>
+          <div class="key">U</div><div class="key">I</div><div class="key">O</div>
+          <div class="key">P</div><div class="key wide">BKSP</div>
+        </div>
+        <div class="keyboard-row">
+          <div class="key wide">CAPS</div>
+          <div class="key">A</div><div class="key">S</div><div class="key">D</div>
+          <div class="key">F</div><div class="key">G</div><div class="key">H</div>
+          <div class="key">J</div><div class="key">K</div><div class="key">L</div>
+          <div class="key wide">ENTER</div>
+        </div>
+        <div class="keyboard-row">
+          <div class="key wide">SHIFT</div>
+          <div class="key">Z</div><div class="key">X</div><div class="key">C</div>
+          <div class="key">V</div><div class="key">B</div><div class="key">N</div>
+          <div class="key">M</div><div class="key wide">SHIFT</div>
+        </div>
+        <div class="keyboard-row">
+          <div class="key wide">CTRL</div>
+          <div class="key wide">ALT</div>
+          <div class="key space"></div>
+          <div class="key wide">ALT</div>
+          <div class="key wide">CTRL</div>
+        </div>
+        <div class="joystick-wrap">
+          <div class="joystick"><div class="joystick-dot"></div></div>
+        </div>
+
+      </div><!-- /flex col -->
+
+      <!-- right side buttons -->
+      <div class="dash-side right">
+        <div class="side-btn green">⬛</div>
+        <div class="side-btn">←</div>
+        <div class="side-btn">→</div>
+        <div class="side-btn orange">⚡</div>
+        <div class="side-btn red">✕</div>
+        <div class="side-btn">◈</div>
+      </div>
+
+    </div><!-- /dash-inner -->
+
+    <!-- status bar -->
+    <div id="statusbar">
+      <span>SYS: NOMINAL · WEAPONS ONLINE · SHIELDS 100%</span>
+      <span class="blink">● REC</span>
+      <span id="clock">--:--:--</span>
+    </div>
+
+  </div><!-- /dashboard -->
+</div><!-- /cockpit -->
+
+<script>
+/* ---- stars ---- */
+(function(){
+  const c=document.getElementById('starfield');
+  for(let i=0;i<100;i++){
+    const s=document.createElement('div');
+    s.className='star';
+    const sz=Math.random()*2+.5;
+    s.style.cssText=`position:absolute;width:${sz}px;height:${sz}px;
+      top:${Math.random()*80}%;left:${Math.random()*100}%;
+      animation-delay:${Math.random()*4}s;animation-duration:${2+Math.random()*3}s;
+      opacity:${.3+Math.random()*.7}`;
+    c.appendChild(s);
+  }
+})();
+
+/* ---- city skyline ---- */
+(function(){
+  const ns='http://www.w3.org/2000/svg';
+  const blds=document.getElementById('city-blds');
+  const wins=document.getElementById('city-wins');
+  let x=0;
+  const grads=['url(#bldg)','url(#bldg2)'];
+  while(x<1400){
+    const w=18+Math.random()*55, h=60+Math.random()*280, y=400-h;
+    const r=document.createElementNS(ns,'rect');
+    r.setAttribute('x',x.toFixed(1)); r.setAttribute('y',y.toFixed(1));
+    r.setAttribute('width',w.toFixed(1)); r.setAttribute('height',h.toFixed(1));
+    r.setAttribute('fill',grads[Math.floor(Math.random()*2)]);
+    blds.appendChild(r);
+    for(let wy=y+8;wy<392;wy+=10){
+      for(let wx=x+4;wx<x+w-4;wx+=9){
+        if(Math.random()<0.28){
+          const win=document.createElementNS(ns,'rect');
+          win.setAttribute('x',wx.toFixed(1)); win.setAttribute('y',wy.toFixed(1));
+          win.setAttribute('width','3'); win.setAttribute('height','4');
+          const lit=Math.random()<0.2;
+          win.setAttribute('fill', lit?'#ff7ad1':'#36204f');
+          if(lit) win.style.animation=`twinkle ${2+Math.random()*4}s ease-in-out ${Math.random()*4}s infinite`;
+          wins.appendChild(win);
+        }
+      }
+    }
+    x+=w+2+Math.random()*12;
+  }
+})();
+
+/* ---- flying ships ---- */
+(function(){
+  const zone=document.getElementById('shipzone');
+  function makeShip(){
+    const s=document.createElement('div');
+    s.className='ship';
+    const top=5+Math.random()*60, dur=10+Math.random()*18;
+    s.style.cssText=`position:absolute;top:${top}%;
+      animation-duration:${dur}s;animation-delay:${-Math.random()*dur}s`;
+    const big=Math.random()>.4;
+    s.innerHTML=big
+      ? `<svg width="90" height="26" viewBox="0 0 90 26" fill="none">
+          <ellipse cx="45" cy="16" rx="42" ry="9" fill="#1a0a3a" opacity=".9"/>
+          <rect x="22" y="7" width="46" height="9" rx="4" fill="#28104e" opacity=".9"/>
+          <ellipse cx="45" cy="16" rx="42" ry="9" fill="none" stroke="#ff1493" stroke-width="1" opacity=".5"/>
+          <rect x="6" y="16" width="8" height="2" fill="#ff1493" opacity=".9"/>
+          <rect x="76" y="16" width="8" height="2" fill="#2b9cff" opacity=".9"/>
+          <circle cx="14" cy="16" r="2.5" fill="#ff1493" opacity=".9"/>
+          <circle cx="76" cy="16" r="2.5" fill="#2b9cff" opacity=".9"/>
+        </svg>`
+      : `<svg width="44" height="14" viewBox="0 0 44 14" fill="none">
+          <ellipse cx="22" cy="8" rx="20" ry="5" fill="#100830" opacity=".85"/>
+          <ellipse cx="22" cy="8" rx="20" ry="5" fill="none" stroke="#2b9cff" stroke-width="1" opacity=".4"/>
+          <circle cx="8" cy="8" r="1.5" fill="#ff7a1e" opacity=".8"/>
+        </svg>`;
+    zone.appendChild(s);
+  }
+  for(let i=0;i<7;i++) makeShip();
+})();
+
+/* ---- sudoku grid preview ---- */
+(function(){
+  const g=document.getElementById('sdkGrid');
+  const d=[5,3,0,0,7,0,0,0,0,6,0,0,1,9,5,0,0,0,0,9,8,0,0,0,0,6,0,
+           8,0,0,0,6,0,0,0,3,4,0,0,8,0,3,0,0,1,7,0,0,0,2,0,0,0,6,
+           0,6,0,0,0,0,2,8,0,0,0,0,4,1,9,0,0,5,0,0,0,0,8,0,0,7,9];
+  d.forEach(v=>{
+    const c=document.createElement('div');
+    c.className='sdk-cell';
+    c.textContent=v||'';
+    g.appendChild(c);
+  });
+})();
+
+/* ---- live crypto prices ---- */
+(function(){
+  const URL='https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,ethereum,ripple,solana&vs_currencies=usd&include_24hr_change=true';
+  function fmt(v){
+    if(v>=1000) return '$'+v.toLocaleString('en-US',{maximumFractionDigits:0});
+    if(v>=1) return '$'+v.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
+    return '$'+v.toLocaleString('en-US',{minimumFractionDigits:4,maximumFractionDigits:4});
+  }
+  const MAP={bitcoin:['p-btc','c-btc'],ethereum:['p-eth','c-eth'],solana:['p-sol','c-sol'],ripple:['p-xrp','c-xrp']};
+  async function load(){
+    try{
+      const r=await fetch(URL,{cache:'no-store'});
+      if(!r.ok) return;
+      const d=await r.json();
+      for(const[k,[pi,ci]] of Object.entries(MAP)){
+        const c=d[k]; if(!c) continue;
+        document.getElementById(pi).textContent=fmt(c.usd);
+        const chg=c.usd_24h_change??0, up=chg>=0;
+        const ce=document.getElementById(ci);
+        ce.textContent=(up?'▲ +':'▼ ')+chg.toFixed(2)+'%';
+        ce.className=up?'cp-chg cp-up':'cp-chg cp-dn';
+      }
+      const t=new Date();
+      document.getElementById('cfoot').textContent='LIVE · '+t.toLocaleTimeString('en-US',{hour12:false});
+    }catch(e){ document.getElementById('cfoot').textContent='FEED OFFLINE'; }
+  }
+  load(); setInterval(load,60000);
+})();
+
+/* ---- clock ---- */
+(function(){
+  const cl=document.getElementById('clock');
+  function tick(){
+    const n=new Date();
+    cl.textContent=[n.getHours(),n.getMinutes(),n.getSeconds()].map(x=>String(x).padStart(2,'0')).join(':');
+  }
+  tick(); setInterval(tick,1000);
+})();
+
+/* ---- size dashboard to fill remaining space ---- */
+(function(){
+  function resize(){
+    const dash=document.getElementById('dashboard');
+    const total=window.innerHeight;
+    dash.style.height=Math.round(total*0.50)+'px';
+  }
+  resize();
+  window.addEventListener('resize',resize);
+})();
+</script>
+</body>
+</html>

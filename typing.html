@@ -1,0 +1,1332 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NEON // TYPERACER</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@500;700;900&family=VT323&display=swap" rel="stylesheet">
+<style>
+/* ===================== THEME TOKENS ===================== */
+:root{
+  --mono:'Share Tech Mono','Courier New',monospace;
+  --title:'Orbitron','Share Tech Mono',sans-serif;
+  --fs:clamp(20px,2.6vw,30px);
+  --lh:clamp(34px,4.4vw,48px);
+}
+
+/* VICE — Neo Miami synthwave (magenta + cyan) */
+.theme-vice{
+  --bg:#0a0612; --bg2:#160a22;
+  --accent:#ff2d9b; --accent2:#2de2e6;
+  --panel:rgba(10,8,24,.55); --border:#ff2d9b;
+  --hud:#2de2e6; --hud2:#ff2d9b;
+  --text-dim:#1d7e84; --text-on:#7ff7ff; --text-glow:#2de2e6;
+  --error:#ff305f;
+  --key-face:rgba(20,12,36,.5); --key-edge:#19505a; --key-text:#34c6d0;
+  --key-press:#2de2e6; --key-hint:#ff2d9b;
+  --sun1:#ff2d9b; --sun2:#ff7a3c; --grid:#ff2d9b;
+  --title-font:var(--title); --type-weight:400;
+}
+/* TRON — grid blue */
+.theme-tron{
+  --bg:#000305; --bg2:#02080d;
+  --accent:#00e5ff; --accent2:#00b0d4;
+  --panel:rgba(0,12,18,.5); --border:#00c8e6;
+  --hud:#46e8ff; --hud2:#00c8e6;
+  --text-dim:#0c6a78; --text-on:#cdf8ff; --text-glow:#7df0ff;
+  --error:#ff4d4d;
+  --key-face:rgba(2,14,20,.55); --key-edge:#0a5566; --key-text:#3fd6ef;
+  --key-press:#00e5ff; --key-hint:#ffcf3a;
+  --sun1:#00e5ff; --sun2:#0090c0; --grid:#00b8de;
+  --title-font:var(--title); --type-weight:400;
+}
+/* RUNNER — Blade Runner orange/teal */
+.theme-runner{
+  --bg:#04080a; --bg2:#06110f;
+  --accent:#ff7a18; --accent2:#42b9c7;
+  --panel:rgba(4,12,14,.5); --border:#ff7a18;
+  --hud:#ff8a2a; --hud2:#42b9c7;
+  --text-dim:#2c7480; --text-on:#cdf3f7; --text-glow:#6fdfe9;
+  --error:#ff3b3b;
+  --key-face:rgba(8,16,18,.55); --key-edge:#1a5a60; --key-text:#3fb0bd;
+  --key-press:#42d6e6; --key-hint:#ff7a18;
+  --sun1:#ff7a18; --sun2:#ff3d00; --grid:#1a5a60;
+  --title-font:var(--title); --type-weight:400;
+}
+/* PHOSPHOR — green CRT terminal (the 4th, original look) */
+.theme-phosphor{
+  --bg:#020a04; --bg2:#041206;
+  --accent:#33ff77; --accent2:#9dff5a;
+  --panel:rgba(4,16,8,.45); --border:#1fae4f;
+  --hud:#5dff8e; --hud2:#33ff77;
+  --text-dim:#176b34; --text-on:#d6ffe2; --text-glow:#7dffa4;
+  --error:#ff5a4d;
+  --key-face:rgba(6,20,10,.5); --key-edge:#15622f; --key-text:#3ec96a;
+  --key-press:#5dff8e; --key-hint:#d6ff33;
+  --sun1:#33ff77; --sun2:#0c6b2a; --grid:#176b34;
+  --title-font:'VT323',var(--title); --type-weight:400;
+}
+/* NEON SIGNS — each word lights up in its own neon color */
+.theme-neon{
+  --bg:#070409; --bg2:#0e0712;
+  --accent:#ff2d9b; --accent2:#2de2e6;
+  --panel:rgba(8,5,14,.55); --border:#ff2d9b;
+  --hud:#2de2e6; --hud2:#ff7ad1;
+  --text-dim:#3a2436; --text-on:#ffffff; --text-glow:#ffffff;
+  --error:#ff3b5f;
+  --key-face:rgba(16,8,20,.5); --key-edge:#3a1f42; --key-text:#c46bd0;
+  --key-press:#ff2d9b; --key-hint:#2de2e6;
+  --sun1:#ff2d9b; --sun2:#7a1f6b; --grid:#ff2d9b;
+  --title-font:var(--title); --type-weight:400;
+}
+/* EXO-FRAME — mech cockpit: blue anime glass, orange lettering */
+.theme-mech{
+  --bg:#02060f; --bg2:#061226;
+  --accent:#2b9cff; --accent2:#ff7a1e;
+  --panel:rgba(8,24,48,.5); --border:#2b9cff;
+  --hud:#ff8a2e; --hud2:#5fb6ff;
+  --text-dim:#7a4a1e; --text-on:#fff0dc; --text-glow:#ff9a3c;
+  --error:#ff4d4d;
+  --key-face:rgba(10,28,54,.5); --key-edge:#1d4f86; --key-text:#ff9a3c;
+  --key-press:#ff7a1e; --key-hint:#ff7a1e;
+  --sun1:#2b9cff; --sun2:#0a3a6b; --grid:#1d4f86;
+  --title-font:var(--title); --type-weight:400;
+}
+
+/* ===================== BASE ===================== */
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{
+  background:#000;
+  font-family:var(--mono);
+  color:var(--hud);
+  overflow:hidden;
+  -webkit-font-smoothing:antialiased;
+}
+#app{
+  position:relative;
+  height:100vh;
+  width:100vw;
+  background:radial-gradient(120% 90% at 50% 8%, var(--bg2), var(--bg) 70%);
+  display:flex;
+  flex-direction:column;
+  overflow:hidden;
+  transition:background .5s ease;
+}
+
+/* ===================== DECORATIVE BACKGROUND ===================== */
+.bg{position:absolute;inset:0;overflow:hidden;pointer-events:none;z-index:0}
+.bg-sun{
+  position:absolute; top:6%; right:6%;
+  width:340px;height:340px;border-radius:50%;
+  background:radial-gradient(circle at 50% 40%, var(--sun1), var(--sun2) 60%, transparent 72%);
+  filter:blur(2px); opacity:.55;
+  -webkit-mask-image:repeating-linear-gradient(180deg,#000 0 10px,transparent 10px 16px);
+  mask-image:repeating-linear-gradient(180deg,#000 0 10px,transparent 10px 16px);
+  animation:sunpulse 5s ease-in-out infinite;
+}
+.theme-tron .bg-sun,.theme-phosphor .bg-sun,.theme-neon .bg-sun,.theme-mech .bg-sun{display:none}
+.theme-neon .bg-grid{display:none}
+@keyframes sunpulse{0%,100%{opacity:.5;transform:scale(1)}50%{opacity:.7;transform:scale(1.03)}}
+.bg-grid{
+  position:absolute; left:-20%; right:-20%; bottom:-10%; height:55%;
+  background-image:
+    linear-gradient(var(--grid) 1px,transparent 1px),
+    linear-gradient(90deg,var(--grid) 1px,transparent 1px);
+  background-size:60px 60px;
+  transform:perspective(420px) rotateX(68deg);
+  transform-origin:bottom;
+  opacity:.18;
+  -webkit-mask-image:linear-gradient(transparent,#000 60%);
+  mask-image:linear-gradient(transparent,#000 60%);
+  animation:gridrun 6s linear infinite;
+}
+@keyframes gridrun{0%{background-position:0 0,0 0}100%{background-position:0 60px,0 0}}
+.bg-radar{
+  position:absolute; left:4%; top:30%;
+  width:160px;height:160px;border-radius:50%;
+  border:1px solid var(--accent);
+  background:
+    radial-gradient(circle,transparent 60%,rgba(0,229,255,.04)),
+    repeating-radial-gradient(circle,transparent 0 18px,rgba(0,229,255,.12) 18px 19px);
+  opacity:0; display:none;
+}
+.theme-tron .bg-radar{display:block;opacity:.25;animation:spin 12s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.bg-rain{position:absolute;inset:0;opacity:0;display:none}
+.theme-runner .bg-rain{display:block;opacity:.4;
+  background-image:repeating-linear-gradient(100deg,transparent 0 6px,rgba(120,200,210,.10) 6px 7px);
+  background-size:14px 100%;
+  animation:rain .5s linear infinite;
+}
+@keyframes rain{to{background-position:-40px 200px}}
+.bg-scan{
+  position:absolute;inset:0;
+  background:repeating-linear-gradient(180deg,rgba(0,0,0,0) 0 2px,rgba(0,0,0,.22) 2px 4px);
+  opacity:.5; mix-blend-mode:multiply;
+}
+.bg-vignette{
+  position:absolute;inset:0;
+  box-shadow:inset 0 0 180px 40px rgba(0,0,0,.9);
+}
+.theme-phosphor .bg-vignette{box-shadow:inset 0 0 220px 70px rgba(0,0,0,.95);animation:flicker 6s steps(60) infinite}
+@keyframes flicker{0%,100%{opacity:1}97%{opacity:.92}98%{opacity:1}}
+
+/* ===================== SCREEN LAYOUT ===================== */
+.screen{
+  position:relative;z-index:2;
+  flex:1; display:flex; flex-direction:column;
+  padding:clamp(10px,2vw,26px);
+  gap:clamp(8px,1.4vh,16px);
+  min-height:0;
+}
+
+/* HUD */
+.hud{
+  display:flex;align-items:stretch;gap:12px;flex-wrap:wrap;
+}
+.logo{display:flex;flex-direction:column;justify-content:center;padding-right:8px;min-width:170px}
+.logo h1{
+  font-family:var(--title-font);font-weight:900;font-size:clamp(22px,3vw,34px);
+  letter-spacing:1px;color:var(--accent);
+  text-shadow:0 0 8px var(--accent),0 0 18px var(--accent);
+  line-height:1;
+}
+.logo h1 .slash{color:var(--accent2);text-shadow:0 0 8px var(--accent2)}
+.logo .sub{font-size:11px;letter-spacing:3px;color:var(--hud2);opacity:.8;margin-top:4px}
+
+.statgrid{display:flex;gap:10px;flex:1;flex-wrap:wrap;align-items:stretch;justify-content:flex-end}
+.stat{
+  border:1px solid var(--border);border-radius:8px;
+  padding:6px 14px;min-width:84px;
+  background:var(--panel);
+  box-shadow:0 0 12px -4px var(--accent),inset 0 0 18px -10px var(--accent);
+  display:flex;flex-direction:column;justify-content:center;
+}
+.stat .lab{font-size:9px;letter-spacing:2px;color:var(--hud2);opacity:.85}
+.stat .val{font-family:var(--title-font);font-size:clamp(16px,2.1vw,24px);color:var(--hud);
+  text-shadow:0 0 8px var(--accent2);line-height:1.1}
+.stat.feed{min-width:96px}
+.eq{display:flex;align-items:flex-end;gap:2px;height:24px;margin-top:2px}
+.eq i{width:4px;background:var(--accent2);box-shadow:0 0 6px var(--accent2);animation:eq 1s ease-in-out infinite}
+.eq i:nth-child(2){animation-delay:.15s}.eq i:nth-child(3){animation-delay:.3s}
+.eq i:nth-child(4){animation-delay:.45s}.eq i:nth-child(5){animation-delay:.1s}
+.eq i:nth-child(6){animation-delay:.35s}.eq i:nth-child(7){animation-delay:.25s}
+@keyframes eq{0%,100%{height:20%}50%{height:100%}}
+
+/* theme switcher */
+.themebar{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.themebar button{
+  font-family:var(--mono);font-size:10px;letter-spacing:1px;cursor:pointer;
+  padding:6px 8px;border-radius:6px;background:transparent;color:var(--hud2);
+  border:1px solid var(--border);opacity:.55;transition:.2s;
+}
+.themebar button:hover{opacity:1}
+.themebar button.on{opacity:1;background:var(--accent);color:#000;box-shadow:0 0 12px var(--accent)}
+
+/* TEXT PANEL */
+.panel{
+  position:relative;flex:1;min-height:0;
+  border:1.5px solid var(--border);border-radius:14px;
+  background:var(--panel);
+  box-shadow:0 0 26px -8px var(--accent),inset 0 0 40px -18px var(--accent);
+  padding:clamp(12px,2vw,22px) clamp(16px,2.4vw,30px);
+  display:flex;flex-direction:column;overflow:hidden;
+}
+.panel .prompt{font-size:13px;letter-spacing:2px;color:var(--hud2);margin-bottom:10px;opacity:.9}
+.panel .prompt::before{content:"> "}
+
+.viewport{
+  position:relative;overflow:hidden;
+  height:calc(var(--lh) * 3);
+  display:flex;align-items:flex-start;
+}
+.stream{
+  position:relative;
+  font-size:var(--fs);line-height:var(--lh);
+  letter-spacing:1px;
+  color:var(--text-dim);
+  font-weight:var(--type-weight);
+  transition:transform .18s ease;
+  will-change:transform;
+  white-space:normal;
+}
+.word{display:inline-block;white-space:nowrap}
+.sp{display:inline;white-space:pre}
+.ch{transition:color .05s,text-shadow .05s}
+.ch.ok{color:var(--text-glow);text-shadow:0 0 8px var(--text-glow),0 0 16px var(--text-glow)}
+.ch.bad{color:var(--error);text-shadow:0 0 8px var(--error);text-decoration:line-through;
+  text-decoration-color:var(--error)}
+.ch.bad.sp{background:rgba(255,60,90,.35);border-radius:2px}
+.ch.cur{
+  background:var(--text-glow);color:#000;border-radius:2px;
+  box-shadow:0 0 10px var(--text-glow);
+  animation:caret 1s steps(2) infinite;
+}
+@keyframes caret{50%{background:transparent;color:var(--text-on);box-shadow:none}}
+
+/* KEYBOARD */
+.keyboard{
+  z-index:2;display:flex;flex-direction:column;gap:clamp(4px,.8vh,8px);
+  align-items:center;
+  padding:clamp(8px,1.4vh,16px);
+}
+.krow{display:flex;gap:clamp(3px,.5vw,7px);justify-content:center;width:100%}
+.key{
+  position:relative;
+  flex:1 1 0;min-width:0;max-width:clamp(40px,4.4vw,70px);
+  height:clamp(34px,5.2vh,56px);
+  border:1px solid var(--key-edge);border-radius:8px;
+  background:var(--key-face);
+  color:var(--key-text);
+  font-family:var(--mono);font-size:clamp(10px,1.1vw,15px);
+  display:flex;align-items:center;justify-content:center;flex-direction:column;
+  line-height:1.05;
+  box-shadow:inset 0 0 14px -8px var(--accent2);
+  transition:transform .05s, box-shadow .12s, color .12s, background .12s;
+  user-select:none;
+}
+.key .small{font-size:.7em;opacity:.7}
+.key.wide{flex:2 1 0;max-width:none}
+.key.spacer{flex:9 1 0;max-width:none}
+.key.tab,.key.caps,.key.shift,.key.bksp,.key.enter,.key.ctrl,.key.alt{
+  font-size:clamp(8px,.85vw,12px);color:var(--key-hint);letter-spacing:1px;
+}
+.key.nexthint{
+  border-color:var(--key-hint);
+  color:var(--key-hint);
+  box-shadow:0 0 14px var(--key-hint),inset 0 0 18px -6px var(--key-hint);
+}
+.key.pressed{
+  transform:translateY(2px);
+  background:var(--key-press);
+  color:#04060a;
+  border-color:var(--key-press);
+  box-shadow:0 0 22px var(--key-press),0 0 40px var(--key-press);
+}
+
+/* status footer */
+.footer{display:flex;justify-content:space-between;font-size:11px;letter-spacing:2px;
+  color:var(--hud2);opacity:.7;padding:0 6px}
+
+/* ===================== OVERLAYS ===================== */
+.overlay{
+  position:absolute;inset:0;z-index:20;
+  background:rgba(0,0,0,.72);
+  backdrop-filter:blur(3px);
+  display:flex;align-items:center;justify-content:center;
+  padding:20px;
+}
+.overlay.hidden{display:none}
+.card{
+  width:min(640px,94vw);
+  max-height:94vh;overflow:auto;
+  border:1.5px solid var(--border);border-radius:18px;
+  background:linear-gradient(160deg,var(--bg2),var(--bg));
+  box-shadow:0 0 50px -10px var(--accent),inset 0 0 60px -30px var(--accent);
+  padding:clamp(22px,4vw,40px);
+  text-align:center;
+}
+.card h2{font-family:var(--title-font);font-size:clamp(26px,5vw,44px);color:var(--accent);
+  text-shadow:0 0 12px var(--accent);letter-spacing:2px;margin-bottom:4px}
+.card .tag{color:var(--hud2);letter-spacing:3px;font-size:12px;margin-bottom:22px;opacity:.85}
+
+.optblock{margin-bottom:20px;text-align:left}
+.optblock .ol{font-size:11px;letter-spacing:3px;color:var(--hud2);margin-bottom:8px;opacity:.8}
+.opts{display:flex;gap:8px;flex-wrap:wrap}
+.opt{
+  flex:1 1 auto;min-width:84px;cursor:pointer;
+  border:1px solid var(--key-edge);border-radius:10px;
+  background:var(--panel);color:var(--hud);
+  font-family:var(--mono);font-size:13px;letter-spacing:1px;
+  padding:11px 10px;text-align:center;transition:.18s;
+}
+.opt:hover{border-color:var(--accent2)}
+.opt.sel{border-color:var(--accent);color:#000;background:var(--accent);
+  box-shadow:0 0 16px var(--accent)}
+.opt .d{display:block;font-size:9px;letter-spacing:1px;opacity:.7;margin-top:3px}
+.opt.sel .d{opacity:.85}
+
+.go{
+  margin-top:8px;width:100%;cursor:pointer;
+  font-family:var(--title-font);font-weight:700;font-size:18px;letter-spacing:3px;
+  padding:16px;border-radius:12px;
+  background:var(--accent);color:#04060a;border:none;
+  box-shadow:0 0 26px var(--accent);
+  transition:.15s;
+}
+.go:hover{filter:brightness(1.12)}
+.go.ghost{background:transparent;color:var(--hud);border:1px solid var(--border);
+  box-shadow:none;margin-top:10px;font-size:14px}
+.go.ghost:hover{background:var(--panel)}
+.hint{font-size:11px;color:var(--hud2);opacity:.7;margin-top:14px;letter-spacing:1px}
+
+/* results grid */
+.bigwpm{font-family:var(--title-font);font-size:clamp(56px,12vw,96px);color:var(--text-glow);
+  text-shadow:0 0 20px var(--text-glow),0 0 40px var(--text-glow);line-height:1}
+.bigwpm small{display:block;font-size:14px;letter-spacing:5px;color:var(--hud2);
+  text-shadow:none;margin-top:-2px}
+.rgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:22px 0}
+.rcell{border:1px solid var(--key-edge);border-radius:10px;padding:12px 6px;background:var(--panel)}
+.rcell .rv{font-family:var(--title-font);font-size:22px;color:var(--hud);text-shadow:0 0 8px var(--accent2)}
+.rcell .rl{font-size:9px;letter-spacing:2px;color:var(--hud2);opacity:.8;margin-top:4px}
+
+@media (max-width:560px){
+  .logo{min-width:120px}
+  .stat{min-width:64px;padding:5px 8px}
+  .themebar button{padding:5px 6px}
+}
+
+/* ---- NEON SIGN THEME (per-word color, light-up) ---- */
+.theme-neon .word{color:var(--wcd)}
+.theme-neon .ch{text-shadow:0 0 4px var(--wcd)}
+.theme-neon .ch.ok{
+  color:var(--wc);
+  text-shadow:0 0 2px #fff,0 0 7px var(--wc),0 0 16px var(--wc),0 0 26px var(--wc);
+  animation:neonOn .42s ease-out;
+}
+.theme-neon .ch.bad{
+  color:var(--error);text-shadow:0 0 8px var(--error);
+  text-decoration:line-through;text-decoration-color:var(--error);
+}
+.theme-neon .ch.cur{background:#fff;color:#000;box-shadow:0 0 12px #fff}
+@keyframes neonOn{0%{opacity:.12}8%{opacity:1}14%{opacity:.3}24%{opacity:1}40%{opacity:.55}55%{opacity:1}72%{opacity:.82}100%{opacity:1}}
+.bg-neonfloor{position:absolute;left:0;right:0;bottom:0;height:42%;display:none;
+  background:radial-gradient(120% 80% at 50% 125%,rgba(255,45,155,.16),rgba(45,226,230,.06) 45%,transparent 65%);
+  filter:blur(10px)}
+.theme-neon .bg-neonfloor{display:block}
+
+/* ---- MECH HUD THEME (blue glass / orange lettering) ---- */
+.bg-glass{position:absolute;inset:0;display:none}
+.theme-mech .bg-glass{display:block;
+  background:
+    linear-gradient(125deg,transparent 0 30%,rgba(95,182,255,.07) 32% 39%,transparent 41%),
+    linear-gradient(125deg,transparent 0 58%,rgba(95,182,255,.05) 60% 66%,transparent 68%),
+    radial-gradient(80% 60% at 50% 0%,rgba(43,156,255,.12),transparent 60%);
+}
+.theme-mech .panel{border-radius:4px;
+  clip-path:polygon(0 0,calc(100% - 20px) 0,100% 20px,100% 100%,20px 100%,0 calc(100% - 20px));
+}
+.theme-mech .bg-radar{display:block;opacity:.16;border-color:var(--accent);animation:spin 18s linear infinite}
+.theme-mech .bg-grid{opacity:.09}
+.theme-mech .key{clip-path:polygon(7px 0,100% 0,100% calc(100% - 7px),calc(100% - 7px) 100%,0 100%,0 7px)}
+.theme-mech .stat,.theme-mech .opt{border-radius:3px}
+
+/* ---- RECORDS UI ---- */
+.recwrap{display:flex;gap:14px;text-align:left;margin:18px 0;flex-wrap:wrap}
+.reccol{flex:1 1 220px;border:1px solid var(--key-edge);border-radius:10px;background:var(--panel);padding:12px 14px}
+.reccol h3{font-family:var(--title-font);font-size:13px;letter-spacing:2px;color:var(--accent);
+  margin-bottom:10px;text-shadow:0 0 8px var(--accent)}
+.scorerow{display:flex;align-items:baseline;gap:8px;font-size:14px;padding:5px 0;
+  border-bottom:1px dashed rgba(255,255,255,.07);color:var(--hud)}
+.scorerow:last-child{border-bottom:none}
+.scorerow .rk{color:var(--hud2);width:24px;flex:none;font-family:var(--title-font)}
+.scorerow .sc{flex:0 0 auto;font-family:var(--title-font)}
+.scorerow .sm{margin-left:auto;color:var(--hud2);opacity:.75;font-size:10px;letter-spacing:1px}
+.scorerow.me{color:#fff;text-shadow:0 0 8px var(--accent)}
+.scorerow.me .rk,.scorerow.me .sc{color:var(--accent)}
+.missrow{display:flex;align-items:center;gap:10px;padding:6px 0}
+.missrow .ml{font-family:var(--title-font);font-size:22px;width:26px;text-align:center;
+  color:var(--accent);text-shadow:0 0 10px var(--accent);text-transform:uppercase}
+.missrow .mbar{flex:1;height:9px;border-radius:5px;background:rgba(255,255,255,.08);overflow:hidden}
+.missrow .mbar i{display:block;height:100%;background:var(--accent);box-shadow:0 0 8px var(--accent);transition:width .4s}
+.missrow .mc{font-size:12px;color:var(--hud2);width:40px;text-align:right}
+.recempty{font-size:12px;color:var(--hud2);opacity:.6;padding:8px 0}
+</style>
+</head>
+<body>
+<div id="app" class="theme-vice">
+
+  <div class="bg">
+    <div class="bg-sun"></div>
+    <div class="bg-grid"></div>
+    <div class="bg-radar"></div>
+    <div class="bg-rain"></div>
+    <div class="bg-glass"></div>
+    <div class="bg-neonfloor"></div>
+    <div class="bg-scan"></div>
+    <div class="bg-vignette"></div>
+  </div>
+
+  <div class="screen">
+    <!-- HUD -->
+    <div class="hud">
+      <div class="logo">
+        <h1 id="logoTitle">TYPE<span class="slash">//</span>RACER</h1>
+        <div class="sub" id="logoSub">NEO MIAMI TERMINAL_1987</div>
+      </div>
+      <div class="statgrid">
+        <div class="stat"><span class="lab">TIME</span><span class="val" id="sTime">01:00</span></div>
+        <div class="stat"><span class="lab">WPM</span><span class="val" id="sWpm">0</span></div>
+        <div class="stat"><span class="lab">ACCURACY</span><span class="val" id="sAcc">100%</span></div>
+        <div class="stat"><span class="lab">SCORE</span><span class="val" id="sScore">0</span></div>
+        <div class="stat feed"><span class="lab">LIVE FEED</span>
+          <div class="eq"><i style="height:40%"></i><i style="height:70%"></i><i style="height:50%"></i><i style="height:90%"></i><i style="height:30%"></i><i style="height:65%"></i><i style="height:45%"></i></div>
+        </div>
+        <div class="themebar" id="themebar">
+          <button data-theme="theme-vice" class="on">VICE</button>
+          <button data-theme="theme-tron">TRON</button>
+          <button data-theme="theme-runner">RUNNER</button>
+          <button data-theme="theme-phosphor">CRT-80</button>
+          <button data-theme="theme-neon">NEON</button>
+          <button data-theme="theme-mech">MECH</button>
+        </div>
+        <div class="themebar" id="audiobar">
+          <button class="audio-toggle on" data-audio="music">♪ MUSIC</button>
+          <button class="audio-toggle on" data-audio="sfx">▣ SFX</button>
+          <button class="audio-toggle" id="voiceBtn">🗣 VOICE OFF</button>
+          <button class="audio-toggle on" id="trackBtn">♫ NIGHT DRIVE</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- TEXT PANEL -->
+    <div class="panel">
+      <div class="prompt">TYPE THE FOLLOWING:</div>
+      <div class="viewport"><div class="stream" id="stream"></div></div>
+    </div>
+
+    <!-- KEYBOARD -->
+    <div class="keyboard" id="keyboard"></div>
+
+    <div class="footer">
+      <span id="fLeft">MODE: ARCADE</span>
+      <span id="fRight">TRACK: NIGHT DRIVE</span>
+    </div>
+  </div>
+
+  <!-- START OVERLAY -->
+  <div class="overlay" id="startOverlay">
+    <div class="card">
+      <h2 id="startTitle">TYPE//RACER</h2>
+      <div class="tag">RETRO TYPING TERMINAL</div>
+
+      <div class="optblock">
+        <div class="ol">AESTHETIC</div>
+        <div class="opts" id="optTheme">
+          <div class="opt sel" data-theme="theme-vice">VICE<span class="d">MIAMI '87</span></div>
+          <div class="opt" data-theme="theme-tron">TRON<span class="d">THE GRID</span></div>
+          <div class="opt" data-theme="theme-runner">RUNNER<span class="d">2049</span></div>
+          <div class="opt" data-theme="theme-phosphor">CRT-80<span class="d">PHOSPHOR</span></div>
+          <div class="opt" data-theme="theme-neon">NEON<span class="d">SIGNS</span></div>
+          <div class="opt" data-theme="theme-mech">MECH<span class="d">EXO-HUD</span></div>
+        </div>
+      </div>
+
+      <div class="optblock">
+        <div class="ol">DURATION</div>
+        <div class="opts" id="optDur">
+          <div class="opt sel" data-dur="60">1 MIN</div>
+          <div class="opt" data-dur="180">3 MIN</div>
+          <div class="opt" data-dur="300">5 MIN</div>
+        </div>
+      </div>
+
+      <div class="optblock">
+        <div class="ol">CONTENT</div>
+        <div class="opts" id="optMode">
+          <div class="opt sel" data-mode="words">RANDOM<span class="d">WORDS</span></div>
+          <div class="opt" data-mode="sentences">SENTENCES<span class="d">REAL TEXT</span></div>
+          <div class="opt" data-mode="dialog">DIALOG<span class="d">FULL PAGES</span></div>
+        </div>
+      </div>
+
+      <div class="optblock">
+        <div class="ol">AUDIO</div>
+        <div class="opts" id="optAudio">
+          <div class="opt audio-opt sel" data-audio="sfx">SFX<span class="d">KEY CLICKS</span></div>
+          <div class="opt audio-opt sel" data-audio="music">MUSIC<span class="d">SYNTHWAVE</span></div>
+        </div>
+      </div>
+
+      <div class="optblock">
+        <div class="ol">MUSIC TRACK</div>
+        <div class="opts" id="optTrack">
+          <div class="opt sel" data-track="0">NIGHT DRIVE<span class="d">112 BPM</span></div>
+          <div class="opt" data-track="1">OUTRUN<span class="d">128 · FAST</span></div>
+          <div class="opt" data-track="2">MIDNIGHT<span class="d">96 · MOODY</span></div>
+          <div class="opt" data-track="3">NEON CRUISE<span class="d">106 · BOUNCE</span></div>
+        </div>
+      </div>
+
+      <div class="optblock">
+        <div class="ol">PRONUNCIATION VOICE</div>
+        <div class="opts" id="optVoice">
+          <div class="opt sel" data-voice="off">OFF<span class="d">SILENT</span></div>
+          <div class="opt" data-voice="girl">ANIME GIRL<span class="d">HIGH</span></div>
+          <div class="opt" data-voice="guy">ANIME GUY<span class="d">MID</span></div>
+          <div class="opt" data-voice="robot">80S ROBOT<span class="d">SYNTH</span></div>
+        </div>
+      </div>
+
+      <button class="go" id="startBtn">INITIALIZE ▸</button>
+      <button class="go ghost" id="recordsBtn">◈ RECORDS &amp; STATS</button>
+      <div class="hint">Timer starts the instant you press your first key.</div>
+    </div>
+  </div>
+
+  <!-- RESULT OVERLAY -->
+  <div class="overlay hidden" id="resultOverlay">
+    <div class="card">
+      <h2>RUN COMPLETE</h2>
+      <div class="tag" id="rTag">SESSION LOGGED</div>
+      <div class="bigwpm"><span id="rWpm">0</span><small>WORDS / MINUTE</small></div>
+      <div class="rgrid">
+        <div class="rcell"><div class="rv" id="rAcc">0%</div><div class="rl">ACCURACY</div></div>
+        <div class="rcell"><div class="rv" id="rWords">0</div><div class="rl">WORDS TYPED</div></div>
+        <div class="rcell"><div class="rv" id="rChars">0</div><div class="rl">CHARACTERS</div></div>
+        <div class="rcell"><div class="rv" id="rErr">0</div><div class="rl">ERRORS</div></div>
+        <div class="rcell"><div class="rv" id="rScore">0</div><div class="rl">SCORE</div></div>
+        <div class="rcell"><div class="rv" id="rDur">1:00</div><div class="rl">DURATION</div></div>
+      </div>
+      <div id="rRecords"></div>
+      <button class="go" id="againBtn">RUN AGAIN ▸</button>
+      <button class="go ghost" id="menuBtn">CHANGE SETTINGS</button>
+    </div>
+  </div>
+
+  <!-- RECORDS OVERLAY -->
+  <div class="overlay hidden" id="recordsOverlay">
+    <div class="card">
+      <h2>RECORDS</h2>
+      <div class="tag">PERSISTENT // ALL MODES &amp; STYLES</div>
+      <div id="recBody"></div>
+      <button class="go ghost" id="clearBtn">CLEAR ALL DATA</button>
+      <button class="go" id="recBackBtn">◂ BACK</button>
+    </div>
+  </div>
+
+</div>
+
+<script>
+/* =========================================================
+   CONTENT
+========================================================= */
+const WORDS = ("neon light city street night drive chrome dream pulse signal "+
+"vapor sky line glow grid code data core wire spark flux haze rain mirror echo "+
+"ghost drift orbit laser pixel sound wave beat synth retro vice runner blade "+
+"system online tower district sector future past memory chase horizon beyond "+
+"tomorrow electric reflect wet shadow district pulse static engine cobalt amber "+
+"velvet midnight skyline machine human matrix render circuit voltage analog tape "+
+"cassette arcade joystick monitor terminal cursor scanline phosphor magenta cyan "+
+"district radio frequency transmit receive decode encrypt access denied granted "+
+"power surge cooler faster brighter louder farther never sleeps always running "+
+"the and for you are with this that have from they will been more time work life "+
+"world hand part child place week case point right group fact").split(/\s+/);
+
+const SENTENCES = [
+"neon lights reflect on the wet streets below the tower.",
+"the city never sleeps inside these electric dreams.",
+"chase the horizon far beyond a fading tomorrow.",
+"rain slicks the boulevard as the signs flicker awake.",
+"a single drone hums low across the empty plaza.",
+"memories fade but the skyline keeps on glowing.",
+"we are the echoes of a future not yet written.",
+"the engine purrs and the dashboard burns cold blue.",
+"every window holds a story told in shifting color.",
+"the grid stretches out forever under a violet sky.",
+"old machines still dream of the people who built them.",
+"static crackles through the speakers of a dying radio.",
+"the night belongs to those who keep on moving.",
+"chrome reflections dance across the cracked black road.",
+"somewhere a screen flickers with a message left unread.",
+"the highway curves into a wall of silver fog.",
+"a thousand lights blink in patterns no one reads.",
+"the rooftop garden glows beneath the satellite haze.",
+"time runs faster when the music turns to neon.",
+"keep your eyes ahead and let the city blur away."
+];
+
+const DIALOG = [
+"The terminal blinked twice before the screen filled with light. Outside, the rain had not stopped for three days, and the streets below carried the color of every sign in the district. She leaned closer to the glass and watched the numbers scroll, counting the seconds until the connection held. Somewhere in the tower a fan began to spin, and the room filled with a low electric hum that felt almost like a heartbeat.",
+"He set the cup down and stared at the wall of monitors. Each one showed a different corner of the city, and each corner looked exactly the same after midnight. The voice on the radio was calm, too calm, the way a voice gets when it has nothing left to lose. We have until sunrise, it said, and then the line went dead. He nodded to no one and reached for the keyboard, fingers already moving before he had decided what to type.",
+"The market never closed, not really. Vendors folded their stalls into the shadows and rolled them out again an hour later under different names. A child ran past with a fistful of cables, laughing at something only she could see. Above them all the great screen turned from blue to gold to a deep and quiet red, and for a single moment the whole street stopped to watch the colors change before the noise rushed back in again.",
+"Listen, she said, and the music dropped to almost nothing. You hear that? Underneath the engines and the rain and the thousand little machines, there is a sound the city makes when it thinks no one is awake. It is not a warning and it is not a song. It is just the place breathing, slow and steady, waiting for the morning that always comes a little later than you hope. He listened, and after a while he understood, and they sat there together saying nothing at all."
+];
+
+/* =========================================================
+   STATE
+========================================================= */
+const $ = id => document.getElementById(id);
+const app = $('app');
+const stream = $('stream');
+
+let cfg = { theme:'theme-vice', dur:60, mode:'words' };
+let chars = [];           // {el, ch}
+let cursor = 0;
+let started = false;
+let finished = false;
+let startTime = 0;
+let remaining = 60;
+let timerId = null;
+let keystrokes = 0, keystrokesCorrect = 0, correctChars = 0, errors = 0;
+let streak = 0, score = 0;
+let buffer = "";          // current text buffer
+let missedRun = {};       // missed letters this run
+let lastEntryDate = 0;    // for highlighting newest score
+
+// neon-sign per-word colors (lit + readable unlit)
+const NEON_PAL=[
+ {lit:'#ff2d9b',dim:'#ff86bf'},{lit:'#2de2e6',dim:'#8eecef'},
+ {lit:'#c6ff4d',dim:'#ddff9a'},{lit:'#ff8a1e',dim:'#ffc081'},
+ {lit:'#c77bff',dim:'#dcb6ff'},{lit:'#ffe14d',dim:'#ffefa0'},
+ {lit:'#5a93ff',dim:'#a7c2ff'},{lit:'#ff5470',dim:'#ffa1b1'},
+ {lit:'#4dffc4',dim:'#a0ffe0'}
+];
+let wordColorIdx=0;
+
+/* ---- persistent storage (works in a downloaded file; degrades gracefully) ---- */
+const store=(()=>{
+  let ok=true;
+  try{ localStorage.setItem('__t','1'); localStorage.removeItem('__t'); }catch(e){ ok=false; }
+  const mem={};
+  return {
+    get(k){ try{ return ok?localStorage.getItem(k):(k in mem?mem[k]:null); }catch(e){ return k in mem?mem[k]:null; } },
+    set(k,v){ try{ if(ok) localStorage.setItem(k,v); else mem[k]=v; }catch(e){ mem[k]=v; } }
+  };
+})();
+function loadScores(){ try{ return JSON.parse(store.get('tr_scores')||'[]'); }catch(e){ return []; } }
+function saveScores(a){ a.sort((x,y)=>y.score-x.score); store.set('tr_scores', JSON.stringify(a.slice(0,50))); }
+function loadMissed(){ try{ return JSON.parse(store.get('tr_missed')||'{}'); }catch(e){ return {}; } }
+function saveMissed(o){ store.set('tr_missed', JSON.stringify(o)); }
+
+/* =========================================================
+   AUDIO ENGINE (Web Audio — no external files)
+========================================================= */
+let audio={sfx:true, music:true};
+let actx=null, master=null, sfxBus=null, musicBus=null;
+function ensureAudio(){
+  try{
+    if(!actx){
+      const AC=window.AudioContext||window.webkitAudioContext;
+      if(!AC) return false;
+      actx=new AC();
+      master=actx.createGain(); master.gain.value=0.9; master.connect(actx.destination);
+      sfxBus=actx.createGain(); sfxBus.gain.value=1; sfxBus.connect(master);
+      musicBus=actx.createGain(); musicBus.gain.value=0.0001; musicBus.connect(master);
+    }
+    if(actx.state==='suspended') actx.resume();
+    return true;
+  }catch(e){ return false; }
+}
+
+/* ---- per-theme key click sounds ---- */
+const SFX={
+  'theme-vice':    {type:'square',  freq:880, dur:0.05, gain:0.16, glide:0},
+  'theme-tron':    {type:'sine',    freq:1280,dur:0.06, gain:0.15, glide:-260},
+  'theme-runner':  {type:'sawtooth',freq:340, dur:0.07, gain:0.14, glide:-70, filter:1400},
+  'theme-phosphor':{type:'noise',   freq:0,   dur:0.035,gain:0.22},
+  'theme-neon':    {type:'sawtooth',freq:1000,dur:0.05, gain:0.15, glide:0,  filter:1600},
+  'theme-mech':    {type:'square',  freq:170, dur:0.09, gain:0.20, glide:-90, filter:900}
+};
+function playTone(p){
+  const t=actx.currentTime;
+  const o=actx.createOscillator(); o.type=p.type; o.frequency.setValueAtTime(p.freq,t);
+  if(p.glide) o.frequency.exponentialRampToValueAtTime(Math.max(40,p.freq+p.glide),t+p.dur);
+  let node=o;
+  if(p.filter){ const f=actx.createBiquadFilter(); f.type='lowpass'; f.frequency.value=p.filter; o.connect(f); node=f; }
+  const g=actx.createGain(); g.gain.setValueAtTime(p.gain,t); g.gain.exponentialRampToValueAtTime(0.0001,t+p.dur);
+  node.connect(g); g.connect(sfxBus); o.start(t); o.stop(t+p.dur+0.02);
+}
+function playNoise(p){
+  const t=actx.currentTime, len=Math.max(1,Math.floor(actx.sampleRate*p.dur));
+  const buf=actx.createBuffer(1,len,actx.sampleRate), d=buf.getChannelData(0);
+  for(let i=0;i<len;i++) d[i]=Math.random()*2-1;
+  const src=actx.createBufferSource(); src.buffer=buf;
+  const f=actx.createBiquadFilter(); f.type='highpass'; f.frequency.value=1600;
+  const g=actx.createGain(); g.gain.setValueAtTime(p.gain,t); g.gain.exponentialRampToValueAtTime(0.0001,t+p.dur);
+  src.connect(f); f.connect(g); g.connect(sfxBus); src.start(t); src.stop(t+p.dur);
+}
+function playClick(correct){
+  if(!audio.sfx || !ensureAudio()) return;
+  if(!correct){ playTone({type:'sawtooth',freq:150,dur:0.11,gain:0.18,glide:-30,filter:800}); return; }
+  const p=SFX[cfg.theme]||SFX['theme-vice'];
+  if(p.type==='noise') playNoise(p); else playTone(p);
+}
+
+/* ---- 80s synthwave background music (multiple tracks) ---- */
+const NOTE_SEMI={C:0,'C#':1,Db:1,D:2,'D#':3,Eb:3,E:4,F:5,'F#':6,Gb:6,G:7,'G#':8,Ab:8,A:9,'A#':10,Bb:10,B:11};
+function nf(n){ const m=/^([A-G][b#]?)(-?\d)$/.exec(n); if(!m) return 220;
+  const midi=NOTE_SEMI[m[1]]+(parseInt(m[2],10)+1)*12; return 440*Math.pow(2,(midi-69)/12); }
+const TRACKS=[
+  {name:'NIGHT DRIVE', bpm:112, lead:'triangle', arp:true,  pad:0.045, kick:[0,4],     hat:[1,3,5,7],
+   prog:[{bass:'A2',tones:['A3','C4','E4']},{bass:'F2',tones:['F3','A3','C4']},{bass:'C3',tones:['G3','C4','E4']},{bass:'G2',tones:['G3','B3','D4']}]},
+  {name:'OUTRUN', bpm:128, lead:'square', arp:true, pad:0.04, kick:[0,2,4,6], hat:[1,3,5,7],
+   prog:[{bass:'C2',tones:['G3','C4','Eb4']},{bass:'Ab2',tones:['Ab3','C4','Eb4']},{bass:'Eb2',tones:['G3','Bb3','Eb4']},{bass:'Bb2',tones:['Bb3','D4','F4']}]},
+  {name:'MIDNIGHT', bpm:96, lead:'sine', arp:false, pad:0.062, kick:[0], hat:[6],
+   prog:[{bass:'E2',tones:['E3','G3','B3']},{bass:'C2',tones:['E3','G3','C4']},{bass:'G2',tones:['G3','B3','D4']},{bass:'D2',tones:['D3','F#3','A3']}]},
+  {name:'NEON CRUISE', bpm:106, lead:'sawtooth', arp:true, pad:0.045, kick:[0,4], hat:[2,6],
+   prog:[{bass:'A2',tones:['A3','C4','E4']},{bass:'E2',tones:['E3','G3','B3']},{bass:'F2',tones:['F3','A3','C4']},{bass:'G2',tones:['G3','B3','D4']}]}
+];
+let trackIdx=0, SD=60/112/2;
+let musicPlaying=false, musicTimer=null, nextNote=0, mstep=0;
+function curTrack(){ return TRACKS[trackIdx]; }
+function mGain(v,t,dur){ const g=actx.createGain(); g.gain.setValueAtTime(0.0001,t);
+  g.gain.exponentialRampToValueAtTime(v,t+0.01); g.gain.exponentialRampToValueAtTime(0.0001,t+dur); return g; }
+function mBass(freq,t){
+  const o=actx.createOscillator(); o.type='sawtooth'; o.frequency.value=freq;
+  const f=actx.createBiquadFilter(); f.type='lowpass'; f.frequency.value=620;
+  const g=mGain(0.13,t,SD*0.9); o.connect(f); f.connect(g); g.connect(musicBus);
+  o.start(t); o.stop(t+SD);
+}
+function mArp(freq,t,type){
+  const o=actx.createOscillator(); o.type=type||'triangle'; o.frequency.value=freq*2;
+  const f=actx.createBiquadFilter(); f.type='lowpass'; f.frequency.value=2600;
+  const g=mGain(0.055,t,SD*0.8); o.connect(f); f.connect(g); g.connect(musicBus);
+  o.start(t); o.stop(t+SD);
+}
+function mPad(tones,t,gv){
+  const dur=SD*8;
+  tones.forEach(fr=>{
+    const o=actx.createOscillator(); o.type='sine'; o.frequency.value=fr;
+    const g=actx.createGain(); g.gain.setValueAtTime(0.0001,t);
+    g.gain.linearRampToValueAtTime(gv,t+0.6);
+    g.gain.linearRampToValueAtTime(gv,t+dur-0.6);
+    g.gain.linearRampToValueAtTime(0.0001,t+dur);
+    o.connect(g); g.connect(musicBus); o.start(t); o.stop(t+dur);
+  });
+}
+function mKick(t){
+  const o=actx.createOscillator(); o.type='sine';
+  o.frequency.setValueAtTime(130,t); o.frequency.exponentialRampToValueAtTime(46,t+0.12);
+  const g=actx.createGain(); g.gain.setValueAtTime(0.28,t); g.gain.exponentialRampToValueAtTime(0.0001,t+0.16);
+  o.connect(g); g.connect(musicBus); o.start(t); o.stop(t+0.18);
+}
+function mHat(t){
+  const len=Math.floor(actx.sampleRate*0.03), buf=actx.createBuffer(1,len,actx.sampleRate), d=buf.getChannelData(0);
+  for(let i=0;i<len;i++) d[i]=Math.random()*2-1;
+  const src=actx.createBufferSource(); src.buffer=buf;
+  const f=actx.createBiquadFilter(); f.type='highpass'; f.frequency.value=7000;
+  const g=actx.createGain(); g.gain.setValueAtTime(0.05,t); g.gain.exponentialRampToValueAtTime(0.0001,t+0.03);
+  src.connect(f); f.connect(g); g.connect(musicBus); src.start(t); src.stop(t+0.03);
+}
+function scheduleStep(idx,t){
+  const tr=curTrack(), L=tr.prog.length, bar=Math.floor(idx/8)%L, s=idx%8, ch=tr.prog[bar];
+  mBass(nf(ch.bass),t);
+  if(tr.arp) mArp(nf(ch.tones[s%ch.tones.length]),t,tr.lead);
+  if(s===0) mPad(ch.tones.map(nf),t,tr.pad);
+  if(tr.kick.indexOf(s)!==-1) mKick(t);
+  if(tr.hat.indexOf(s)!==-1) mHat(t);
+}
+function musicScheduler(){
+  while(nextNote < actx.currentTime+0.12){ scheduleStep(mstep,nextNote); nextNote+=SD; mstep++; }
+}
+function startMusic(){
+  if(!ensureAudio() || musicPlaying) return;
+  musicPlaying=true; SD=60/curTrack().bpm/2;
+  musicBus.gain.cancelScheduledValues(actx.currentTime);
+  musicBus.gain.setTargetAtTime(0.85, actx.currentTime, 0.4);
+  nextNote=actx.currentTime+0.1; mstep=0;
+  musicTimer=setInterval(musicScheduler,25);
+}
+function stopMusic(){
+  musicPlaying=false;
+  if(musicTimer){ clearInterval(musicTimer); musicTimer=null; }
+  if(actx && musicBus) musicBus.gain.setTargetAtTime(0.0001, actx.currentTime, 0.25);
+}
+function setTrack(i){
+  trackIdx=((i%TRACKS.length)+TRACKS.length)%TRACKS.length;
+  document.querySelectorAll('[data-track]').forEach(el=>{
+    if(el.classList.contains('opt')) el.classList.toggle('sel', Number(el.dataset.track)===trackIdx);
+  });
+  const b=$('trackBtn'); if(b) b.textContent='♫ '+curTrack().name;
+  if(musicPlaying){ stopMusic(); startMusic(); }
+}
+function cycleTrack(){ setTrack(trackIdx+1); }
+function setAudio(kind,val){
+  audio[kind]=val;
+  document.querySelectorAll('[data-audio="'+kind+'"]').forEach(el=>{
+    if(el.classList.contains('opt')) el.classList.toggle('sel',val);
+    else el.classList.toggle('on',val);
+  });
+  if(kind==='music'){ if(val) startMusic(); else stopMusic(); }
+  else if(val) ensureAudio();
+}
+function toggleAudio(kind){ setAudio(kind, !audio[kind]); }
+
+/* =========================================================
+   SPOKEN WORDS (Web Speech API) — pronounces each finished word
+========================================================= */
+let voiceCfg='off';
+let _voices=[];
+function loadVoices(){ try{ _voices=window.speechSynthesis.getVoices()||[]; }catch(e){ _voices=[]; } }
+if('speechSynthesis' in window){ loadVoices(); try{ window.speechSynthesis.onvoiceschanged=loadVoices; }catch(e){} }
+
+const VOICE={
+  girl:{rate:1.12,pitch:1.9,match:['samantha','victoria','female','woman','girl','zira','ava','allison','susan','karen','tessa','fiona','moira','kyoko','google us english','google uk english female']},
+  guy: {rate:1.0, pitch:1.12,match:['daniel','alex','fred','male','man','david','oliver','george','tom','arthur','rishi','google uk english male']},
+  robot:{rate:0.82,pitch:0.35,match:['zarvox','trinoids','robot','cellos','boing','albert','organ','whisper','ralph']}
+};
+function pickVoice(kind){
+  if(!_voices.length) loadVoices();
+  const en=_voices.filter(v=>/^en/i.test(v.lang));
+  const pool=en.length?en:_voices;
+  for(const m of VOICE[kind].match){
+    const f=pool.find(v=>v.name.toLowerCase().includes(m));
+    if(f) return f;
+  }
+  return pool[0]||null;
+}
+function speakWord(word){
+  if(voiceCfg==='off' || !('speechSynthesis' in window)) return;
+  try{
+    const c=VOICE[voiceCfg];
+    const u=new SpeechSynthesisUtterance(word);
+    u.rate=c.rate; u.pitch=c.pitch; u.volume=1;
+    const v=pickVoice(voiceCfg); if(v) u.voice=v;
+    window.speechSynthesis.cancel();   // keep speech in step with fast typing
+    window.speechSynthesis.speak(u);
+  }catch(e){}
+}
+function speakCompletedWord(endIdx){
+  if(voiceCfg==='off') return;
+  let i=endIdx, w='';
+  while(i>=0 && chars[i].ch!==' '){ w=chars[i].ch+w; i--; }
+  w=w.replace(/[^a-zA-Z']/g,'').trim();
+  if(w) speakWord(w);
+}
+const VOICE_LABEL={off:'VOICE OFF', girl:'ANIME GIRL', guy:'ANIME GUY', robot:'80S ROBOT'};
+function setVoice(val){
+  voiceCfg=val;
+  document.querySelectorAll('[data-voice]').forEach(el=>{
+    if(el.classList.contains('opt')) el.classList.toggle('sel', el.dataset.voice===val);
+  });
+  const b=$('voiceBtn');
+  if(b){ b.textContent='🗣 '+VOICE_LABEL[val]; b.classList.toggle('on', val!=='off'); }
+  if(val!=='off') speakWord('online');   // quick sample so you hear the persona
+}
+function cycleVoice(){
+  const order=['off','girl','guy','robot'];
+  setVoice(order[(order.indexOf(voiceCfg)+1)%order.length]);
+}
+
+const THEME_META = {
+  'theme-vice':   {title:'TYPE<span class="slash">//</span>RACER', sub:'NEO MIAMI TERMINAL_1987', fl:'MODE: ARCADE', fr:'TRACK: NIGHT DRIVE', stitle:'TYPE//RACER'},
+  'theme-tron':   {title:'TRON<span class="slash">//</span>TYPE', sub:'USER: CLU // ID 0x7F7E2B1A', fl:'MODE: PRACTICE', fr:'LIGHT CYCLE READY', stitle:'TRON//TYPE'},
+  'theme-runner': {title:'TYPR<span class="slash">//</span>RUNNER', sub:'LAPD INTERFACE 9.7', fl:'MODEL: TYPR-8000', fr:'SECTOR: CITY CENTER', stitle:'TYPR//RUNNER'},
+  'theme-phosphor':{title:'CRT<span class="slash">-</span>80', sub:'ZENITH TERMINAL // SYSTEM-80', fl:'MODE: STANDARD', fr:'BUFFER: NOMINAL', stitle:'CRT-80'},
+  'theme-neon':   {title:'NEON<span class="slash">//</span>SIGNS', sub:'STRIP DISTRICT // AFTER DARK', fl:'MODE: NIGHTLIFE', fr:'POWER: ON', stitle:'NEON//SIGNS'},
+  'theme-mech':   {title:'EXO<span class="slash">//</span>FRAME', sub:'MECH OS 4.4 // PILOT LINK ACTIVE', fl:'SYS: NOMINAL', fr:'HUD: LOCKED', stitle:'EXO//FRAME'}
+};
+
+/* =========================================================
+   KEYBOARD
+========================================================= */
+const KB_ROWS = [
+  [["`","~"],["1","!"],["2","@"],["3","#"],["4","$"],["5","%"],["6","^"],["7","&"],["8","*"],["9","("],["0",")"],["-","_"],["=","+"],["BACKSPACE","bksp wide"]],
+  [["TAB","tab wide"],["q","Q"],["w","W"],["e","E"],["r","R"],["t","T"],["y","Y"],["u","U"],["i","I"],["o","O"],["p","P"],["[","{"],["]","}"],["\\","|"]],
+  [["CAPS LOCK","caps wide"],["a","A"],["s","S"],["d","D"],["f","F"],["g","G"],["h","H"],["j","J"],["k","K"],["l","L"],[";",":"],["'","\""],["ENTER","enter wide"]],
+  [["SHIFT","shift wide"],["z","Z"],["x","X"],["c","C"],["v","V"],["b","B"],["n","N"],["m","M"],[",","<"],[".",">"],["/","?"],["SHIFT","shift wide"]],
+  [["CTRL","ctrl wide"],["ALT","alt wide"],[" ","spacer"],["ALT","alt wide"],["CTRL","ctrl wide"]]
+];
+const keyMap = {};   // character -> key element
+const SPECIAL = {"BACKSPACE":1,"TAB":1,"CAPS LOCK":1,"ENTER":1,"SHIFT":1,"CTRL":1,"ALT":1};
+const SPECIAL_KEYNAME = {"BACKSPACE":"Backspace","TAB":"Tab","CAPS LOCK":"CapsLock","ENTER":"Enter","SHIFT":"Shift","CTRL":"Control","ALT":"Alt"};
+
+function buildKeyboard(){
+  const kb = $('keyboard');
+  kb.innerHTML='';
+  KB_ROWS.forEach(row=>{
+    const r=document.createElement('div'); r.className='krow';
+    row.forEach(def=>{
+      const k=document.createElement('div');
+      const label=def[0], meta=def[1]||'';
+      k.className='key '+meta;
+      if(SPECIAL[label]){
+        k.textContent=label;
+      } else if(meta==='spacer'){
+        k.textContent='';
+      } else {
+        // primary char (lower/base) + shifted char (top)
+        const top=document.createElement('span'); top.className='small'; top.textContent=def[1];
+        const bot=document.createElement('span'); bot.textContent=def[0].toUpperCase();
+        // letters: only show one big glyph
+        if(/^[a-z]$/.test(def[0])){ k.textContent=def[0].toUpperCase(); }
+        else { k.appendChild(top); k.appendChild(bot); }
+      }
+      // register characters this key can produce
+      if(meta==='spacer'){ keyMap[' ']=k; }
+      else if(SPECIAL[label]){ if(SPECIAL_KEYNAME[label]) keyMap[SPECIAL_KEYNAME[label]]=k; }
+      else {
+        keyMap[def[0]]=k;
+        if(def[1] && def[1].length===1) keyMap[def[1]]=k;
+        if(/^[a-z]$/.test(def[0])) keyMap[def[0].toUpperCase()]=k;
+      }
+      r.appendChild(k);
+    });
+    kb.appendChild(r);
+  });
+}
+
+function keyFor(ch){
+  if(ch===' ') return keyMap[' '];
+  if(keyMap[ch]) return keyMap[ch];
+  const low = ch.toLowerCase();
+  return keyMap[low]||null;
+}
+
+let lastHint=null;
+function setHint(){
+  if(lastHint){lastHint.classList.remove('nexthint');lastHint=null;}
+  if(finished) return;
+  const next = chars[cursor];
+  const k = next ? keyFor(next.ch) : null;
+  if(k){ k.classList.add('nexthint'); lastHint=k; }
+}
+
+function flashKey(ch){
+  const k=keyFor(ch); if(!k) return;
+  k.classList.add('pressed');
+  setTimeout(()=>k.classList.remove('pressed'),110);
+}
+
+/* =========================================================
+   CONTENT GENERATION
+========================================================= */
+function shuffle(a){a=a.slice();for(let i=a.length-1;i>0;i--){const j=Math.random()*(i+1)|0;[a[i],a[j]]=[a[j],a[i]];}return a;}
+
+function genWords(n){
+  let out=[];
+  for(let i=0;i<n;i++) out.push(WORDS[Math.random()*WORDS.length|0]);
+  return out.join(' ');
+}
+function genSentences(n){
+  let out=[], pool=shuffle(SENTENCES);
+  for(let i=0;i<n;i++){ if(i%pool.length===0) pool=shuffle(SENTENCES); out.push(pool[i%pool.length]); }
+  return out.join(' ');
+}
+function genDialog(n){
+  let out=[], pool=shuffle(DIALOG);
+  for(let i=0;i<n;i++){ if(i%pool.length===0) pool=shuffle(DIALOG); out.push(pool[i%pool.length]); }
+  return out.join(' ');
+}
+function moreText(){
+  if(cfg.mode==='words') return ' '+genWords(120);
+  if(cfg.mode==='sentences') return ' '+genSentences(14);
+  return ' '+genDialog(3);
+}
+function initialText(){
+  // generous buffer for up to 5 min of fast typing
+  if(cfg.mode==='words') return genWords(700);
+  if(cfg.mode==='sentences') return genSentences(80);
+  return genDialog(16);
+}
+
+/* =========================================================
+   RENDERING THE STREAM
+========================================================= */
+function renderStream(text){
+  buffer = text;
+  stream.innerHTML='';
+  chars=[]; curEl=null; wordColorIdx=0;
+  appendChunk(text);
+  cursor=0;
+  refreshCursor();
+  layout();
+}
+function appendChunk(text){
+  // split into words; keep single spaces as separators
+  const parts = text.split(' ');
+  parts.forEach((w,wi)=>{
+    if(w.length){
+      const wEl=document.createElement('span'); wEl.className='word';
+      const col=NEON_PAL[wordColorIdx++ % NEON_PAL.length];
+      wEl.style.setProperty('--wc',col.lit);
+      wEl.style.setProperty('--wcd',col.dim);
+      for(const c of w){
+        const cEl=document.createElement('span'); cEl.className='ch'; cEl.textContent=c;
+        wEl.appendChild(cEl); chars.push({el:cEl,ch:c});
+      }
+      stream.appendChild(wEl);
+    }
+    // space after each part except last of this chunk
+    if(wi<parts.length-1){
+      const sEl=document.createElement('span'); sEl.className='ch sp'; sEl.textContent=' ';
+      stream.appendChild(sEl); chars.push({el:sEl,ch:' '});
+    }
+  });
+}
+
+let curEl=null;
+function refreshCursor(){
+  if(curEl) curEl.classList.remove('cur');
+  curEl = chars[cursor] ? chars[cursor].el : null;
+  if(curEl) curEl.classList.add('cur');
+}
+
+let lineH = 46;
+function layout(){
+  const cur = chars[cursor];
+  if(!cur){ stream.style.transform='translateY(0)'; return; }
+  const cs = getComputedStyle(stream).lineHeight;
+  const parsed = parseFloat(cs);
+  if(parsed>0) lineH = parsed;
+  const top = cur.el.offsetTop;
+  const firstTop = chars[0].el.offsetTop;
+  const line = Math.round((top-firstTop)/lineH);
+  const shift = Math.max(0,(line-1))*lineH;   // keep current line as middle row
+  stream.style.transform='translateY('+(-shift)+'px)';
+}
+
+/* =========================================================
+   TYPING LOGIC
+========================================================= */
+function typeChar(ch){
+  if(finished) return;
+  if(!started) startGameTimer();
+  const cell = chars[cursor];
+  if(!cell) return;
+  keystrokes++;
+  const ok = (ch===cell.ch);
+  cell.el.classList.remove('cur');
+  if(ok){
+    cell.el.classList.add('ok'); cell.el.classList.remove('bad');
+    keystrokesCorrect++; correctChars++;
+    streak++; score += 10 + Math.min(40,Math.floor(streak/5)*5);
+  } else {
+    cell.el.classList.add('bad'); cell.el.classList.remove('ok');
+    errors++; streak=0; score=Math.max(0,score-5);
+    if(/[a-z]/i.test(cell.ch)){ const L=cell.ch.toLowerCase(); missedRun[L]=(missedRun[L]||0)+1; }
+  }
+  cursor++;
+  refreshCursor();
+  playClick(ok);
+  if(cell.ch===' ') speakCompletedWord(cursor-2);
+  // extend buffer if running low
+  if(cursor > chars.length-120){ appendChunk(moreText()); }
+  layout();
+  setHint();
+  updateStats();
+}
+
+function backspace(){
+  if(finished||cursor===0) return;
+  cursor--;
+  const cell=chars[cursor];
+  if(cell.el.classList.contains('ok')) correctChars=Math.max(0,correctChars-1);
+  cell.el.classList.remove('ok','bad');
+  streak=0;
+  refreshCursor();
+  layout();
+  setHint();
+  updateStats();
+}
+
+/* =========================================================
+   TIMER + STATS
+========================================================= */
+function fmt(s){ s=Math.max(0,Math.ceil(s)); const m=Math.floor(s/60),x=s%60; return m+':'+String(x).padStart(2,'0'); }
+function fmt2(s){ s=Math.max(0,Math.ceil(s)); const m=Math.floor(s/60),x=s%60; return String(m).padStart(2,'0')+':'+String(x).padStart(2,'0'); }
+
+function startGameTimer(){
+  started=true; startTime=Date.now();
+  timerId=setInterval(tick,100);
+}
+function tick(){
+  const elapsed=(Date.now()-startTime)/1000;
+  remaining=cfg.dur-elapsed;
+  if(remaining<=0){ remaining=0; updateStats(); endGame(); return; }
+  updateStats();
+}
+function curWpm(){
+  const elapsedMin = started ? Math.max((cfg.dur-remaining)/60, 1/60) : 0;
+  return started ? Math.round((correctChars/5)/elapsedMin) : 0;
+}
+function curAcc(){
+  return keystrokes? Math.round(keystrokesCorrect/keystrokes*100) : 100;
+}
+function updateStats(){
+  $('sTime').textContent = fmt2(started?remaining:cfg.dur);
+  $('sWpm').textContent  = curWpm();
+  $('sAcc').textContent  = curAcc()+'%';
+  $('sScore').textContent= score.toLocaleString();
+}
+
+/* =========================================================
+   GAME FLOW
+========================================================= */
+function startGame(){
+  finished=false; started=false;
+  cursor=0; keystrokes=0; keystrokesCorrect=0; correctChars=0; errors=0;
+  streak=0; score=0; remaining=cfg.dur; missedRun={};
+  clearInterval(timerId);
+  renderStream(initialText());
+  setHint();
+  updateStats();
+  $('startOverlay').classList.add('hidden');
+  $('resultOverlay').classList.add('hidden');
+  ensureAudio();
+  if(audio.music) startMusic();
+}
+
+function endGame(){
+  finished=true; clearInterval(timerId);
+  if(lastHint){lastHint.classList.remove('nexthint');lastHint=null;}
+  const minutes=cfg.dur/60;
+  const wpm=Math.round((correctChars/5)/minutes);
+  const acc=curAcc();
+  $('rWpm').textContent=wpm;
+  $('rAcc').textContent=acc+'%';
+  $('rWords').textContent=Math.round(correctChars/5);
+  $('rChars').textContent=correctChars;
+  $('rErr').textContent=errors;
+  $('rScore').textContent=score.toLocaleString();
+  $('rDur').textContent=fmt(cfg.dur);
+  $('rTag').textContent = ({words:'RANDOM WORDS',sentences:'REAL SENTENCES',dialog:'DIALOG PAGES'})[cfg.mode]+' // '+fmt(cfg.dur);
+
+  // --- commit to persistent records ---
+  const g=loadMissed();
+  for(const k in missedRun) g[k]=(g[k]||0)+missedRun[k];
+  saveMissed(g);
+  lastEntryDate=Date.now();
+  const arr=loadScores();
+  arr.push({score, wpm, acc, mode:cfg.mode, dur:cfg.dur, theme:cfg.theme, date:lastEntryDate});
+  saveScores(arr);
+
+  renderRecords($('rRecords'), lastEntryDate);
+  $('resultOverlay').classList.remove('hidden');
+}
+
+const MODE_LABEL={words:'WORDS',sentences:'SENT',dialog:'DIALOG'};
+function renderRecords(container, highlight){
+  const scores=loadScores().slice(0,10);
+  const missed=Object.entries(loadMissed()).sort((a,b)=>b[1]-a[1]).slice(0,5);
+  let html='<div class="recwrap">';
+
+  // Top 10
+  html+='<div class="reccol"><h3>TOP 10 SCORES</h3>';
+  if(!scores.length){ html+='<div class="recempty">No runs logged yet.</div>'; }
+  else scores.forEach((s,i)=>{
+    const me=(highlight && s.date===highlight)?' me':'';
+    html+='<div class="scorerow'+me+'"><span class="rk">'+(i+1)+'</span>'+
+          '<span class="sc">'+s.score.toLocaleString()+'</span>'+
+          '<span class="sm">'+s.wpm+' WPM · '+s.acc+'% · '+(MODE_LABEL[s.mode]||s.mode)+' '+fmt(s.dur)+'</span></div>';
+  });
+  html+='</div>';
+
+  // Most missed
+  html+='<div class="reccol"><h3>MOST MISSED LETTERS</h3>';
+  if(!missed.length){ html+='<div class="recempty">No misses recorded yet.</div>'; }
+  else{
+    const max=missed[0][1]||1;
+    missed.forEach(([L,c])=>{
+      const w=Math.round(c/max*100);
+      html+='<div class="missrow"><span class="ml">'+L+'</span>'+
+            '<span class="mbar"><i style="width:'+w+'%"></i></span>'+
+            '<span class="mc">'+c+'</span></div>';
+    });
+  }
+  html+='</div></div>';
+  container.innerHTML=html;
+}
+
+/* =========================================================
+   THEME
+========================================================= */
+function applyTheme(t){
+  cfg.theme=t;
+  app.className=t;
+  const m=THEME_META[t];
+  $('logoTitle').innerHTML=m.title;
+  $('logoSub').textContent=m.sub;
+  $('fLeft').textContent=m.fl;
+  $('fRight').textContent=m.fr;
+  $('startTitle').textContent=m.stitle;
+  document.querySelectorAll('#themebar button').forEach(b=>b.classList.toggle('on',b.dataset.theme===t));
+  document.querySelectorAll('#optTheme .opt').forEach(o=>o.classList.toggle('sel',o.dataset.theme===t));
+  // relayout because fonts/metrics may differ slightly
+  requestAnimationFrame(layout);
+}
+
+/* =========================================================
+   WIRE UP UI
+========================================================= */
+function selectGroup(container,attr,val,store){
+  container.querySelectorAll('.opt').forEach(o=>o.classList.toggle('sel',o.dataset[attr]===String(val)));
+  cfg[store]=isNaN(val)?val:Number(val);
+}
+
+document.querySelectorAll('#themebar button').forEach(b=>{
+  b.addEventListener('click',()=>applyTheme(b.dataset.theme));
+});
+$('optTheme').addEventListener('click',e=>{
+  const o=e.target.closest('.opt'); if(!o)return; applyTheme(o.dataset.theme);
+});
+$('optDur').addEventListener('click',e=>{
+  const o=e.target.closest('.opt'); if(!o)return;
+  selectGroup($('optDur'),'dur',o.dataset.dur,'dur'); updateStats();
+});
+$('optMode').addEventListener('click',e=>{
+  const o=e.target.closest('.opt'); if(!o)return;
+  selectGroup($('optMode'),'mode',o.dataset.mode,'mode');
+});
+$('audiobar').addEventListener('click',e=>{
+  const b=e.target.closest('[data-audio]'); if(b) toggleAudio(b.dataset.audio);
+});
+$('optAudio').addEventListener('click',e=>{
+  const o=e.target.closest('[data-audio]'); if(o) toggleAudio(o.dataset.audio);
+});
+$('voiceBtn').addEventListener('click',cycleVoice);
+$('optVoice').addEventListener('click',e=>{
+  const o=e.target.closest('[data-voice]'); if(o) setVoice(o.dataset.voice);
+});
+$('trackBtn').addEventListener('click',cycleTrack);
+$('optTrack').addEventListener('click',e=>{
+  const o=e.target.closest('[data-track]'); if(o) setTrack(Number(o.dataset.track));
+});
+$('startBtn').addEventListener('click',startGame);
+$('againBtn').addEventListener('click',startGame);
+$('menuBtn').addEventListener('click',()=>{
+  $('resultOverlay').classList.add('hidden');
+  $('startOverlay').classList.remove('hidden');
+});
+$('recordsBtn').addEventListener('click',()=>{
+  renderRecords($('recBody'), 0);
+  $('startOverlay').classList.add('hidden');
+  $('recordsOverlay').classList.remove('hidden');
+});
+$('recBackBtn').addEventListener('click',()=>{
+  $('recordsOverlay').classList.add('hidden');
+  $('startOverlay').classList.remove('hidden');
+});
+$('clearBtn').addEventListener('click',()=>{
+  store.set('tr_scores','[]'); store.set('tr_missed','{}');
+  renderRecords($('recBody'), 0);
+});
+
+/* keyboard input */
+document.addEventListener('keydown',e=>{
+  // don't hijack browser shortcuts
+  if(e.ctrlKey||e.metaKey||e.altKey) return;
+  // ignore typing while any overlay is open
+  if(!$('startOverlay').classList.contains('hidden')) return;
+  if(!$('resultOverlay').classList.contains('hidden')) return;
+  if(!$('recordsOverlay').classList.contains('hidden')) return;
+  if(e.key==='Backspace'){ e.preventDefault(); flashKey('Backspace'); backspace(); return; }
+  if(e.key===' '){ e.preventDefault(); }
+  if(e.key.length===1){
+    flashKey(e.key);
+    typeChar(e.key);
+  }
+});
+document.addEventListener('keyup',e=>{
+  const k=keyFor(e.key); if(k)k.classList.remove('pressed');
+});
+
+window.addEventListener('resize',()=>{ if(chars.length) layout(); });
+
+/* =========================================================
+   BOOT
+========================================================= */
+buildKeyboard();
+applyTheme('theme-vice');
+// preview content behind the start overlay
+renderStream(initialText());
+setHint();
+updateStats();
+if(document.fonts && document.fonts.ready){ document.fonts.ready.then(()=>{ if(chars.length) layout(); }); }
+</script>
+</body>
+</html>
