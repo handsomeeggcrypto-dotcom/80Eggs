@@ -486,7 +486,7 @@
       document.querySelectorAll('.preset-card').forEach(c=>c.classList.remove('selected')); layoutTarget(); }); });
 
   const PRESETS={ bacon:{shot:'baconshot.png'}, doom:{shot:'doomshot.png'} };
-  function loadPreset(key){
+  window.loadPreset=function(key){
     document.querySelectorAll('.preset-card').forEach(c=>c.classList.remove('selected'));
     const card=document.getElementById(key==='bacon'?'presetBacon':'presetDoom');
     if(card) card.classList.add('selected');
@@ -497,7 +497,7 @@
       const t=new Image(); t.src=src; targetThumb.appendChild(t);
       layoutTarget();
     }; im.src=src;
-  }
+  };
 
   $("startBtn").addEventListener("click",startGame);
   $("againBtn").addEventListener("click",startGame);
