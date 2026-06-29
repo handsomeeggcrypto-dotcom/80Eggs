@@ -66,10 +66,15 @@ html,body{
 .hotspot:hover .label{ opacity:1; }
 
 /* ---- Screen hotspot positions (% of 1536×1024 image) ----
-   Left  (SYSTEM MONITOR / crypto): ~cols 55–420, rows 555–875
-   Center (TYPING GAME):            ~cols 460–1075, rows 505–865
-   Right  (SUDOKU):                 ~cols 1115–1490, rows 555–875
+   Top-left (SYSTEM STATUS / egg defend): ~cols 0–280, rows 0–265
+   Left  (SYSTEM MONITOR / crypto):       ~cols 55–420, rows 555–875
+   Center (TYPING GAME):                  ~cols 460–1075, rows 505–865
+   Right  (SUDOKU):                       ~cols 1115–1490, rows 555–875
 */
+#hs-eggdefend{
+  left:0%;     top:0%;
+  width:18.5%; height:26%;
+}
 #hs-crypto{
   left:3.6%;   top:54.2%;
   width:23.7%; height:31.3%;
@@ -88,6 +93,9 @@ html,body{
 <div id="cockpit">
   <img src="cockpit.png" alt="80Eggs Cockpit" draggable="false">
 
+  <a class="hotspot" id="hs-eggdefend" href="eggdefend.html">
+    <span class="label">EGG DEFEND</span>
+  </a>
   <a class="hotspot" id="hs-crypto" href="crypto.html">
     <span class="label">EGG CONTROL PANEL</span>
   </a>
