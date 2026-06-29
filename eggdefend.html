@@ -93,6 +93,12 @@
   button.btn:active, label.btn:active{ transform:translateY(3px); box-shadow:0 1px 0 #246b18; }
   label.btn.amber{ background:linear-gradient(180deg,#ffe6a0,var(--amber) 60%,#c98a16); color:#2a1402; box-shadow:0 4px 0 #8a5a0c, 0 0 14px rgba(255,210,60,.4); }
   label.btn.ghost{ background:transparent; color:var(--lime); border:2px solid var(--lime-dim); box-shadow:none; }
+  .preset-card{ cursor:pointer; border:3px solid var(--lime-dim); border-radius:12px; overflow:hidden;
+    width:110px; text-align:center; transition:.15s; background:rgba(0,0,0,.4); }
+  .preset-card:hover,.preset-card.selected{ border-color:var(--lime); box-shadow:0 0 18px rgba(157,255,110,.6); }
+  .preset-card img{ width:100%; height:100px; object-fit:cover; display:block; }
+  .preset-label{ font-family:"Press Start 2P",monospace; font-size:7px; color:var(--lime);
+    padding:5px 4px; letter-spacing:1px; }
   .debrief-score{ font-family:"Press Start 2P",monospace; font-size:40px; color:var(--amber); text-shadow:0 0 18px rgba(255,210,60,.7); margin:6px 0 2px; }
   .debrief-lbl{ font-size:10px; letter-spacing:2px; color:var(--lime-dim); margin-bottom:8px; }
   .rank{ font-family:"Press Start 2P",monospace; font-size:20px; color:var(--lime); margin:6px 0; text-shadow:0 0 12px rgba(86,255,99,.55); }
@@ -144,14 +150,32 @@
       <h1>EGG COVER</h1>
       <div class="sub">PILOT: EGG · READY</div>
       <div class="thumb" id="targetThumb"><span class="ph">the picture you<br>shoot eggs at</span></div>
+
+      <div class="brief" style="margin-bottom:10px">CHOOSE YOUR TARGET:</div>
+
+      <!-- Preset character cards -->
+      <div style="display:flex;gap:10px;justify-content:center;margin-bottom:12px;flex-wrap:wrap">
+        <div class="preset-card" id="presetBacon" onclick="loadPreset('bacon')" title="Lord Bacon">
+          <img src="baconprofil.png" alt="Lord Bacon">
+          <div class="preset-label">LORD BACON</div>
+        </div>
+        <div class="preset-card" id="presetDoom" onclick="loadPreset('doom')" title="Chef Doom">
+          <img src="doomprofil.png" alt="Chef Doom">
+          <div class="preset-label">CHEF DOOM</div>
+        </div>
+      </div>
+
+      <div class="btnrow" style="margin-bottom:8px">
+        <label class="btn amber" for="targetInput">📁 UPLOAD YOUR OWN</label>
+      </div>
+
       <div class="brief">
-        <span class="k">①</span> Upload a <b>target</b> — your brother, a pet, anyone.<br>
+        <span class="k">①</span> Pick a target above or upload your own.<br>
         <span class="k">②</span> <b>Aim</b> the buster — <b>← →</b> or move the mouse.<br>
         <span class="k">③</span> <b>Fire</b> with <b>space</b> / click / the FIRE pad.<br>
         <span class="k">④</span> Cover the target in eggs before time runs out!
       </div>
       <div class="btnrow">
-        <label class="btn amber" for="targetInput">UPLOAD TARGET</label>
         <button class="btn" id="startBtn">LAUNCH · 60s</button>
       </div>
     </div></div>
@@ -458,7 +482,22 @@
 
   function loadImage(file,cb){ const url=URL.createObjectURL(file); const im=new Image(); im.onload=()=>cb(im,url); im.src=url; }
   $("targetInput").addEventListener("change",e=>{ const f=e.target.files&&e.target.files[0]; if(!f) return;
-    loadImage(f,(im,url)=>{ img=im; targetThumb.innerHTML=""; const t=new Image(); t.src=url; targetThumb.appendChild(t); layoutTarget(); }); });
+    loadImage(f,(im,url)=>{ img=im; targetThumb.innerHTML=""; const t=new Image(); t.src=url; targetThumb.appendChild(t);
+      document.querySelectorAll('.preset-card').forEach(c=>c.classList.remove('selected')); layoutTarget(); }); });
+
+  const PRESETS={ bacon:{shot:'baconshot.png'}, doom:{shot:'doomshot.png'} };
+  function loadPreset(key){
+    document.querySelectorAll('.preset-card').forEach(c=>c.classList.remove('selected'));
+    const card=document.getElementById(key==='bacon'?'presetBacon':'presetDoom');
+    if(card) card.classList.add('selected');
+    const src=PRESETS[key].shot;
+    const im=new Image(); im.onload=()=>{
+      img=im;
+      targetThumb.innerHTML='';
+      const t=new Image(); t.src=src; targetThumb.appendChild(t);
+      layoutTarget();
+    }; im.src=src;
+  }
 
   $("startBtn").addEventListener("click",startGame);
   $("againBtn").addEventListener("click",startGame);
