@@ -1027,6 +1027,56 @@
             transition:.2s;
         }
         #backBtn:hover{background:#2a0010;box-shadow:0 0 22px #ff2040,0 0 50px rgba(255,32,64,.6),inset 0 0 14px rgba(255,32,64,.25)}
+
+        /* ---- MOBILE NUMPAD ---- */
+        #mobile-numpad {
+            display: none;
+            position: fixed;
+            bottom: 0; left: 0; right: 0;
+            z-index: 100;
+            padding: 10px 10px 16px;
+            background: rgba(0,0,0,0.88);
+            border-top: 2px solid currentColor;
+            gap: 8px;
+            grid-template-columns: repeat(5, 1fr);
+            backdrop-filter: blur(6px);
+        }
+        /* show only on touch/mobile */
+        @media (pointer: coarse) {
+            #mobile-numpad { display: grid; }
+            body { padding-bottom: 120px; }
+        }
+        .np-btn {
+            font-family: 'Courier New', monospace;
+            font-size: clamp(18px, 5vw, 26px);
+            font-weight: bold;
+            padding: 14px 6px;
+            border-radius: 8px;
+            border: 2px solid currentColor;
+            background: rgba(0,0,0,0.5);
+            cursor: pointer;
+            transition: .12s;
+            letter-spacing: 1px;
+        }
+        .np-btn:active { transform: scale(0.93); opacity: 0.7; }
+        .np-btn.erase { font-size: clamp(12px, 3.5vw, 16px); letter-spacing: 1px; }
+
+        /* theme colours for numpad */
+        .theme-system80 #mobile-numpad { color: #00ff41; border-color: #00ff41; }
+        .theme-system80 .np-btn        { color: #00ff41; border-color: #00ff41; }
+        .theme-system80 .np-btn:active { background: #00ff41; color: #000; }
+
+        .theme-gundam #mobile-numpad   { color: #ff4444; border-color: #ff4444; }
+        .theme-gundam .np-btn          { color: #ff4444; border-color: #ff4444; }
+        .theme-gundam .np-btn:active   { background: #ff4444; color: #000; }
+
+        .theme-miami #mobile-numpad    { color: #ff2d9b; border-color: #ff2d9b; }
+        .theme-miami .np-btn           { color: #ff2d9b; border-color: #ff2d9b; }
+        .theme-miami .np-btn:active    { background: #ff2d9b; color: #000; }
+
+        .theme-cyberpunk #mobile-numpad { color: #f7e318; border-color: #f7e318; }
+        .theme-cyberpunk .np-btn        { color: #f7e318; border-color: #f7e318; }
+        .theme-cyberpunk .np-btn:active { background: #f7e318; color: #000; }
     </style>
 </head>
 <body class="theme-system80">
@@ -1618,6 +1668,27 @@
         function viewScores() {
             displayLeaderboard();
             document.getElementById('completionModal').classList.remove('hidden');
+        }
+    </script>
+
+    <!-- Mobile number pad — only visible on touch screens -->
+    <div id="mobile-numpad">
+        <button class="np-btn" onclick="mobileInput(1)">1</button>
+        <button class="np-btn" onclick="mobileInput(2)">2</button>
+        <button class="np-btn" onclick="mobileInput(3)">3</button>
+        <button class="np-btn" onclick="mobileInput(4)">4</button>
+        <button class="np-btn" onclick="mobileInput(5)">5</button>
+        <button class="np-btn" onclick="mobileInput(6)">6</button>
+        <button class="np-btn" onclick="mobileInput(7)">7</button>
+        <button class="np-btn" onclick="mobileInput(8)">8</button>
+        <button class="np-btn" onclick="mobileInput(9)">9</button>
+        <button class="np-btn erase" onclick="mobileInput(0)">ERASE</button>
+    </div>
+    <script>
+        function mobileInput(num) {
+            if (!game.selectedCell) return;
+            const { row, col } = game.selectedCell;
+            game.setCellValue(row, col, num);
         }
     </script>
 </body>
