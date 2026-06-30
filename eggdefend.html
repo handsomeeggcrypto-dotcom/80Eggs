@@ -16,6 +16,7 @@
   #wrap{ position:fixed; inset:0; }
 
   #cockpitImg{ position:absolute; inset:0; z-index:1; width:100%; height:100%; object-fit:contain; background:#0a1108; }
+  @media (orientation:portrait){ #cockpitImg{ object-fit:cover; object-position:center 30%; } }
   canvas#game{ position:absolute; inset:0; z-index:2; width:100%; height:100%; display:block; touch-action:none; }
 
   /* play window (lined up with the cockpit windscreen) */
@@ -241,11 +242,23 @@
   const covCtx=covCan.getContext("2d",{willReadFrequently:true});
 
   function containRect(nw,nh,W,H){ const s=Math.min(W/nw,H/nh),w=nw*s,h=nh*s; return {x:(W-w)/2,y:(H-h)/2,w,h}; }
+  function coverRect(nw,nh,W,H){ const s=Math.max(W/nw,H/nh),w=nw*s,h=nh*s; return {x:(W-w)/2,y:(H-h)/2,w,h}; }
+  const MOBILE_LAYOUT={
+    view: {x:0.220, y:0.170, w:0.560, h:0.420},
+    bar:  {x:0.340, y:0.620},
+    fire: {x:0.380, y:0.880},
+  };
+  function isMobilePortrait(){ return W < H; }
   function resize(){
     DPR=Math.min(window.devicePixelRatio||1,2);
     W=window.innerWidth; H=window.innerHeight;
     canvas.width=Math.round(W*DPR); canvas.height=Math.round(H*DPR); ctx.setTransform(DPR,0,0,DPR,0,0);
-    cockpitRect = cockpitImg ? containRect(cockpitImg.naturalWidth,cockpitImg.naturalHeight,W,H) : {x:0,y:0,w:W,h:H};
+    if(cockpitImg){
+      cockpitRect = isMobilePortrait()
+        ? coverRect(cockpitImg.naturalWidth,cockpitImg.naturalHeight,W,H)
+        : containRect(cockpitImg.naturalWidth,cockpitImg.naturalHeight,W,H);
+    } else { cockpitRect={x:0,y:0,w:W,h:H}; }
+    layout = isMobilePortrait() ? JSON.parse(JSON.stringify(MOBILE_LAYOUT)) : JSON.parse(JSON.stringify(DEFAULT_LAYOUT));
     applyLayout();
   }
   function px(f){ return {x:cockpitRect.x+f.x*cockpitRect.w, y:cockpitRect.y+f.y*cockpitRect.h}; }
@@ -261,7 +274,8 @@
   function placeEl(el,f){ const p=px(f); el.style.left=p.x+"px"; el.style.top=p.y+"px"; }
 
   function layoutTarget(){
-    const pad=Math.min(play.w,play.h)*0.05, zw=play.w-pad*2, zh=play.h-pad*2;
+    const padFactor=isMobilePortrait()?0.02:0.05;
+    const pad=Math.min(play.w,play.h)*padFactor, zw=play.w-pad*2, zh=play.h-pad*2;
     let ar=img?img.naturalWidth/img.naturalHeight:4/3, w=zw, h=w/ar; if(h>zh){ h=zh; w=h*ar; }
     imgRect={x:play.cx-w/2, y:play.y+pad+(zh-h)/2, w, h};
     rebakeSplats();
