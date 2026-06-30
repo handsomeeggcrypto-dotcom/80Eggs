@@ -170,6 +170,12 @@
         <label class="btn amber" for="targetInput">📁 UPLOAD YOUR OWN</label>
       </div>
 
+      <div class="brief" style="margin-bottom:8px">TIMER:</div>
+      <div class="btnrow" style="margin-bottom:10px" id="durBtns">
+        <button class="btn ghost" id="dur30" onclick="setDur(30)">30s</button>
+        <button class="btn" id="dur60" onclick="setDur(60)">60s</button>
+      </div>
+
       <div class="brief">
         <span class="k">①</span> Pick a target above or upload your own.<br>
         <span class="k">②</span> <b>Aim</b> the buster — <b>← →</b> or move the mouse.<br>
@@ -223,7 +229,7 @@
 
   // default layout, tuned to the baked-in cockpit (fractions of the displayed cockpit image)
   const DEFAULT_LAYOUT={
-    view: {x:0.330, y:0.205, w:0.340, h:0.360},
+    view: {x:0.260, y:0.100, w:0.480, h:0.430},
     bar:  {x:0.388, y:0.598},
     fire: {x:0.430, y:0.892},
   };
@@ -235,7 +241,14 @@
   let eggs=[], particles=[];
   let cannon={x:0,y:0,len:28,angle:0,recoil:0}, aim={x:0,y:0};
   let usingMouse=false, keyL=false, keyR=false;
+  let gameDuration=60;
   let mode="start", score=0, coverage=0, timeLeft=60, endAt=0, lastFire=0, lastT=0, shake=0, coverTimer=0;
+  window.setDur=function(s){
+    gameDuration=s;
+    document.getElementById('dur30').className='btn'+(s===30?'':' ghost');
+    document.getElementById('dur60').className='btn'+(s===60?'':' ghost');
+    document.getElementById('startBtn').textContent='LAUNCH · '+s+'s';
+  };
   const FIRE_COOLDOWN=110, EGG_SPEED=1200;
 
   const covCan=document.createElement("canvas"); covCan.width=84; covCan.height=84;
@@ -244,7 +257,7 @@
   function containRect(nw,nh,W,H){ const s=Math.min(W/nw,H/nh),w=nw*s,h=nh*s; return {x:(W-w)/2,y:(H-h)/2,w,h}; }
   function coverRect(nw,nh,W,H){ const s=Math.max(W/nw,H/nh),w=nw*s,h=nh*s; return {x:(W-w)/2,y:(H-h)/2,w,h}; }
   const MOBILE_LAYOUT={
-    view: {x:0.220, y:0.170, w:0.560, h:0.420},
+    view: {x:0.220, y:0.055, w:0.560, h:0.460},
     bar:  {x:0.340, y:0.620},
     fire: {x:0.380, y:0.880},
   };
@@ -365,15 +378,45 @@
 
   function drawTarget(){
     const r=imgRect;
-    ctx.save(); roundRect(r.x,r.y,r.w,r.h,5); ctx.clip();
-    if(img) ctx.drawImage(img,r.x,r.y,r.w,r.h);
-    else{ ctx.fillStyle="rgba(10,20,30,0.55)"; ctx.fillRect(r.x,r.y,r.w,r.h); drawDefaultTarget(r); }
+    // Draw image with feathered edges (no hard box clip)
+    ctx.save();
+    if(img){
+      ctx.drawImage(img,r.x,r.y,r.w,r.h);
+      // Feather edges so target blends into cockpit scene
+      const fade=Math.min(r.w,r.h)*0.12;
+      const sides=[
+        [r.x,r.y,fade,r.h,true],[r.x+r.w-fade,r.y,fade,r.h,false],
+        [r.x,r.y,r.w,fade,true,true],[r.x,r.y+r.h-fade,r.w,fade,false,true]
+      ];
+      for(const [sx,sy,sw,sh,fromStart,horiz] of sides){
+        const g=horiz
+          ?(ctx.createLinearGradient(sx,sy,sx+sw,sy))
+          :(ctx.createLinearGradient(sx,sy,sx,sy+sh));
+        g.addColorStop(0,fromStart?'rgba(0,0,0,0.55)':'rgba(0,0,0,0)');
+        g.addColorStop(1,fromStart?'rgba(0,0,0,0)':'rgba(0,0,0,0.55)');
+        ctx.fillStyle=g; ctx.fillRect(sx,sy,sw,sh);
+      }
+      // Cockpit glass tint — subtle blue/cyan sheen
+      const glass=ctx.createLinearGradient(r.x,r.y,r.x,r.y+r.h);
+      glass.addColorStop(0,'rgba(120,210,255,0.13)');
+      glass.addColorStop(0.5,'rgba(80,170,230,0.06)');
+      glass.addColorStop(1,'rgba(60,120,200,0.10)');
+      ctx.fillStyle=glass; ctx.fillRect(r.x,r.y,r.w,r.h);
+      // Glass reflection streak
+      ctx.save(); ctx.globalAlpha=0.09; ctx.fillStyle='#fff';
+      ctx.beginPath();
+      ctx.moveTo(r.x+r.w*0.18,r.y); ctx.lineTo(r.x+r.w*0.32,r.y);
+      ctx.lineTo(r.x+r.w*0.22,r.y+r.h*0.45); ctx.lineTo(r.x+r.w*0.10,r.y+r.h*0.45);
+      ctx.closePath(); ctx.fill(); ctx.restore();
+    } else {
+      ctx.fillStyle="rgba(10,20,30,0.55)"; ctx.fillRect(r.x,r.y,r.w,r.h); drawDefaultTarget(r);
+    }
     if(splatLayer) ctx.drawImage(splatLayer,r.x,r.y,r.w,r.h);
     ctx.restore();
-    // green TGT-LOCK style brackets to sell "locked enemy outside"
-    ctx.strokeStyle="rgba(157,255,110,0.95)"; ctx.lineWidth=2; ctx.shadowColor="rgba(157,255,110,0.6)"; ctx.shadowBlur=8;
-    bracket(r.x-3,r.y-3,r.w+6,r.h+6,16); ctx.shadowBlur=0;
-    ctx.fillStyle="rgba(157,255,110,0.92)"; ctx.font='bold 11px "Chivo Mono",monospace'; ctx.textAlign="left";
+    // HUD targeting brackets
+    ctx.strokeStyle="rgba(157,255,110,0.85)"; ctx.lineWidth=2; ctx.shadowColor="rgba(157,255,110,0.5)"; ctx.shadowBlur=6;
+    bracket(r.x-3,r.y-3,r.w+6,r.h+6,20); ctx.shadowBlur=0;
+    ctx.fillStyle="rgba(157,255,110,0.85)"; ctx.font='bold 11px "Chivo Mono",monospace'; ctx.textAlign="left";
     ctx.fillText("▸ TGT LOCK", r.x-2, r.y-9);
   }
   function drawDefaultTarget(r){
@@ -422,8 +465,8 @@
   function startGame(){
     score=0; coverage=0; eggsN.textContent="0"; coverN.textContent="0%";
     splats.length=0; eggs=[]; particles=[]; rebakeSplats();
-    timeLeft=60; timeN.textContent="60"; hudbar.classList.remove("low");
-    mode="play"; endAt=performance.now()+60000; coverTimer=0;
+    timeLeft=gameDuration; timeN.textContent=gameDuration; hudbar.classList.remove("low");
+    mode="play"; endAt=performance.now()+gameDuration*1000; coverTimer=0;
     document.body.classList.add("playing"); startScreen.hidden=true; overScreen.hidden=true; audio();
   }
   function endGame(){
