@@ -67,7 +67,9 @@
   body.editing #editHint{ display:block; }
 
   .overlay{ position:absolute; inset:0; z-index:30; display:flex; align-items:center; justify-content:center; padding:18px;
-    background:radial-gradient(130% 110% at 50% 18%, rgba(16,30,12,.74), rgba(3,8,5,.92)); }
+    background:radial-gradient(130% 110% at 50% 18%, rgba(16,30,12,.74), rgba(3,8,5,.92));
+    overflow-y:auto; }
+  @media (max-height:700px),(pointer:coarse){ .overlay{ align-items:flex-start; padding-top:60px; } }
   .overlay[hidden]{ display:none; }
   .panel{ width:min(540px,94vw); pointer-events:auto;
     background:linear-gradient(180deg,#22321a,#0c1608); border:3px solid #0a1c0c; border-radius:16px;
