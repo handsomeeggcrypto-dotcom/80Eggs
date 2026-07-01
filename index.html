@@ -87,6 +87,27 @@ html,body{
   left:72.7%;  top:54.2%;
   width:24.5%; height:31.3%;
 }
+
+/* Heart sticker — top right, outside the cockpit panel area */
+#hs-smoke{
+  right:0%;    top:0%;
+  width:14%;   height:20%;
+  border-radius:50%;
+  overflow:hidden;
+}
+#hs-smoke img{
+  width:100%; height:100%;
+  object-fit:cover;
+  pointer-events:none;
+  user-select:none;
+  display:block;
+  transition:transform .2s, filter .2s;
+}
+#hs-smoke:hover img{
+  transform:scale(1.08);
+  filter:drop-shadow(0 0 12px rgba(255,120,200,0.8)) drop-shadow(0 0 30px rgba(255,80,180,0.5));
+}
+#hs-smoke .label{ bottom:auto; top:105%; }
 </style>
 </head>
 <body>
@@ -104,6 +125,10 @@ html,body{
   </a>
   <a class="hotspot" id="hs-sudoku" href="sudoku.html">
     <span class="label">SUDOKU 数独</span>
+  </a>
+  <a class="hotspot" id="hs-smoke" href="smokebreak.html">
+    <img src="heart.jpg" alt="Smoke Ring Break">
+    <span class="label">SMOKE BREAK</span>
   </a>
 </div>
 </body>
