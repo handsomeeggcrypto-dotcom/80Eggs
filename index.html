@@ -33,37 +33,68 @@ html,body{
   draggable:false;
 }
 
+/* Pulsing neon glow animations — each hotspot has its own color theme */
+@keyframes pulse-cyan{
+  0%,100%{box-shadow:0 0 0 2px rgba(45,226,230,0.5), 0 0 18px 4px rgba(45,226,230,0.25), inset 0 0 12px rgba(45,226,230,0.06);}
+  50%{box-shadow:0 0 0 2px rgba(45,226,230,0.9), 0 0 40px 12px rgba(45,226,230,0.45), inset 0 0 24px rgba(45,226,230,0.12);}
+}
+@keyframes pulse-orange{
+  0%,100%{box-shadow:0 0 0 2px rgba(255,154,60,0.5), 0 0 18px 4px rgba(255,154,60,0.25), inset 0 0 12px rgba(255,154,60,0.06);}
+  50%{box-shadow:0 0 0 2px rgba(255,154,60,0.9), 0 0 40px 12px rgba(255,154,60,0.45), inset 0 0 24px rgba(255,154,60,0.12);}
+}
+@keyframes pulse-green{
+  0%,100%{box-shadow:0 0 0 2px rgba(125,255,164,0.5), 0 0 18px 4px rgba(125,255,164,0.25), inset 0 0 12px rgba(125,255,164,0.06);}
+  50%{box-shadow:0 0 0 2px rgba(125,255,164,0.9), 0 0 40px 12px rgba(125,255,164,0.45), inset 0 0 24px rgba(125,255,164,0.12);}
+}
+@keyframes pulse-purple{
+  0%,100%{box-shadow:0 0 0 2px rgba(200,120,255,0.5), 0 0 18px 4px rgba(200,120,255,0.25), inset 0 0 12px rgba(200,120,255,0.06);}
+  50%{box-shadow:0 0 0 2px rgba(200,120,255,0.9), 0 0 40px 12px rgba(200,120,255,0.45), inset 0 0 24px rgba(200,120,255,0.12);}
+}
+@keyframes label-pulse{
+  0%,100%{opacity:.7;}
+  50%{opacity:1;}
+}
+
 /* Clickable screen hotspots — % of the #cockpit container */
 .hotspot{
   position:absolute;
   cursor:pointer;
   text-decoration:none;
   border-radius:6px;
-  transition:box-shadow .2s, background .2s;
-}
-.hotspot:hover{
-  box-shadow:0 0 0 3px rgba(255,255,255,0.45),
-             0 0 35px 8px rgba(180,120,255,0.5);
-  background:rgba(180,120,255,0.07);
 }
 
-/* Label revealed on hover */
+/* Each hotspot gets its own neon color */
+#hs-eggdefend{ animation:pulse-green 2.4s ease-in-out infinite; }
+#hs-crypto{    animation:pulse-cyan  2.8s ease-in-out infinite; }
+#hs-typing{    animation:pulse-orange 2.2s ease-in-out infinite; }
+#hs-sudoku{    animation:pulse-purple 3.0s ease-in-out infinite; }
+
+.hotspot:hover{
+  animation:none;
+  box-shadow:0 0 0 3px rgba(255,255,255,0.7),
+             0 0 50px 16px rgba(255,255,255,0.25),
+             inset 0 0 30px rgba(255,255,255,0.08);
+  background:rgba(255,255,255,0.06);
+}
+
+/* Label — always visible, pulses gently */
 .hotspot .label{
   position:absolute;
   bottom:10%;
   left:50%;
   transform:translateX(-50%);
   font-family:'Courier New',monospace;
-  font-size:clamp(9px,1.1vw,14px);
+  font-size:clamp(8px,1vw,13px);
   letter-spacing:2px;
-  color:#fff;
-  text-shadow:0 0 8px #c97fff, 0 0 20px #c97fff;
   white-space:nowrap;
-  opacity:0;
-  transition:opacity .2s;
   pointer-events:none;
+  animation:label-pulse 2.2s ease-in-out infinite;
 }
-.hotspot:hover .label{ opacity:1; }
+#hs-eggdefend .label{ color:#7dffa4; text-shadow:0 0 6px #7dffa4, 0 0 16px #7dffa4; }
+#hs-crypto    .label{ color:#2de2e6; text-shadow:0 0 6px #2de2e6, 0 0 16px #2de2e6; }
+#hs-typing    .label{ color:#ff9a3c; text-shadow:0 0 6px #ff9a3c, 0 0 16px #ff9a3c; }
+#hs-sudoku    .label{ color:#c87fff; text-shadow:0 0 6px #c87fff, 0 0 16px #c87fff; }
+#hs-smoke     .label{ color:#ff80d0; text-shadow:0 0 6px #ff80d0, 0 0 16px #ff80d0; bottom:auto; top:105%; }
 
 /* ---- Screen hotspot positions (% of 1536×1024 image) ----
    Top-left (SYSTEM STATUS / egg defend): ~cols 0–280, rows 0–265
