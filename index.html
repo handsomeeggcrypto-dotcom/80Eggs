@@ -24,13 +24,29 @@ html,body{
   flex-shrink:0;
 }
 
-#cockpit img{
+/* Video background fills the window area */
+#bg-video{
+  position:absolute;
+  inset:0;
+  width:100%;
+  height:100%;
+  object-fit:cover;
+  z-index:0;
+  pointer-events:none;
+}
+
+/* Cockpit frame sits on top — mix-blend-mode:multiply makes white areas
+   transparent so the video shows through the windows */
+#cockpit-img{
+  position:absolute;
+  inset:0;
   width:100%;
   height:100%;
   display:block;
   user-select:none;
   pointer-events:none;
-  draggable:false;
+  z-index:1;
+  mix-blend-mode:multiply;
 }
 
 /* Pulsing neon glow animations — each hotspot has its own color theme */
@@ -61,6 +77,7 @@ html,body{
   cursor:pointer;
   text-decoration:none;
   border-radius:6px;
+  z-index:2;
 }
 
 /* Each hotspot gets its own neon color */
@@ -143,7 +160,10 @@ html,body{
 </head>
 <body>
 <div id="cockpit">
-  <img src="cockpit.png" alt="80Eggs Cockpit" draggable="false">
+  <video id="bg-video" autoplay loop muted playsinline>
+    <source src="bg.MOV" type="video/mp4">
+  </video>
+  <img id="cockpit-img" src="cockpit2.png" alt="80Eggs Cockpit" draggable="false">
 
   <a class="hotspot" id="hs-eggdefend" href="eggdefend.html">
     <span class="label">EGG DEFEND</span>
