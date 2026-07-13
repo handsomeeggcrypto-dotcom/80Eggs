@@ -154,6 +154,27 @@ html,body{
   filter:drop-shadow(0 0 12px rgba(255,120,200,0.8)) drop-shadow(0 0 30px rgba(255,80,180,0.5));
 }
 #hs-smoke .label{ bottom:auto; top:105%; }
+
+/* Secret hotspot — hidden until "67" is typed */
+#hs-secret{
+  left:36%;    top:1%;
+  width:28%;   height:10%;
+  opacity:0;
+  pointer-events:none;
+  transition:opacity .4s;
+  border-radius:6px;
+  z-index:2;
+}
+#hs-secret.revealed{
+  opacity:1;
+  pointer-events:auto;
+  animation:pulse-secret 1.5s ease-in-out infinite;
+}
+@keyframes pulse-secret{
+  0%,100%{box-shadow:0 0 0 2px rgba(255,230,50,0.6), 0 0 20px 6px rgba(255,200,0,0.3);}
+  50%{box-shadow:0 0 0 2px rgba(255,230,50,1), 0 0 45px 14px rgba(255,200,0,0.6);}
+}
+#hs-secret .label{ color:#ffe032; text-shadow:0 0 6px #ffe032, 0 0 18px #ffe032; }
 </style>
 </head>
 <body>
@@ -179,6 +200,24 @@ html,body{
     <img src="heart.JPG" alt="Smoke Ring Break">
     <span class="label">SMOKE BREAK</span>
   </a>
+  <a class="hotspot" id="hs-secret" href="moe_fights.html">
+    <span class="label">??? CLASSIFIED ???</span>
+  </a>
 </div>
+<script>
+(function(){
+  let seq = '';
+  document.addEventListener('keydown', function(e){
+    seq += e.key;
+    if(seq.length > 2) seq = seq.slice(-2);
+    if(seq === '67'){
+      const el = document.getElementById('hs-secret');
+      el.classList.add('revealed');
+      // flash the label text briefly
+      seq = '';
+    }
+  });
+})();
+</script>
 </body>
 </html>
