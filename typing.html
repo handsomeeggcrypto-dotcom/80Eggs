@@ -95,6 +95,20 @@
   --title-font:var(--title); --type-weight:400;
 }
 
+/* WIN98 — Windows 98 desktop */
+.theme-win98{
+  --bg:#008080; --bg2:#006868;
+  --accent:#000080; --accent2:#1084d0;
+  --panel:#c0c0c0; --border:#808080;
+  --hud:#000000; --hud2:#000080;
+  --text-dim:#808080; --text-on:#000000; --text-glow:#000080;
+  --error:#cc0000;
+  --key-face:#c0c0c0; --key-edge:#808080; --key-text:#000000;
+  --key-press:#000080; --key-hint:#000080;
+  --sun1:#1084d0; --sun2:#000080; --grid:#0000aa;
+  --title-font:Tahoma,'MS Sans Serif',Geneva,Verdana,sans-serif; --type-weight:700;
+}
+
 /* ===================== BASE ===================== */
 *{box-sizing:border-box;margin:0;padding:0}
 html,body{height:100%}
@@ -414,6 +428,88 @@ body{
 .theme-mech .key{clip-path:polygon(7px 0,100% 0,100% calc(100% - 7px),calc(100% - 7px) 100%,0 100%,0 7px)}
 .theme-mech .stat,.theme-mech .opt{border-radius:3px}
 
+/* ---- WIN98 THEME ---- */
+.theme-win98 #app{
+  background:#008080;
+}
+.theme-win98 .bg-sun,.theme-win98 .bg-grid,.theme-win98 .bg-radar,
+.theme-win98 .bg-rain,.theme-win98 .bg-glass,.theme-win98 .bg-vignette{display:none}
+/* Titlebar gradient strip across the top */
+.theme-win98 .hdr{
+  background:linear-gradient(90deg,#000080,#1084d0);
+  border-bottom:2px solid #000;
+  padding:3px 8px 3px 6px;
+}
+.theme-win98 .logo h1{
+  font-family:Tahoma,'MS Sans Serif',Verdana,sans-serif;
+  font-size:clamp(14px,2vw,20px);
+  font-weight:bold;
+  color:#fff;
+  text-shadow:1px 1px 0 #000;
+  letter-spacing:1px;
+}
+.theme-win98 .logo .sub{color:rgba(255,255,255,.7);letter-spacing:1px}
+.theme-win98 .stat{
+  border-radius:0;
+  background:#c0c0c0;
+  border:none;
+  box-shadow:inset 1px 1px 0 #fff,inset -1px -1px 0 #000,inset 2px 2px 0 #dfdfdf,inset -2px -2px 0 #808080;
+}
+.theme-win98 .stat .lab{color:#000080}
+.theme-win98 .stat .val{color:#000;text-shadow:none}
+.theme-win98 .eq i{background:#000080;box-shadow:none}
+.theme-win98 .panel{
+  border-radius:0;
+  background:#fff;
+  border:none;
+  box-shadow:inset 1px 1px 0 #808080,inset -1px -1px 0 #fff,inset 2px 2px 0 #000,inset -2px -2px 0 #dfdfdf;
+}
+.theme-win98 .panel .prompt{color:#000080;opacity:1}
+.theme-win98 .stream{color:#808080}
+.theme-win98 .ch.ok{color:#000080;text-shadow:none}
+.theme-win98 .ch.cur{background:#000080;color:#fff;box-shadow:none}
+.theme-win98 .ch.err{color:#cc0000;text-shadow:none}
+.theme-win98 .themebar button{
+  background:#c0c0c0;color:#000;border:none;border-radius:0;
+  box-shadow:inset 1px 1px 0 #fff,inset -1px -1px 0 #000,inset 2px 2px 0 #dfdfdf,inset -2px -2px 0 #808080;
+  opacity:.85;
+}
+.theme-win98 .themebar button.on{
+  background:#c0c0c0;color:#000;
+  box-shadow:inset 1px 1px 0 #000,inset -1px -1px 0 #fff,inset 2px 2px 0 #808080,inset -2px -2px 0 #dfdfdf;
+}
+.theme-win98 .key{
+  border-radius:2px;
+  background:#c0c0c0;
+  border:none;
+  box-shadow:inset 1px 1px 0 #fff,inset -1px -1px 0 #000,inset 2px 2px 0 #dfdfdf,inset -2px -2px 0 #808080;
+  color:#000;
+}
+.theme-win98 .key.lit{
+  background:#000080;color:#fff;
+  box-shadow:inset 1px 1px 0 #1084d0,inset -1px -1px 0 #000040,inset 2px 2px 0 #2080c0,inset -2px -2px 0 #000060;
+}
+.theme-win98 .key.pressed{
+  box-shadow:inset 1px 1px 0 #000,inset -1px -1px 0 #fff,inset 2px 2px 0 #808080,inset -2px -2px 0 #dfdfdf;
+}
+.theme-win98 .opt{border-radius:0}
+.theme-win98 .opt.sel{
+  background:#000080;color:#fff;
+  box-shadow:none;border-color:#000080;
+}
+.theme-win98 .card{
+  border-radius:0;
+  background:#c0c0c0;
+  box-shadow:inset 1px 1px 0 #fff,inset -1px -1px 0 #000,inset 2px 2px 0 #dfdfdf,inset -2px -2px 0 #808080;
+}
+.theme-win98 .card h2{color:#000080;text-shadow:none;font-family:Tahoma,Verdana,sans-serif}
+.theme-win98 .bigwpm{color:#000080;text-shadow:none}
+.theme-win98 #goBtn{
+  border-radius:0;background:#c0c0c0;color:#000;
+  box-shadow:inset 1px 1px 0 #fff,inset -1px -1px 0 #000,inset 2px 2px 0 #dfdfdf,inset -2px -2px 0 #808080;
+}
+.theme-win98 #goBtn:hover{background:#dfdfdf}
+
 /* ---- RECORDS UI ---- */
 .recwrap{display:flex;gap:14px;text-align:left;margin:18px 0;flex-wrap:wrap}
 .reccol{flex:1 1 220px;border:1px solid var(--key-edge);border-radius:10px;background:var(--panel);padding:12px 14px}
@@ -485,6 +581,7 @@ body{
           <button data-theme="theme-phosphor">CRT-80</button>
           <button data-theme="theme-neon">NEON</button>
           <button data-theme="theme-mech">MECH</button>
+          <button data-theme="theme-win98">WIN98</button>
         </div>
         <div class="themebar" id="audiobar">
           <button class="audio-toggle on" data-audio="music">♪ MUSIC</button>
@@ -525,6 +622,7 @@ body{
           <div class="opt" data-theme="theme-phosphor">CRT-80<span class="d">PHOSPHOR</span></div>
           <div class="opt" data-theme="theme-neon">NEON<span class="d">SIGNS</span></div>
           <div class="opt" data-theme="theme-mech">MECH<span class="d">EXO-HUD</span></div>
+          <div class="opt" data-theme="theme-win98">WIN98<span class="d">DESKTOP</span></div>
         </div>
       </div>
 
@@ -798,7 +896,8 @@ const SFX={
   'theme-runner':  {type:'sawtooth',freq:340, dur:0.07, gain:0.14, glide:-70, filter:1400},
   'theme-phosphor':{type:'noise',   freq:0,   dur:0.035,gain:0.22},
   'theme-neon':    {type:'sawtooth',freq:1000,dur:0.05, gain:0.15, glide:0,  filter:1600},
-  'theme-mech':    {type:'square',  freq:170, dur:0.09, gain:0.20, glide:-90, filter:900}
+  'theme-mech':    {type:'square',  freq:170, dur:0.09, gain:0.20, glide:-90, filter:900},
+  'theme-win98':   {type:'square',  freq:440, dur:0.04, gain:0.12, glide:0,  filter:800}
 };
 function playTone(p){
   const t=actx.currentTime;
@@ -1005,7 +1104,8 @@ const THEME_META = {
   'theme-runner': {title:'TYPR<span class="slash">//</span>RUNNER', sub:'LAPD INTERFACE 9.7', fl:'MODEL: TYPR-8000', fr:'SECTOR: CITY CENTER', stitle:'TYPR//RUNNER'},
   'theme-phosphor':{title:'CRT<span class="slash">-</span>80', sub:'ZENITH TERMINAL // SYSTEM-80', fl:'MODE: STANDARD', fr:'BUFFER: NOMINAL', stitle:'CRT-80'},
   'theme-neon':   {title:'NEON<span class="slash">//</span>SIGNS', sub:'STRIP DISTRICT // AFTER DARK', fl:'MODE: NIGHTLIFE', fr:'POWER: ON', stitle:'NEON//SIGNS'},
-  'theme-mech':   {title:'EXO<span class="slash">//</span>FRAME', sub:'MECH OS 4.4 // PILOT LINK ACTIVE', fl:'SYS: NOMINAL', fr:'HUD: LOCKED', stitle:'EXO//FRAME'}
+  'theme-mech':   {title:'EXO<span class="slash">//</span>FRAME', sub:'MECH OS 4.4 // PILOT LINK ACTIVE', fl:'SYS: NOMINAL', fr:'HUD: LOCKED', stitle:'EXO//FRAME'},
+  'theme-win98':  {title:'TYPE<span class="slash">.</span>EXE', sub:'WINDOWS 98 // TYPING TRAINER v1.0', fl:'READY', fr:'NUM LOCK: ON', stitle:'TYPE.EXE'}
 };
 
 /* =========================================================
