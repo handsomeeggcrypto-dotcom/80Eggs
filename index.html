@@ -3,218 +3,471 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>80EGGS — COCKPIT</title>
+<title>80Eggs</title>
 <style>
-*{margin:0;padding:0;box-sizing:border-box}
-html,body{
-  height:100%;
-  background:#000;
-  display:flex;
-  align-items:center;
-  justify-content:center;
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{
+  font-family:Tahoma,'MS Sans Serif',Geneva,Verdana,sans-serif;
+  font-size:11px;
+  color:#000;
+  background:#008080;
+  -webkit-font-smoothing:none;
   overflow:hidden;
+  user-select:none;
 }
 
-/* Container always matches image's 3:2 aspect ratio, fits inside viewport */
-#cockpit{
+/* ===== win98 bevel mixins (via box-shadow) ===== */
+.raised{
+  background:#c0c0c0;
+  box-shadow:
+    inset 1px 1px 0 #fff,
+    inset -1px -1px 0 #000,
+    inset 2px 2px 0 #dfdfdf,
+    inset -2px -2px 0 #808080;
+}
+.sunken{
+  background:#c0c0c0;
+  box-shadow:
+    inset 1px 1px 0 #000,
+    inset -1px -1px 0 #fff,
+    inset 2px 2px 0 #808080,
+    inset -2px -2px 0 #dfdfdf;
+}
+.field{
+  background:#fff;
+  box-shadow:
+    inset 1px 1px 0 #808080,
+    inset -1px -1px 0 #fff,
+    inset 2px 2px 0 #000,
+    inset -2px -2px 0 #dfdfdf;
+}
+
+/* ===== desktop ===== */
+#desktop{
   position:relative;
-  /* fill width up to 3:2 constraint, never taller than 100vh */
-  width:min(100vw, calc(100vh * 3 / 2));
-  height:min(100vh, calc(100vw * 2 / 3));
-  flex-shrink:0;
-}
-
-/* Video background fills the window area */
-#bg-video{
-  position:absolute;
-  inset:0;
-  width:100%;
-  height:100%;
-  object-fit:cover;
-  z-index:0;
-  pointer-events:none;
-}
-
-/* Cockpit frame sits on top — transparent window areas let the video show through */
-#cockpit-img{
-  position:absolute;
-  inset:0;
-  width:100%;
-  height:100%;
-  display:block;
-  user-select:none;
-  pointer-events:none;
-  z-index:1;
-}
-
-/* Pulsing neon glow animations — each hotspot has its own color theme */
-@keyframes pulse-cyan{
-  0%,100%{box-shadow:0 0 0 2px rgba(45,226,230,0.5), 0 0 18px 4px rgba(45,226,230,0.25), inset 0 0 12px rgba(45,226,230,0.06);}
-  50%{box-shadow:0 0 0 2px rgba(45,226,230,0.9), 0 0 40px 12px rgba(45,226,230,0.45), inset 0 0 24px rgba(45,226,230,0.12);}
-}
-@keyframes pulse-orange{
-  0%,100%{box-shadow:0 0 0 2px rgba(255,154,60,0.5), 0 0 18px 4px rgba(255,154,60,0.25), inset 0 0 12px rgba(255,154,60,0.06);}
-  50%{box-shadow:0 0 0 2px rgba(255,154,60,0.9), 0 0 40px 12px rgba(255,154,60,0.45), inset 0 0 24px rgba(255,154,60,0.12);}
-}
-@keyframes pulse-green{
-  0%,100%{box-shadow:0 0 0 2px rgba(125,255,164,0.5), 0 0 18px 4px rgba(125,255,164,0.25), inset 0 0 12px rgba(125,255,164,0.06);}
-  50%{box-shadow:0 0 0 2px rgba(125,255,164,0.9), 0 0 40px 12px rgba(125,255,164,0.45), inset 0 0 24px rgba(125,255,164,0.12);}
-}
-@keyframes pulse-purple{
-  0%,100%{box-shadow:0 0 0 2px rgba(200,120,255,0.5), 0 0 18px 4px rgba(200,120,255,0.25), inset 0 0 12px rgba(200,120,255,0.06);}
-  50%{box-shadow:0 0 0 2px rgba(200,120,255,0.9), 0 0 40px 12px rgba(200,120,255,0.45), inset 0 0 24px rgba(200,120,255,0.12);}
-}
-@keyframes label-pulse{
-  0%,100%{opacity:.7;}
-  50%{opacity:1;}
-}
-
-/* Clickable screen hotspots — % of the #cockpit container */
-.hotspot{
-  position:absolute;
-  cursor:pointer;
-  text-decoration:none;
-  border-radius:6px;
-  z-index:2;
-}
-
-/* Each hotspot gets its own neon color */
-#hs-eggdefend{ animation:pulse-green 2.4s ease-in-out infinite; }
-#hs-crypto{    animation:pulse-cyan  2.8s ease-in-out infinite; }
-#hs-typing{    animation:pulse-orange 2.2s ease-in-out infinite; }
-#hs-sudoku{    animation:pulse-purple 3.0s ease-in-out infinite; }
-
-.hotspot:hover{
-  animation:none;
-  box-shadow:0 0 0 3px rgba(255,255,255,0.7),
-             0 0 50px 16px rgba(255,255,255,0.25),
-             inset 0 0 30px rgba(255,255,255,0.08);
-  background:rgba(255,255,255,0.06);
-}
-
-/* Label — always visible, pulses gently */
-.hotspot .label{
-  position:absolute;
-  bottom:10%;
-  left:50%;
-  transform:translateX(-50%);
-  font-family:'Courier New',monospace;
-  font-size:clamp(8px,1vw,13px);
-  letter-spacing:2px;
-  white-space:nowrap;
-  pointer-events:none;
-  animation:label-pulse 2.2s ease-in-out infinite;
-}
-#hs-eggdefend .label{ color:#7dffa4; text-shadow:0 0 6px #7dffa4, 0 0 16px #7dffa4; }
-#hs-crypto    .label{ color:#2de2e6; text-shadow:0 0 6px #2de2e6, 0 0 16px #2de2e6; }
-#hs-typing    .label{ color:#ff9a3c; text-shadow:0 0 6px #ff9a3c, 0 0 16px #ff9a3c; }
-#hs-sudoku    .label{ color:#c87fff; text-shadow:0 0 6px #c87fff, 0 0 16px #c87fff; }
-#hs-smoke     .label{ color:#ff80d0; text-shadow:0 0 6px #ff80d0, 0 0 16px #ff80d0; bottom:auto; top:105%; }
-
-/* ---- Screen hotspot positions (% of 1536×1024 image) ----
-   Top-left (SYSTEM STATUS / egg defend): ~cols 0–280, rows 0–265
-   Left  (SYSTEM MONITOR / crypto):       ~cols 55–420, rows 555–875
-   Center (TYPING GAME):                  ~cols 460–1075, rows 505–865
-   Right  (SUDOKU):                       ~cols 1115–1490, rows 555–875
-*/
-#hs-eggdefend{
-  left:0.5%;   top:0.5%;
-  width:16%;   height:23%;
-}
-#hs-crypto{
-  left:5%;     top:56%;
-  width:20%;   height:26%;
-}
-#hs-typing{
-  left:31.5%;  top:51%;
-  width:37%;   height:31%;
-}
-#hs-sudoku{
-  left:73%;    top:56%;
-  width:21%;   height:26%;
-}
-
-/* Heart sticker — top right, outside the cockpit panel area */
-#hs-smoke{
-  right:0%;    top:0%;
-  width:14%;   height:20%;
-  border-radius:50%;
+  height:100vh;width:100vw;
   overflow:hidden;
 }
-#hs-smoke img{
-  width:100%; height:100%;
-  object-fit:cover;
-  pointer-events:none;
-  user-select:none;
-  display:block;
-  transition:transform .2s, filter .2s;
+.desk-icon{
+  position:absolute;
+  width:76px;
+  display:flex;flex-direction:column;align-items:center;gap:4px;
+  padding:4px;cursor:pointer;
 }
-#hs-smoke:hover img{
-  transform:scale(1.08);
-  filter:drop-shadow(0 0 12px rgba(255,120,200,0.8)) drop-shadow(0 0 30px rgba(255,80,180,0.5));
+.desk-icon .ico{font-size:30px;line-height:1;filter:drop-shadow(1px 1px 0 rgba(0,0,0,.4))}
+.desk-icon .lab{
+  color:#fff;font-size:11px;text-align:center;line-height:1.2;
+  text-shadow:1px 1px 1px #000;
+  padding:1px 3px;
 }
-#hs-smoke .label{ bottom:auto; top:105%; }
+.desk-icon:hover .lab, .desk-icon.sel .lab{
+  background:#000080;outline:1px dotted #fff;
+}
 
-/* Secret hotspot — hidden until "67" is typed */
-#hs-secret{
-  left:36%;    top:1%;
-  width:28%;   height:10%;
-  opacity:0;
-  pointer-events:none;
-  transition:opacity .4s;
-  border-radius:6px;
-  z-index:2;
+/* ===== window ===== */
+#win{
+  position:absolute;
+  top:26px;left:4vw;right:4vw;
+  bottom:44px;
+  display:flex;flex-direction:column;
+  min-width:320px;
 }
-#hs-secret.revealed{
+.titlebar{
+  height:22px;
+  display:flex;align-items:center;
+  padding:2px 3px 2px 4px;
+  background:linear-gradient(90deg,#000080,#1084d0);
+  color:#fff;font-weight:bold;font-size:12px;
+  gap:5px;
+}
+.titlebar .ticon{font-size:13px}
+.titlebar .ttext{flex:1;letter-spacing:.3px}
+.tbtn{
+  width:16px;height:14px;
+  display:flex;align-items:center;justify-content:center;
+  font-family:'Marlett',Tahoma,sans-serif;font-size:10px;font-weight:bold;color:#000;
+  cursor:pointer;
+}
+.tbtn:active{
+  box-shadow:
+    inset 1px 1px 0 #000,
+    inset -1px -1px 0 #fff,
+    inset 2px 2px 0 #808080,
+    inset -2px -2px 0 #dfdfdf;
+}
+
+.menubar{
+  display:flex;gap:2px;padding:2px 4px;font-size:11px;
+}
+.menubar span{padding:2px 8px;cursor:pointer}
+.menubar span:hover{background:#000080;color:#fff}
+
+.toolbar{
+  display:flex;align-items:center;gap:4px;padding:3px 4px;
+}
+.tbutton{
+  padding:3px 8px;font-size:11px;display:flex;align-items:center;gap:4px;cursor:pointer;
+}
+.addr-row{
+  display:flex;align-items:center;gap:6px;padding:3px 4px 5px;font-size:11px;
+}
+.addr-field{
+  flex:1;padding:2px 5px;font-size:11px;display:flex;align-items:center;gap:5px;
+}
+
+.content{
+  flex:1;min-height:0;display:flex;
+}
+.sidebar{
+  width:150px;
+  padding:8px;
+  border-right:2px solid #808080;
+  display:flex;flex-direction:column;gap:8px;
+  overflow-y:auto;
+}
+.sidebar .banner{
+  background:#000080;color:#fff;font-weight:bold;font-size:13px;
+  padding:6px;text-align:center;
+}
+.sidebar .feat{
+  padding:6px;text-align:center;
+}
+.sidebar .feat .ico{font-size:44px}
+.sidebar .feat h3{font-size:13px;margin:6px 0 3px;color:#000080}
+.sidebar .feat p{font-size:11px;line-height:1.35;margin-bottom:6px}
+.sidebar .feat .playbtn{
+  padding:5px 10px;font-size:11px;font-weight:bold;cursor:pointer;display:inline-block;
+}
+.sidebar .infobox{font-size:11px;line-height:1.5;color:#000}
+
+.iconpane{
+  flex:1;min-height:0;overflow:auto;
+  background:#fff;
+  padding:10px;
+  display:grid;
+  grid-template-columns:repeat(auto-fill,minmax(84px,1fr));
+  gap:4px;
+  align-content:start;
+}
+.icon{
+  display:flex;flex-direction:column;align-items:center;gap:4px;
+  padding:6px 2px;cursor:pointer;text-decoration:none;color:#000;
+  text-align:center;
+}
+.icon .ico{
+  width:32px;height:32px;font-size:30px;line-height:32px;
+  display:flex;align-items:center;justify-content:center;
+}
+.icon .lab{font-size:11px;line-height:1.2;padding:1px 3px}
+.icon:hover .lab{background:#000080;color:#fff;outline:1px dotted #000080}
+.icon:hover .ico{filter:brightness(1.15)}
+
+/* ===== Locked MoeFights — visible but not clickable until "67" typed ===== */
+.icon.locked{
+  opacity:.45;
+  cursor:not-allowed;
+  pointer-events:none;
+}
+.icon.locked .lab::after{
+  content:' 🔒';
+}
+.icon.unlocked{
   opacity:1;
   pointer-events:auto;
-  animation:pulse-secret 1.5s ease-in-out infinite;
+  cursor:pointer;
+  animation:unlock-flash .4s ease;
 }
-@keyframes pulse-secret{
-  0%,100%{box-shadow:0 0 0 2px rgba(255,230,50,0.6), 0 0 20px 6px rgba(255,200,0,0.3);}
-  50%{box-shadow:0 0 0 2px rgba(255,230,50,1), 0 0 45px 14px rgba(255,200,0,0.6);}
+@keyframes unlock-flash{
+  0%{background:#ffff80}
+  100%{background:transparent}
 }
-#hs-secret .label{ color:#ffe032; text-shadow:0 0 6px #ffe032, 0 0 18px #ffe032; }
+.playbtn.locked-btn{
+  opacity:.45;
+  cursor:not-allowed;
+  pointer-events:none;
+}
+.playbtn.locked-btn::after{content:' 🔒'}
+
+.statusbar{
+  display:flex;align-items:center;gap:2px;padding:2px 4px;font-size:11px;
+}
+.statuscell{
+  flex:1;padding:2px 6px;
+}
+.statuscell.small{flex:none;width:120px}
+
+/* scrollbars, win98-ish */
+.iconpane::-webkit-scrollbar, .sidebar::-webkit-scrollbar{width:16px}
+.iconpane::-webkit-scrollbar-track, .sidebar::-webkit-scrollbar-track{background:#dfdfdf}
+.iconpane::-webkit-scrollbar-thumb, .sidebar::-webkit-scrollbar-thumb{
+  background:#c0c0c0;
+  box-shadow:inset 1px 1px 0 #fff, inset -1px -1px 0 #000;
+}
+
+/* ===== taskbar ===== */
+#taskbar{
+  position:fixed;left:0;right:0;bottom:0;height:30px;
+  display:flex;align-items:center;gap:4px;padding:2px 3px;
+  z-index:100;
+}
+#startbtn{
+  height:24px;padding:2px 8px 2px 4px;
+  display:flex;align-items:center;gap:5px;font-weight:bold;font-size:12px;cursor:pointer;
+}
+#startbtn .egg{
+  font-size:15px;line-height:1;
+}
+#startbtn.active{
+  box-shadow:
+    inset 1px 1px 0 #000,
+    inset -1px -1px 0 #fff,
+    inset 2px 2px 0 #808080,
+    inset -2px -2px 0 #dfdfdf;
+}
+.tsep{width:2px;align-self:stretch;box-shadow:inset -1px 0 0 #fff, inset 1px 0 0 #808080;margin:2px 1px}
+.taskitem{
+  height:24px;padding:2px 10px;display:flex;align-items:center;gap:6px;font-size:11px;
+  cursor:pointer;min-width:140px;
+  box-shadow:
+    inset 1px 1px 0 #000,
+    inset -1px -1px 0 #fff,
+    inset 2px 2px 0 #808080,
+    inset -2px -2px 0 #dfdfdf;
+}
+#tray{
+  margin-left:auto;height:24px;padding:2px 8px;display:flex;align-items:center;gap:8px;font-size:11px;
+}
+
+/* ===== start menu ===== */
+#startmenu{
+  position:fixed;left:2px;bottom:32px;width:210px;
+  display:none;flex-direction:column;z-index:200;
+  padding:2px;
+}
+#startmenu.open{display:flex}
+.sm-inner{display:flex;flex:1}
+.sm-side{
+  width:26px;
+  background:linear-gradient(180deg,#000080,#1084d0);
+  display:flex;align-items:flex-end;justify-content:center;padding:6px 0;
+}
+.sm-side span{
+  writing-mode:vertical-rl;transform:rotate(180deg);
+  color:#fff;font-weight:bold;font-size:15px;letter-spacing:1px;
+}
+.sm-items{flex:1;padding:3px}
+.sm-item{
+  display:flex;align-items:center;gap:8px;padding:5px 8px;font-size:11px;cursor:pointer;position:relative;
+}
+.sm-item:hover{background:#000080;color:#fff}
+.sm-item .ico{width:20px;text-align:center;font-size:14px}
+.sm-item .arrow{margin-left:auto;font-size:10px}
+.sm-sep{height:1px;margin:3px 4px;box-shadow:inset 0 1px 0 #808080, inset 0 -1px 0 #fff}
+
+.flyout{
+  position:absolute;left:100%;top:-3px;width:170px;
+  display:none;flex-direction:column;padding:3px;z-index:210;
+}
+.sm-item.has-flyout:hover .flyout{display:flex}
+.flyout .sm-item{font-size:11px}
+
+/* locked state in start menu */
+.sm-item.sm-locked{opacity:.45;cursor:not-allowed;pointer-events:none;}
+.sm-item.sm-locked .lab::after{content:' 🔒'}
 </style>
 </head>
 <body>
-<div id="cockpit">
-  <video id="bg-video" autoplay loop muted playsinline>
-    <source src="bg.MOV" type="video/mp4">
-  </video>
-  <img id="cockpit-img" src="cockpit4.png" alt="80Eggs Cockpit" draggable="false">
+<div id="desktop">
 
-  <a class="hotspot" id="hs-eggdefend" href="eggdefend.html">
-    <span class="label">EGG DEFEND</span>
-  </a>
-  <a class="hotspot" id="hs-crypto" href="crypto.html">
-    <span class="label">EGG CONTROL PANEL</span>
-  </a>
-  <a class="hotspot" id="hs-typing" href="typing.html">
-    <span class="label">TYPING TERMINAL</span>
-  </a>
-  <a class="hotspot" id="hs-sudoku" href="sudoku.html">
-    <span class="label">SUDOKU 数独</span>
-  </a>
-  <a class="hotspot" id="hs-smoke" href="smokebreak.html">
-    <img src="heart.JPG" alt="Smoke Ring Break">
-    <span class="label">SMOKE BREAK</span>
-  </a>
-  <a class="hotspot" id="hs-secret" href="moe_fights.html">
-    <span class="label">??? CLASSIFIED ???</span>
-  </a>
+  <!-- decorative desktop icons -->
+  <div class="desk-icon" style="top:14px;left:14px" onclick="selectDesk(this)">
+    <div class="ico">🖥️</div>
+    <div class="lab">My Computer</div>
+  </div>
+  <div class="desk-icon" style="top:110px;left:14px" onclick="selectDesk(this)">
+    <div class="ico">🗑️</div>
+    <div class="lab">Recycle Bin</div>
+  </div>
+  <div class="desk-icon" style="top:206px;left:14px" onclick="selectDesk(this)">
+    <div class="ico">🥚</div>
+    <div class="lab">80Eggs.lnk</div>
+  </div>
+
+  <!-- ===== main window ===== -->
+  <div id="win" class="raised">
+    <div class="titlebar">
+      <span class="ticon">🥚</span>
+      <span class="ttext">80Eggs</span>
+      <div class="tbtn raised" title="Minimize">_</div>
+      <div class="tbtn raised" title="Maximize">▢</div>
+      <div class="tbtn raised" title="Close" onclick="closeWin()">✕</div>
+    </div>
+
+    <div class="menubar raised" style="box-shadow:none;border-top:1px solid #808080">
+      <span>File</span><span>Edit</span><span>View</span><span>Favorites</span><span>Help</span>
+    </div>
+
+    <div class="toolbar raised" style="border-top:1px solid #808080">
+      <div class="tbutton raised">◀ Back</div>
+      <div class="tbutton raised">Forward ▶</div>
+      <div class="tbutton raised">⬆ Up</div>
+      <div class="tbutton raised">🔍 Search</div>
+      <div class="tbutton raised">📁 Folders</div>
+    </div>
+    <div class="addr-row">
+      <span>Address</span>
+      <div class="addr-field sunken">🥚 C:\Games\80Eggs</div>
+    </div>
+
+    <div class="content sunken" style="margin:0 4px 4px;background:#fff">
+      <div class="sidebar raised" style="border-right:none;box-shadow:none;background:#c0c0c0">
+        <div class="banner">80Eggs</div>
+        <div class="feat sunken" style="background:#dcdcf7">
+          <div class="ico">🥚</div>
+          <h3>Egg Defend</h3>
+          <p>Shoot eggs at your enemies from the cockpit.</p>
+          <a class="playbtn raised" href="eggdefend.html">Play now</a>
+        </div>
+        <div id="sidebar-moe" class="feat sunken" style="background:#dcdcf7;margin-top:4px">
+          <div class="ico">⚔️</div>
+          <h3>MoeFights</h3>
+          <p>Head-to-head battler.<br>Pick a fighter and throw down.</p>
+          <a id="sidebar-moe-btn" class="playbtn raised locked-btn" href="moe_fights.html">Play now</a>
+        </div>
+        <div class="infobox">
+          Select an item to view its<br>description.
+          <br><br>
+          6 object(s)
+        </div>
+      </div>
+
+      <div class="iconpane">
+        <a class="icon" href="eggdefend.html">
+          <div class="ico">🥚</div>
+          <div class="lab">Egg Defend</div>
+        </a>
+        <a class="icon" href="smokebreak.html">
+          <div class="ico">🚬</div>
+          <div class="lab">Smoke Break</div>
+        </a>
+        <a class="icon" href="typing.html">
+          <div class="ico">⌨️</div>
+          <div class="lab">Typing Terminal</div>
+        </a>
+        <a class="icon" href="sudoku.html">
+          <div class="ico">🔢</div>
+          <div class="lab">Sudoku</div>
+        </a>
+        <a class="icon" href="crypto.html">
+          <div class="ico">📡</div>
+          <div class="lab">Egg Control Panel</div>
+        </a>
+        <a id="moe-icon" class="icon locked" href="moe_fights.html">
+          <div class="ico">⚔️</div>
+          <div class="lab">MoeFights</div>
+        </a>
+      </div>
+    </div>
+
+    <div class="statusbar raised" style="box-shadow:none;border-top:1px solid #808080">
+      <div class="statuscell sunken">6 object(s)</div>
+      <div class="statuscell small sunken">💾 1.44MB free</div>
+      <div class="statuscell small sunken">🌐 Local intranet</div>
+    </div>
+  </div>
 </div>
+
+<!-- ===== start menu ===== -->
+<div id="startmenu" class="raised">
+  <div class="sm-inner">
+    <div class="sm-side"><span>80Eggs 98</span></div>
+    <div class="sm-items">
+      <div class="sm-item has-flyout">
+        <span class="ico">🥚</span><span>Programs</span><span class="arrow">▶</span>
+        <div class="flyout raised">
+          <a class="sm-item" href="eggdefend.html"><span class="ico">🥚</span><span>Egg Defend</span></a>
+          <a class="sm-item" href="smokebreak.html"><span class="ico">🚬</span><span>Smoke Break</span></a>
+          <a class="sm-item" href="typing.html"><span class="ico">⌨️</span><span>Typing Terminal</span></a>
+          <a class="sm-item" href="sudoku.html"><span class="ico">🔢</span><span>Sudoku</span></a>
+          <a class="sm-item" href="crypto.html"><span class="ico">📡</span><span>Egg Control Panel</span></a>
+          <a id="moe-sm-item" class="sm-item sm-locked" href="moe_fights.html"><span class="ico">⚔️</span><span>MoeFights 🔒</span></a>
+        </div>
+      </div>
+      <div class="sm-item"><span class="ico">📄</span><span>Documents</span></div>
+      <div class="sm-item"><span class="ico">⚙️</span><span>Settings</span></div>
+      <div class="sm-item"><span class="ico">🔍</span><span>Find</span></div>
+      <div class="sm-item"><span class="ico">❓</span><span>Help</span></div>
+      <div class="sm-item"><span class="ico">▶️</span><span>Run...</span></div>
+      <div class="sm-sep"></div>
+      <div class="sm-item" onclick="alert('Are you sure you want to shut down 80Eggs?')"><span class="ico">🔌</span><span>Shut Down...</span></div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== taskbar ===== -->
+<div id="taskbar" class="raised">
+  <div id="startbtn" class="raised" onclick="toggleStart()">
+    <div class="egg">🥚</div>
+    <span>Start</span>
+  </div>
+  <div class="tsep"></div>
+  <div class="taskitem"><span>🥚</span><span>80Eggs</span></div>
+  <div id="tray" class="sunken">
+    <span id="clock">00:00 PM</span>
+  </div>
+</div>
+
 <script>
+function toggleStart(){
+  document.getElementById('startmenu').classList.toggle('open');
+  document.getElementById('startbtn').classList.toggle('active');
+}
+document.addEventListener('click', function(e){
+  const menu = document.getElementById('startmenu');
+  const btn = document.getElementById('startbtn');
+  if(menu.classList.contains('open') && !menu.contains(e.target) && !btn.contains(e.target)){
+    menu.classList.remove('open');
+    btn.classList.remove('active');
+  }
+});
+function selectDesk(el){
+  document.querySelectorAll('.desk-icon').forEach(d=>d.classList.remove('sel'));
+  el.classList.add('sel');
+}
+function closeWin(){
+  document.getElementById('win').style.display='none';
+}
+function updateClock(){
+  const d = new Date();
+  let h = d.getHours();
+  const m = d.getMinutes().toString().padStart(2,'0');
+  const ampm = h >= 12 ? 'PM' : 'AM';
+  h = h % 12; if(h===0) h = 12;
+  document.getElementById('clock').textContent = h+':'+m+' '+ampm;
+}
+updateClock();
+setInterval(updateClock, 1000*10);
+
+/* ===== "67" secret unlock for MoeFights ===== */
 (function(){
   let seq = '';
   document.addEventListener('keydown', function(e){
     seq += e.key;
     if(seq.length > 2) seq = seq.slice(-2);
     if(seq === '67'){
-      const el = document.getElementById('hs-secret');
-      el.classList.add('revealed');
-      // flash the label text briefly
       seq = '';
+      // unlock icon grid
+      const icon = document.getElementById('moe-icon');
+      icon.classList.remove('locked');
+      icon.classList.add('unlocked');
+      // unlock sidebar play button
+      const btn = document.getElementById('sidebar-moe-btn');
+      btn.classList.remove('locked-btn');
+      // unlock start menu item
+      const smItem = document.getElementById('moe-sm-item');
+      smItem.classList.remove('sm-locked');
+      smItem.querySelector('span:last-child').textContent = 'MoeFights';
     }
   });
 })();
