@@ -333,7 +333,7 @@ body{
           <div class="ico">⚔️</div>
           <h3>MoeFights</h3>
           <p>Head-to-head battler.<br>Pick a fighter and throw down.</p>
-          <a id="sidebar-moe-btn" class="playbtn raised locked-btn" href="moe_fights.html">Play now</a>
+          <a class="playbtn raised" href="moe_fights.html">Play now</a>
         </div>
         <div class="infobox">
           Select an item to view its<br>description.
@@ -363,7 +363,7 @@ body{
           <div class="ico">📡</div>
           <div class="lab">Egg Control Panel</div>
         </a>
-        <a id="moe-icon" class="icon locked" href="moe_fights.html">
+        <a class="icon" href="moe_fights.html">
           <div class="ico">⚔️</div>
           <div class="lab">MoeFights</div>
         </a>
@@ -391,7 +391,7 @@ body{
           <a class="sm-item" href="typing.html"><span class="ico">⌨️</span><span>Typing Terminal</span></a>
           <a class="sm-item" href="sudoku.html"><span class="ico">🔢</span><span>Sudoku</span></a>
           <a class="sm-item" href="crypto.html"><span class="ico">📡</span><span>Egg Control Panel</span></a>
-          <a id="moe-sm-item" class="sm-item sm-locked" href="moe_fights.html"><span class="ico">⚔️</span><span>MoeFights 🔒</span></a>
+          <a class="sm-item" href="moe_fights.html"><span class="ico">⚔️</span><span>MoeFights</span></a>
         </div>
       </div>
       <div class="sm-item"><span class="ico">📄</span><span>Documents</span></div>
@@ -449,28 +449,6 @@ function updateClock(){
 updateClock();
 setInterval(updateClock, 1000*10);
 
-/* ===== "67" secret unlock for MoeFights ===== */
-(function(){
-  let seq = '';
-  document.addEventListener('keydown', function(e){
-    seq += e.key;
-    if(seq.length > 2) seq = seq.slice(-2);
-    if(seq === '67'){
-      seq = '';
-      // unlock icon grid
-      const icon = document.getElementById('moe-icon');
-      icon.classList.remove('locked');
-      icon.classList.add('unlocked');
-      // unlock sidebar play button
-      const btn = document.getElementById('sidebar-moe-btn');
-      btn.classList.remove('locked-btn');
-      // unlock start menu item
-      const smItem = document.getElementById('moe-sm-item');
-      smItem.classList.remove('sm-locked');
-      smItem.querySelector('span:last-child').textContent = 'MoeFights';
-    }
-  });
-})();
 </script>
 </body>
 </html>
