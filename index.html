@@ -272,6 +272,72 @@ body{
 .sm-item.has-flyout:hover .flyout{display:flex}
 .flyout .sm-item{font-size:11px}
 
+/* ===== Shutdown overlay ===== */
+#shutdown-overlay{
+  display:none;
+  position:fixed;inset:0;z-index:9999;
+  flex-direction:column;align-items:center;justify-content:center;
+}
+/* Confirm dialog */
+#sd-confirm{
+  background:#c0c0c0;
+  box-shadow:inset 1px 1px 0 #fff,inset -1px -1px 0 #000,inset 2px 2px 0 #dfdfdf,inset -2px -2px 0 #808080;
+  width:340px;
+}
+#sd-confirm .titlebar{
+  height:22px;display:flex;align-items:center;padding:2px 3px 2px 4px;
+  background:linear-gradient(90deg,#000080,#1084d0);color:#fff;font-weight:bold;font-size:12px;gap:5px;
+}
+#sd-confirm .sd-body{padding:18px 16px 12px;display:flex;gap:14px;align-items:flex-start}
+#sd-confirm .sd-icon{font-size:32px;line-height:1}
+#sd-confirm .sd-msg{font-size:12px;line-height:1.6}
+#sd-confirm .sd-btns{display:flex;justify-content:center;gap:8px;padding:0 16px 14px}
+.sd-btn{
+  padding:4px 20px;font-size:11px;font-weight:bold;cursor:pointer;min-width:70px;text-align:center;
+  background:#c0c0c0;
+  box-shadow:inset 1px 1px 0 #fff,inset -1px -1px 0 #000,inset 2px 2px 0 #dfdfdf,inset -2px -2px 0 #808080;
+}
+.sd-btn:active{
+  box-shadow:inset 1px 1px 0 #000,inset -1px -1px 0 #fff,inset 2px 2px 0 #808080,inset -2px -2px 0 #dfdfdf;
+}
+
+/* Please wait screen */
+#sd-wait{
+  display:none;position:fixed;inset:0;z-index:10000;
+  background:#000080;
+  flex-direction:column;align-items:center;justify-content:center;
+  color:#fff;font-family:Tahoma,'MS Sans Serif',sans-serif;text-align:center;
+}
+#sd-wait p{font-size:16px;margin-bottom:6px}
+#sd-wait small{font-size:12px;opacity:.8}
+
+/* Black screen + power button */
+#sd-off{
+  display:none;position:fixed;inset:0;z-index:10001;
+  background:#000;align-items:center;justify-content:center;
+}
+#power-btn{
+  font-size:72px;cursor:pointer;
+  color:#333;
+  text-shadow:0 0 0px #333;
+  transition:color .3s, text-shadow .3s;
+  user-select:none;
+  animation:power-breathe 3s ease-in-out infinite;
+}
+#power-btn:hover{
+  color:#00cc44;
+  text-shadow:0 0 20px #00cc44, 0 0 50px #00cc44;
+  animation:none;
+}
+@keyframes power-breathe{
+  0%,100%{color:#1a1a1a;text-shadow:0 0 4px #0a3a0a}
+  50%{color:#2a4a2a;text-shadow:0 0 16px #00aa33}
+}
+
+/* Fade transitions */
+#sd-wait{transition:opacity .6s}
+#sd-off{transition:opacity .8s}
+
 /* locked state in start menu */
 .sm-item.sm-locked{opacity:.45;cursor:not-allowed;pointer-events:none;}
 .sm-item.sm-locked .lab::after{content:' 🔒'}
@@ -400,9 +466,38 @@ body{
       <div class="sm-item"><span class="ico">❓</span><span>Help</span></div>
       <div class="sm-item"><span class="ico">▶️</span><span>Run...</span></div>
       <div class="sm-sep"></div>
-      <div class="sm-item" onclick="alert('Are you sure you want to shut down 80Eggs?')"><span class="ico">🔌</span><span>Shut Down...</span></div>
+      <div class="sm-item" onclick="shutdownConfirm()"><span class="ico">🔌</span><span>Shut Down...</span></div>
     </div>
   </div>
+</div>
+
+<!-- ===== Shutdown confirm dialog ===== -->
+<div id="shutdown-overlay" style="display:none;position:fixed;inset:0;z-index:9999;align-items:center;justify-content:center;background:transparent">
+  <div id="sd-confirm">
+    <div class="titlebar">
+      <span style="font-size:13px">🔌</span>
+      <span style="flex:1">Shut Down Windows</span>
+    </div>
+    <div class="sd-body">
+      <div class="sd-icon">🖥️</div>
+      <div class="sd-msg">Are you sure you want to<br>shut down 80Eggs?</div>
+    </div>
+    <div class="sd-btns">
+      <div class="sd-btn" onclick="doShutdown()">OK</div>
+      <div class="sd-btn" onclick="cancelShutdown()">Cancel</div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== Please wait screen ===== -->
+<div id="sd-wait" style="display:none">
+  <p>It is now safe to turn off your computer.</p>
+  <small>Please wait...</small>
+</div>
+
+<!-- ===== Black screen / power button ===== -->
+<div id="sd-off" style="display:none">
+  <div id="power-btn" onclick="powerOn()" title="Power on">⏻</div>
 </div>
 
 <!-- ===== taskbar ===== -->
@@ -448,6 +543,38 @@ function updateClock(){
 }
 updateClock();
 setInterval(updateClock, 1000*10);
+
+function shutdownConfirm(){
+  document.getElementById('startmenu').classList.remove('open');
+  document.getElementById('startbtn').classList.remove('active');
+  const o = document.getElementById('shutdown-overlay');
+  o.style.display = 'flex';
+}
+function cancelShutdown(){
+  document.getElementById('shutdown-overlay').style.display = 'none';
+}
+function doShutdown(){
+  document.getElementById('shutdown-overlay').style.display = 'none';
+  // Show "please wait" blue screen
+  const wait = document.getElementById('sd-wait');
+  wait.style.display = 'flex';
+  wait.style.opacity = '1';
+  // Fade to black after 1.8s
+  setTimeout(()=>{
+    wait.style.opacity = '0';
+    setTimeout(()=>{
+      wait.style.display = 'none';
+      const off = document.getElementById('sd-off');
+      off.style.display = 'flex';
+      off.style.opacity = '1';
+    }, 700);
+  }, 1800);
+}
+function powerOn(){
+  const off = document.getElementById('sd-off');
+  off.style.opacity = '0';
+  setTimeout(()=>{ off.style.display = 'none'; }, 800);
+}
 
 </script>
 </body>
