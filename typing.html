@@ -94,19 +94,31 @@
   --sun1:#2b9cff; --sun2:#0a3a6b; --grid:#1d4f86;
   --title-font:var(--title); --type-weight:400;
 }
-
-/* WIN98 — Windows 98 desktop */
-.theme-win98{
-  --bg:#008080; --bg2:#006868;
-  --accent:#000080; --accent2:#1084d0;
-  --panel:#c0c0c0; --border:#808080;
-  --hud:#000000; --hud2:#000080;
-  --text-dim:#808080; --text-on:#000000; --text-glow:#000080;
-  --error:#cc0000;
-  --key-face:#c0c0c0; --key-edge:#808080; --key-text:#000000;
-  --key-press:#000080; --key-hint:#000080;
-  --sun1:#1084d0; --sun2:#000080; --grid:#0000aa;
-  --title-font:Tahoma,'MS Sans Serif',Geneva,Verdana,sans-serif; --type-weight:700;
+/* COTTON CANDY — soft pastel sky, light background */
+.theme-cotton{
+  --bg:#a9dcff; --bg2:#ffd3ea;
+  --accent:#ff6fb5; --accent2:#7ec8ff;
+  --panel:rgba(255,255,255,.55); --border:#ff9ed2;
+  --hud:#c94f9c; --hud2:#6f95cf;
+  --text-dim:#9a7fbe; --text-on:#ff2e93; --text-glow:#ff2e93;
+  --error:#ff5560;
+  --key-face:rgba(255,255,255,.62); --key-edge:#ffb8dd; --key-text:#bd5a9f;
+  --key-press:#ff8ec6; --key-hint:#7ec8ff;
+  --sun1:#ffd1e8; --sun2:#bfe6ff; --grid:#ffb8dd;
+  --title-font:var(--title); --type-weight:400;
+}
+/* Y2K FUTURISM — chrome, holographic, glossy gel */
+.theme-y2k{
+  --bg:#060a16; --bg2:#0e1730;
+  --accent:#2be5ff; --accent2:#ff4fd8;
+  --panel:rgba(24,38,72,.5); --border:#8fd0ff;
+  --hud:#a7ecff; --hud2:#ff9ae4;
+  --text-dim:#5f7aae; --text-on:#e9fbff; --text-glow:#8ff4ff;
+  --error:#ff4d6d;
+  --key-face:rgba(180,214,255,.12); --key-edge:#6fc6ff; --key-text:#c7ecff;
+  --key-press:#2be5ff; --key-hint:#ff4fd8;
+  --sun1:#2be5ff; --sun2:#ff4fd8; --grid:#3a6ea5;
+  --title-font:var(--title); --type-weight:400;
 }
 
 /* ===================== BASE ===================== */
@@ -141,8 +153,8 @@ body{
   mask-image:repeating-linear-gradient(180deg,#000 0 10px,transparent 10px 16px);
   animation:sunpulse 5s ease-in-out infinite;
 }
-.theme-tron .bg-sun,.theme-phosphor .bg-sun,.theme-neon .bg-sun,.theme-mech .bg-sun{display:none}
-.theme-neon .bg-grid{display:none}
+.theme-tron .bg-sun,.theme-phosphor .bg-sun,.theme-neon .bg-sun,.theme-mech .bg-sun,.theme-cotton .bg-sun,.theme-y2k .bg-sun{display:none}
+.theme-neon .bg-grid,.theme-cotton .bg-grid{display:none}
 @keyframes sunpulse{0%,100%{opacity:.5;transform:scale(1)}50%{opacity:.7;transform:scale(1.03)}}
 .bg-grid{
   position:absolute; left:-20%; right:-20%; bottom:-10%; height:55%;
@@ -428,87 +440,91 @@ body{
 .theme-mech .key{clip-path:polygon(7px 0,100% 0,100% calc(100% - 7px),calc(100% - 7px) 100%,0 100%,0 7px)}
 .theme-mech .stat,.theme-mech .opt{border-radius:3px}
 
-/* ---- WIN98 THEME ---- */
-.theme-win98 #app{
-  background:#008080;
+/* ---- COTTON CANDY THEME (light pastel) ---- */
+.bg-clouds{position:absolute;inset:0;display:none}
+.theme-cotton .bg-clouds{display:block;
+  background:
+    radial-gradient(46% 32% at 22% 82%, #ffffff 0%, rgba(255,255,255,0) 62%),
+    radial-gradient(42% 30% at 43% 92%, #ffdcef 0%, rgba(255,220,239,0) 66%),
+    radial-gradient(52% 34% at 68% 85%, #ffffff 0%, rgba(255,255,255,0) 62%),
+    radial-gradient(44% 30% at 90% 90%, #d8ecff 0%, rgba(216,236,255,0) 66%),
+    radial-gradient(40% 28% at 80% 68%, #ffe6f4 0%, rgba(255,230,244,0) 66%),
+    radial-gradient(48% 32% at 10% 58%, #ffffff 0%, rgba(255,255,255,0) 60%),
+    radial-gradient(44% 28% at 55% 36%, rgba(255,255,255,.65) 0%, rgba(255,255,255,0) 64%),
+    linear-gradient(180deg, #a9dcff 0%, #c6e4ff 38%, #ffd9ee 100%);
+  background-repeat:no-repeat;
 }
-.theme-win98 .bg-sun,.theme-win98 .bg-grid,.theme-win98 .bg-radar,
-.theme-win98 .bg-rain,.theme-win98 .bg-glass,.theme-win98 .bg-vignette{display:none}
-/* Titlebar gradient strip across the top */
-.theme-win98 .hdr{
-  background:linear-gradient(90deg,#000080,#1084d0);
-  border-bottom:2px solid #000;
-  padding:3px 8px 3px 6px;
+.theme-cotton .bg-clouds::after{content:'';position:absolute;inset:0;
+  background:
+    radial-gradient(28% 18% at 30% 28%, rgba(255,255,255,.6), transparent 60%),
+    radial-gradient(24% 16% at 72% 22%, rgba(255,255,255,.5), transparent 60%);
+  animation:cloudFloat 55s linear infinite alternate;
 }
-.theme-win98 .logo h1{
-  font-family:Tahoma,'MS Sans Serif',Verdana,sans-serif;
-  font-size:clamp(14px,2vw,20px);
-  font-weight:bold;
-  color:#fff;
-  text-shadow:1px 1px 0 #000;
-  letter-spacing:1px;
+@keyframes cloudFloat{from{transform:translateX(-5%)}to{transform:translateX(5%)}}
+.theme-cotton .bg-scan{display:none}
+.theme-cotton .bg-vignette{box-shadow:inset 0 0 170px 40px rgba(255,255,255,.5)}
+.theme-cotton .panel{
+  box-shadow:0 12px 34px rgba(255,120,180,.22), inset 0 0 40px rgba(255,255,255,.5);
+  backdrop-filter:blur(4px);
 }
-.theme-win98 .logo .sub{color:rgba(255,255,255,.7);letter-spacing:1px}
-.theme-win98 .stat{
-  border-radius:0;
-  background:#c0c0c0;
-  border:none;
-  box-shadow:inset 1px 1px 0 #fff,inset -1px -1px 0 #000,inset 2px 2px 0 #dfdfdf,inset -2px -2px 0 #808080;
+.theme-cotton .stat,.theme-cotton .card{backdrop-filter:blur(4px)}
+.theme-cotton .stat{box-shadow:0 6px 16px rgba(255,140,190,.18)}
+.theme-cotton .ch.ok{text-shadow:0 0 6px rgba(255,110,181,.55)}
+.theme-cotton .logo h1{text-shadow:0 2px 10px rgba(255,110,181,.45)}
+.theme-cotton .prompt{opacity:1}
+
+/* ---- Y2K FUTURISM THEME (chrome + holographic + gel) ---- */
+.bg-holo{position:absolute;inset:-25%;display:none}
+.theme-y2k .bg-holo{display:block;
+  background:conic-gradient(from 0deg at 50% 50%, #2be5ff, #7f9cff, #ff4fd8, #b0f0ff, #9affd6, #2be5ff);
+  filter:blur(80px); opacity:.22; animation:holoSpin 26s linear infinite;
 }
-.theme-win98 .stat .lab{color:#000080}
-.theme-win98 .stat .val{color:#000;text-shadow:none}
-.theme-win98 .eq i{background:#000080;box-shadow:none}
-.theme-win98 .panel{
-  border-radius:0;
-  background:#fff;
-  border:none;
-  box-shadow:inset 1px 1px 0 #808080,inset -1px -1px 0 #fff,inset 2px 2px 0 #000,inset -2px -2px 0 #dfdfdf;
+@keyframes holoSpin{to{transform:rotate(360deg)}}
+.bg-stars{position:absolute;inset:0;display:none}
+.theme-y2k .bg-stars{display:block;
+  background-image:
+    radial-gradient(2px 2px at 15% 22%, #fff, transparent),
+    radial-gradient(2px 2px at 70% 14%, #cdefff, transparent),
+    radial-gradient(1.5px 1.5px at 40% 58%, #fff, transparent),
+    radial-gradient(2px 2px at 86% 52%, #ffd6f5, transparent),
+    radial-gradient(1.5px 1.5px at 24% 80%, #fff, transparent),
+    radial-gradient(2px 2px at 60% 82%, #cdefff, transparent),
+    radial-gradient(1.5px 1.5px at 92% 28%, #fff, transparent),
+    radial-gradient(1.5px 1.5px at 8% 48%, #ffd6f5, transparent);
+  animation:twinkle 3.2s ease-in-out infinite alternate;
 }
-.theme-win98 .panel .prompt{color:#000080;opacity:1}
-.theme-win98 .stream{color:#808080}
-.theme-win98 .ch.ok{color:#000080;text-shadow:none}
-.theme-win98 .ch.cur{background:#000080;color:#fff;box-shadow:none}
-.theme-win98 .ch.err{color:#cc0000;text-shadow:none}
-.theme-win98 .themebar button{
-  background:#c0c0c0;color:#000;border:none;border-radius:0;
-  box-shadow:inset 1px 1px 0 #fff,inset -1px -1px 0 #000,inset 2px 2px 0 #dfdfdf,inset -2px -2px 0 #808080;
-  opacity:.85;
+@keyframes twinkle{from{opacity:.45}to{opacity:1}}
+.theme-y2k .bg-scan{opacity:.25}
+.theme-y2k .panel{
+  border-radius:20px;
+  background:linear-gradient(180deg, rgba(120,180,255,.15), rgba(18,28,58,.5) 42%);
+  box-shadow:0 0 32px -6px var(--accent), inset 0 2px 0 rgba(255,255,255,.28), inset 0 0 44px -14px var(--accent2);
 }
-.theme-win98 .themebar button.on{
-  background:#c0c0c0;color:#000;
-  box-shadow:inset 1px 1px 0 #000,inset -1px -1px 0 #fff,inset 2px 2px 0 #808080,inset -2px -2px 0 #dfdfdf;
+.theme-y2k .panel::before{content:'';position:absolute;left:10px;right:10px;top:7px;height:34%;
+  border-radius:16px;background:linear-gradient(180deg, rgba(255,255,255,.22), transparent);pointer-events:none}
+.theme-y2k .stat{
+  border-radius:12px;
+  background:linear-gradient(180deg, rgba(120,180,255,.16), rgba(18,28,58,.5));
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.28), 0 0 16px -6px var(--accent);
 }
-.theme-win98 .key{
-  border-radius:2px;
-  background:#c0c0c0;
-  border:none;
-  box-shadow:inset 1px 1px 0 #fff,inset -1px -1px 0 #000,inset 2px 2px 0 #dfdfdf,inset -2px -2px 0 #808080;
-  color:#000;
+.theme-y2k .key{
+  border-radius:12px;
+  background:linear-gradient(180deg, rgba(255,255,255,.20), rgba(90,150,230,.06) 42%, rgba(255,255,255,.04));
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.35), 0 2px 6px rgba(0,0,0,.4);
 }
-.theme-win98 .key.lit{
-  background:#000080;color:#fff;
-  box-shadow:inset 1px 1px 0 #1084d0,inset -1px -1px 0 #000040,inset 2px 2px 0 #2080c0,inset -2px -2px 0 #000060;
+.theme-y2k .key.pressed{background:linear-gradient(180deg,#c9f6ff,var(--key-press))}
+.theme-y2k .ch.ok{color:var(--text-glow);text-shadow:0 0 6px var(--accent),0 0 14px var(--accent2)}
+.theme-y2k .go{background:linear-gradient(180deg,#9ff2ff,#2be5ff);color:#053349;
+  box-shadow:0 0 22px var(--accent),inset 0 1px 0 rgba(255,255,255,.6)}
+.theme-y2k .go.ghost{background:transparent;color:var(--hud)}
+.theme-y2k .opt.sel{background:linear-gradient(180deg,#ffb4ee,var(--accent2));color:#3a0b2e}
+.theme-y2k .logo h1{
+  background:linear-gradient(180deg,#ffffff,#a9dcff 52%,#2be5ff);
+  -webkit-background-clip:text;background-clip:text;
+  -webkit-text-fill-color:transparent;
+  text-shadow:0 0 16px rgba(43,229,255,.45);
 }
-.theme-win98 .key.pressed{
-  box-shadow:inset 1px 1px 0 #000,inset -1px -1px 0 #fff,inset 2px 2px 0 #808080,inset -2px -2px 0 #dfdfdf;
-}
-.theme-win98 .opt{border-radius:0}
-.theme-win98 .opt.sel{
-  background:#000080;color:#fff;
-  box-shadow:none;border-color:#000080;
-}
-.theme-win98 .card{
-  border-radius:0;
-  background:#c0c0c0;
-  box-shadow:inset 1px 1px 0 #fff,inset -1px -1px 0 #000,inset 2px 2px 0 #dfdfdf,inset -2px -2px 0 #808080;
-}
-.theme-win98 .card h2{color:#000080;text-shadow:none;font-family:Tahoma,Verdana,sans-serif}
-.theme-win98 .bigwpm{color:#000080;text-shadow:none}
-.theme-win98 #goBtn{
-  border-radius:0;background:#c0c0c0;color:#000;
-  box-shadow:inset 1px 1px 0 #fff,inset -1px -1px 0 #000,inset 2px 2px 0 #dfdfdf,inset -2px -2px 0 #808080;
-}
-.theme-win98 #goBtn:hover{background:#dfdfdf}
+.theme-y2k .logo h1 .slash{-webkit-text-fill-color:var(--accent2);color:var(--accent2)}
 
 /* ---- RECORDS UI ---- */
 .recwrap{display:flex;gap:14px;text-align:left;margin:18px 0;flex-wrap:wrap}
@@ -530,22 +546,61 @@ body{
 .missrow .mbar i{display:block;height:100%;background:var(--accent);box-shadow:0 0 8px var(--accent);transition:width .4s}
 .missrow .mc{font-size:12px;color:var(--hud2);width:40px;text-align:right}
 .recempty{font-size:12px;color:var(--hud2);opacity:.6;padding:8px 0}
-#backBtn{
-  position:fixed;top:14px;left:14px;z-index:999;
-  font-family:var(--title);font-size:11px;letter-spacing:2px;
-  padding:8px 14px;border-radius:8px;cursor:pointer;
-  background:#1a0008;color:#ff2040;
-  border:1.5px solid #ff2040;
-  box-shadow:0 0 14px #ff2040,0 0 30px rgba(255,32,64,.4),inset 0 0 10px rgba(255,32,64,.15);
-  text-decoration:none;
-  text-shadow:0 0 8px #ff2040;
-  transition:.2s;
+
+/* ---- BRAIN DUMP + MONEY ENGINE ---- */
+.dumparea{
+  display:none; flex:1; width:100%; min-height:0;
+  background:rgba(0,0,0,.15); border:1px dashed var(--key-edge); border-radius:10px;
+  outline:none; resize:none; padding:10px 12px;
+  color:var(--text-on); font-family:var(--mono); font-size:var(--fs); line-height:1.5;
+  letter-spacing:1px; caret-color:var(--accent);
 }
-#backBtn:hover{background:#2a0010;box-shadow:0 0 22px #ff2040,0 0 50px rgba(255,32,64,.6),inset 0 0 14px rgba(255,32,64,.25)}
+.dumparea::placeholder{color:var(--text-dim);opacity:.8}
+.finishbtn{
+  display:none; position:absolute; top:12px; right:16px; z-index:3;
+  font-family:var(--mono); font-size:12px; letter-spacing:2px; cursor:pointer;
+  padding:7px 14px; border-radius:8px; border:1px solid var(--accent);
+  background:var(--accent); color:#04060a; box-shadow:0 0 14px var(--accent);
+}
+.finishbtn:hover{filter:brightness(1.12)}
+.dumpout{
+  width:100%; height:150px; resize:vertical; margin-bottom:12px;
+  background:rgba(0,0,0,.2); border:1px solid var(--key-edge); border-radius:10px;
+  padding:10px 12px; color:var(--hud); font-family:var(--mono); font-size:12px; line-height:1.5;
+  outline:none;
+}
+.dumpbtns{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px}
+.dumpbtns .go{margin-top:0;flex:1 1 auto;font-size:13px;padding:12px 10px}
+.go.copied{background:var(--accent2)!important;color:#04060a!important}
+
+.mesec{border:1px solid var(--key-edge);border-radius:12px;background:var(--panel);
+  padding:14px 16px;margin-bottom:14px;text-align:left}
+.mesec h3{font-family:var(--title-font);font-size:14px;letter-spacing:2px;color:var(--accent);
+  text-shadow:0 0 8px var(--accent);margin-bottom:10px}
+.merow{display:flex;gap:8px;align-items:center;margin-bottom:10px;flex-wrap:wrap}
+.merow label{font-size:11px;letter-spacing:1px;color:var(--hud2);min-width:120px}
+.meinput{flex:1;min-width:90px;background:rgba(0,0,0,.2);border:1px solid var(--key-edge);
+  border-radius:8px;padding:9px 11px;color:var(--hud);font-family:var(--mono);font-size:14px;outline:none}
+.mebtn{cursor:pointer;font-family:var(--mono);font-size:12px;letter-spacing:1px;padding:9px 14px;
+  border-radius:8px;border:1px solid var(--accent);background:var(--accent);color:#04060a}
+.mebtn.ghost{background:transparent;color:var(--hud);border-color:var(--key-edge)}
+.mebtn:hover{filter:brightness(1.1)}
+.mebar{height:16px;border-radius:8px;background:rgba(255,255,255,.08);overflow:hidden;margin:6px 0}
+.mebar i{display:block;height:100%;background:linear-gradient(90deg,var(--accent2),var(--accent));
+  box-shadow:0 0 10px var(--accent);transition:width .5s}
+.mebig{font-family:var(--title-font);font-size:30px;color:var(--text-glow);
+  text-shadow:0 0 12px var(--accent);line-height:1.1}
+.mesub{font-size:11px;color:var(--hud2);opacity:.85;margin-top:2px}
+.meaction{font-size:15px;color:var(--hud);line-height:1.5;margin:6px 0 12px}
+.mestreak{font-family:var(--title-font);font-size:20px;color:var(--accent2);text-shadow:0 0 10px var(--accent2)}
+.melist{font-size:11px;color:var(--hud2);opacity:.8;margin-top:8px;max-height:70px;overflow:auto}
+.medone{color:var(--accent2);font-size:12px;letter-spacing:1px;margin-top:6px}
+#back-btn{position:fixed;top:14px;left:14px;z-index:200;font-family:'Courier New',monospace;font-size:13px;letter-spacing:2px;color:#ff3c3c;text-shadow:0 0 8px #ff3c3c,0 0 20px #ff3c3c;text-decoration:none;border:1.5px solid #ff3c3c;padding:5px 12px;border-radius:4px;background:rgba(0,0,0,0.55);box-shadow:0 0 10px rgba(255,60,60,0.4);transition:background .2s;}
+#back-btn:hover{background:rgba(255,60,60,0.18);}
 </style>
 </head>
 <body>
-<a id="backBtn" href="index.html">◂ MENU</a>
+<a id="back-btn" href="index.html">◂ MENU</a>
 <div id="app" class="theme-vice">
 
   <div class="bg">
@@ -555,6 +610,9 @@ body{
     <div class="bg-rain"></div>
     <div class="bg-glass"></div>
     <div class="bg-neonfloor"></div>
+    <div class="bg-clouds"></div>
+    <div class="bg-holo"></div>
+    <div class="bg-stars"></div>
     <div class="bg-scan"></div>
     <div class="bg-vignette"></div>
   </div>
@@ -581,7 +639,8 @@ body{
           <button data-theme="theme-phosphor">CRT-80</button>
           <button data-theme="theme-neon">NEON</button>
           <button data-theme="theme-mech">MECH</button>
-          <button data-theme="theme-win98">WIN98</button>
+          <button data-theme="theme-cotton">COTTON</button>
+          <button data-theme="theme-y2k">Y2K</button>
         </div>
         <div class="themebar" id="audiobar">
           <button class="audio-toggle on" data-audio="music">♪ MUSIC</button>
@@ -594,8 +653,10 @@ body{
 
     <!-- TEXT PANEL -->
     <div class="panel">
-      <div class="prompt">TYPE THE FOLLOWING:</div>
-      <div class="viewport"><div class="stream" id="stream"></div></div>
+      <div class="prompt" id="promptLabel">TYPE THE FOLLOWING:</div>
+      <button class="finishbtn" id="finishDump">FINISH ▸</button>
+      <div class="viewport" id="viewport"><div class="stream" id="stream"></div></div>
+      <textarea id="dumpArea" class="dumparea" spellcheck="false" placeholder="Brain dump everything on your mind... ideas, plans, a post you want to write. Don't stop to fix typos — just get it all out. Hit FINISH when you're done."></textarea>
     </div>
 
     <!-- KEYBOARD -->
@@ -622,7 +683,8 @@ body{
           <div class="opt" data-theme="theme-phosphor">CRT-80<span class="d">PHOSPHOR</span></div>
           <div class="opt" data-theme="theme-neon">NEON<span class="d">SIGNS</span></div>
           <div class="opt" data-theme="theme-mech">MECH<span class="d">EXO-HUD</span></div>
-          <div class="opt" data-theme="theme-win98">WIN98<span class="d">DESKTOP</span></div>
+          <div class="opt" data-theme="theme-cotton">COTTON<span class="d">CANDY SKY</span></div>
+          <div class="opt" data-theme="theme-y2k">Y2K<span class="d">MILLENNIUM</span></div>
         </div>
       </div>
 
@@ -643,6 +705,12 @@ body{
           <div class="opt" data-mode="dialog">DIALOG<span class="d">FULL PAGES</span></div>
           <div class="opt" data-mode="affirmations">AFFIRMATIONS<span class="d">WEALTH MIND</span></div>
           <div class="opt" data-mode="learning">LEARNING<span class="d">DAILY TIPS</span></div>
+          <div class="opt" data-mode="sales">SALES<span class="d">PERSUASION</span></div>
+          <div class="opt" data-mode="business">BUSINESS<span class="d">SIDE HUSTLE</span></div>
+          <div class="opt" data-mode="money">MONEY IQ<span class="d">FINANCIAL</span></div>
+          <div class="opt" data-mode="wealth">WEALTH ⚡<span class="d">MEGA MIX</span></div>
+          <div class="opt" data-mode="claude">CLAUDE<span class="d">AI MASTERY</span></div>
+          <div class="opt" data-mode="braindump">BRAIN DUMP<span class="d">FREE WRITE</span></div>
         </div>
       </div>
 
@@ -675,6 +743,7 @@ body{
       </div>
 
       <button class="go" id="startBtn">INITIALIZE ▸</button>
+      <button class="go ghost" id="moneyBtn">◆ MONEY ENGINE</button>
       <button class="go ghost" id="recordsBtn">◈ RECORDS &amp; STATS</button>
       <div class="hint">Timer starts the instant you press your first key.</div>
     </div>
@@ -695,6 +764,7 @@ body{
         <div class="rcell"><div class="rv" id="rDur">1:00</div><div class="rl">DURATION</div></div>
       </div>
       <div id="rRecords"></div>
+      <div id="rAction"></div>
       <button class="go" id="againBtn">RUN AGAIN ▸</button>
       <button class="go ghost" id="menuBtn">CHANGE SETTINGS</button>
     </div>
@@ -708,6 +778,52 @@ body{
       <div id="recBody"></div>
       <button class="go ghost" id="clearBtn">CLEAR ALL DATA</button>
       <button class="go" id="recBackBtn">◂ BACK</button>
+    </div>
+  </div>
+
+  <!-- MONEY ENGINE OVERLAY -->
+  <div class="overlay hidden" id="moneyOverlay">
+    <div class="card">
+      <h2>MONEY ENGINE</h2>
+      <div class="tag">FREEDOM METER // DAILY ACTION</div>
+      <div id="moneyBody"></div>
+      <button class="go" id="moneyBackBtn">◂ BACK</button>
+    </div>
+  </div>
+
+  <!-- BRAIN DUMP OUTPUT OVERLAY -->
+  <div class="overlay hidden" id="dumpOverlay">
+    <div class="card">
+      <h2>BRAIN DUMP</h2>
+      <div class="tag" id="dumpTag">CAPTURED // READY FOR AI</div>
+      <div class="rgrid" style="grid-template-columns:repeat(3,1fr)">
+        <div class="rcell"><div class="rv" id="dWords">0</div><div class="rl">WORDS</div></div>
+        <div class="rcell"><div class="rv" id="dWpm">0</div><div class="rl">WPM</div></div>
+        <div class="rcell"><div class="rv" id="dTime">0:00</div><div class="rl">TIME</div></div>
+      </div>
+      <div class="optblock">
+        <div class="ol">TURN IT INTO</div>
+        <div class="opts" id="optFormat">
+          <div class="opt sel" data-format="blog">BLOG POST</div>
+          <div class="opt" data-format="thread">X THREAD</div>
+          <div class="opt" data-format="linkedin">LINKEDIN</div>
+          <div class="opt" data-format="email">EMAIL</div>
+          <div class="opt" data-format="newsletter">NEWSLETTER</div>
+        </div>
+      </div>
+      <div class="ol" style="text-align:left;margin-bottom:6px">PROMPT + YOUR DUMP — PASTE INTO ANY AI</div>
+      <textarea id="dumpOut" class="dumpout" readonly></textarea>
+      <div class="dumpbtns">
+        <button class="go" id="copyAllBtn">⧉ COPY PROMPT + TEXT</button>
+        <button class="go ghost" id="copyTextBtn">COPY TEXT ONLY</button>
+        <button class="go ghost" id="downloadBtn">⬇ DOWNLOAD .md</button>
+      </div>
+      <div class="dumpbtns">
+        <button class="go ghost" id="shareXBtn">↗ POST TO X</button>
+        <button class="go ghost" id="shareLiBtn">↗ COPY &amp; OPEN LINKEDIN</button>
+      </div>
+      <button class="go" id="dumpAgainBtn">NEW DUMP ▸</button>
+      <button class="go ghost" id="dumpMenuBtn">CHANGE SETTINGS</button>
     </div>
   </div>
 
@@ -823,6 +939,99 @@ const LEARNING = [
 "learning to cook a few meals saves money and improves health."
 ];
 
+const SALES = [
+"people buy outcomes, not features, so sell the result.",
+"the person who asks the questions controls the conversation.",
+"listen twice as much as you talk and you will close more.",
+"a confused mind always says no, so keep the offer simple.",
+"customers do not want a drill, they want the hole it makes.",
+"features tell, but stories and benefits sell.",
+"price is only an issue in the absence of value.",
+"handle an objection by asking what is really holding them back.",
+"trust is built with proof, not with promises.",
+"the follow up is where most sales are actually won.",
+"scarcity and deadlines move the people who keep saying maybe.",
+"speak to one clear person, not to everyone at once.",
+"lead with the benefit and let the details come later.",
+"a testimonial from a peer beats any claim you make yourself.",
+"silence after you ask for the sale is your strongest tool.",
+"match your customer's pace and words to build rapport fast.",
+"objections are usually just requests for more information.",
+"make it easy to say yes and hard to stay on the fence.",
+"the first number sets the anchor for the whole negotiation.",
+"you do not have to convince; just present with calm confidence.",
+"sell to the problem that keeps your customer up at night.",
+"every no gets you closer to the next yes.",
+"clarity beats cleverness when you are asking for the sale.",
+"give real value first and the sale often follows on its own.",
+"know your numbers so you can walk away without fear.",
+"a strong guarantee removes the risk and lowers resistance.",
+"talk about them far more than you talk about yourself.",
+"the money is in solving a painful and specific problem."
+];
+
+const BUSINESS = [
+"start with a problem that people already pay to solve.",
+"sell the offer before you build the whole product.",
+"your first ten customers teach you more than any plan.",
+"charge money early, because free users hide the truth.",
+"a side hustle becomes freedom when it covers your bills.",
+"validate demand with pre sales, not with opinions.",
+"pick a niche small enough that you can actually win it.",
+"revenue solves most early problems, so chase it first.",
+"do things that do not scale until you find what works.",
+"one product sold a hundred times beats a hundred half built.",
+"cash flow keeps a business alive, not profit on paper.",
+"raise your prices before you feel quite ready to.",
+"systems and checklists let the business run without you.",
+"track one key number that predicts your growth.",
+"reinvest early profits into whatever brings more customers.",
+"a boring business that makes money beats an exciting idea.",
+"find where your buyers gather and show up there often.",
+"solve your own problem and others will likely share it.",
+"consistency compounds; show up long after motivation fades.",
+"keep your day job until the side income is stable.",
+"an audience you own is worth more than any single sale.",
+"delegate the tasks that you are the worst at doing.",
+"test small, learn fast, and double down on what works.",
+"the goal is to build an asset, not just to stay busy.",
+"recurring revenue turns a hustle into real freedom.",
+"margins matter more than revenue; watch what you keep.",
+"write down the process the second time you do a task.",
+"leave the job when the business survives without heroics."
+];
+
+const MONEY = [
+"an asset puts money in your pocket; a liability takes it out.",
+"the wealthy buy assets first and buy luxuries with the income.",
+"your savings rate matters more than your salary.",
+"pay yourself first and invest before you spend a dime.",
+"compound growth rewards time far more than timing.",
+"tax advantaged accounts let your money grow untaxed for years.",
+"inflation is a quiet tax on every dollar you do not invest.",
+"good debt buys assets; bad debt buys things that lose value.",
+"diversify so that no single loss can ever wipe you out.",
+"low cost index funds beat most active managers over time.",
+"never invest in something you cannot explain simply.",
+"an emergency fund stops you from selling at the worst time.",
+"lifestyle creep quietly eats every raise you earn.",
+"cash flow, not net worth, is what actually pays your bills.",
+"the rule of seventy two estimates years to double your money.",
+"time in the market beats trying to time the market.",
+"a budget is telling your money where to go on purpose.",
+"leverage multiplies both gains and losses, so respect it.",
+"reinvested dividends are a quiet and powerful wealth engine.",
+"understand the fees, because small percentages compound too.",
+"build several income streams so one loss is not fatal.",
+"wealth is assets that pay you whether you work or not.",
+"spend on what you value and cut hard on what you do not.",
+"learn to read a simple profit and loss statement.",
+"avoid the lifestyle debt that charges you to look wealthy.",
+"measure freedom in the months you could survive without work.",
+"raises mean little if your expenses rise to match them.",
+"money is a tool; the real prize is options and peace of mind."
+];
+
 /* =========================================================
    STATE
 ========================================================= */
@@ -896,8 +1105,7 @@ const SFX={
   'theme-runner':  {type:'sawtooth',freq:340, dur:0.07, gain:0.14, glide:-70, filter:1400},
   'theme-phosphor':{type:'noise',   freq:0,   dur:0.035,gain:0.22},
   'theme-neon':    {type:'sawtooth',freq:1000,dur:0.05, gain:0.15, glide:0,  filter:1600},
-  'theme-mech':    {type:'square',  freq:170, dur:0.09, gain:0.20, glide:-90, filter:900},
-  'theme-win98':   {type:'square',  freq:440, dur:0.04, gain:0.12, glide:0,  filter:800}
+  'theme-mech':    {type:'square',  freq:170, dur:0.09, gain:0.20, glide:-90, filter:900}
 };
 function playTone(p){
   const t=actx.currentTime;
@@ -1105,7 +1313,8 @@ const THEME_META = {
   'theme-phosphor':{title:'CRT<span class="slash">-</span>80', sub:'ZENITH TERMINAL // SYSTEM-80', fl:'MODE: STANDARD', fr:'BUFFER: NOMINAL', stitle:'CRT-80'},
   'theme-neon':   {title:'NEON<span class="slash">//</span>SIGNS', sub:'STRIP DISTRICT // AFTER DARK', fl:'MODE: NIGHTLIFE', fr:'POWER: ON', stitle:'NEON//SIGNS'},
   'theme-mech':   {title:'EXO<span class="slash">//</span>FRAME', sub:'MECH OS 4.4 // PILOT LINK ACTIVE', fl:'SYS: NOMINAL', fr:'HUD: LOCKED', stitle:'EXO//FRAME'},
-  'theme-win98':  {title:'TYPE<span class="slash">.</span>EXE', sub:'WINDOWS 98 // TYPING TRAINER v1.0', fl:'READY', fr:'NUM LOCK: ON', stitle:'TYPE.EXE'}
+  'theme-cotton': {title:'COTTON<span class="slash">//</span>CANDY', sub:'DREAM SKY // SUGARWAVE 88', fl:'MODE: SWEET', fr:'FLAVOR: BUBBLEGUM', stitle:'COTTON//CANDY'},
+  'theme-y2k':    {title:'Y2K<span class="slash">//</span>FUTURE', sub:'MILLENNIUM SYSTEM 2000', fl:'MODE: TURBO', fr:'STATUS: ONLINE 24/7', stitle:'Y2K//FUTURE'}
 };
 
 /* =========================================================
@@ -1194,7 +1403,42 @@ function genPool(pool,n){
   for(let i=0;i<n;i++){ if(i%p.length===0) p=shuffle(pool); out.push(p[i%p.length]); }
   return out.join(' ');
 }
-const MODE_POOL={sentences:SENTENCES, affirmations:AFFIRMATIONS, learning:LEARNING};
+const CLAUDE = [
+"be specific; a clear detailed prompt beats a vague clever one.",
+"give claude an example of what great output looks like.",
+"tell claude what role to play, like a senior copywriter.",
+"use xml tags to separate your instructions from your data.",
+"ask claude to think step by step before it answers.",
+"state the exact format and length you want in the output.",
+"put long documents before your question, not after it.",
+"break a big job into a chain of smaller focused prompts.",
+"tell claude what to do, not only what to avoid.",
+"give claude room to reason and the answers get better.",
+"iterate; refine the prompt when the first answer misses.",
+"show two or three examples to lock in the style you want.",
+"ask claude to critique and then improve its own draft.",
+"output tokens cost several times more than input tokens.",
+"shorter answers are cheaper, so ask for concise output.",
+"set a max length to keep your token spend under control.",
+"prompt caching can cut repeated context by about ninety percent.",
+"cache your system prompt and reference docs to save money.",
+"the batch api runs bulk jobs at half the token cost.",
+"route simple tasks to a smaller and cheaper model.",
+"send a summary instead of resending the whole chat history.",
+"trim unused context, because every extra token is money spent.",
+"reuse one good prompt template instead of rewriting it each time.",
+"use claude to ship a rough version fast, then validate demand.",
+"turn a boring repetitive task into an automation you can sell.",
+"build one small tool that solves one painful problem well.",
+"let claude draft the sales page, the emails, and the landing copy.",
+"package what you know into a digital product with claude's help.",
+"prototype an app in an afternoon and test it on real users.",
+"learn a high income skill faster by building projects with claude.",
+"have claude research a niche and find the gaps you can fill.",
+"the money comes from shipping and selling, not just generating."
+];
+const WEALTH = [].concat(AFFIRMATIONS, SALES, BUSINESS, MONEY);
+const MODE_POOL={sentences:SENTENCES, affirmations:AFFIRMATIONS, learning:LEARNING, sales:SALES, business:BUSINESS, money:MONEY, wealth:WEALTH, claude:CLAUDE};
 function moreText(){
   if(cfg.mode==='words') return ' '+genWords(120);
   if(cfg.mode==='dialog') return ' '+genPool(DIALOG,3);
@@ -1320,12 +1564,15 @@ function startGameTimer(){
 function tick(){
   const elapsed=(Date.now()-startTime)/1000;
   remaining=cfg.dur-elapsed;
-  if(remaining<=0){ remaining=0; updateStats(); endGame(); return; }
+  if(remaining<=0){ remaining=0; updateStats(); if(cfg.mode==='braindump') finishBrainDump(); else endGame(); return; }
   updateStats();
 }
+function dumpWordCount(){ const t=$('dumpArea').value.trim(); return t? t.split(/\s+/).length : 0; }
 function curWpm(){
-  const elapsedMin = started ? Math.max((cfg.dur-remaining)/60, 1/60) : 0;
-  return started ? Math.round((correctChars/5)/elapsedMin) : 0;
+  if(!started) return 0;
+  const elapsedMin = Math.max((cfg.dur-remaining)/60, 1/60);
+  const words = (cfg.mode==='braindump') ? dumpWordCount() : correctChars/5;
+  return Math.round(words/elapsedMin);
 }
 function curAcc(){
   return keystrokes? Math.round(keystrokesCorrect/keystrokes*100) : 100;
@@ -1333,8 +1580,8 @@ function curAcc(){
 function updateStats(){
   $('sTime').textContent = fmt2(started?remaining:cfg.dur);
   $('sWpm').textContent  = curWpm();
-  $('sAcc').textContent  = curAcc()+'%';
-  $('sScore').textContent= score.toLocaleString();
+  $('sAcc').textContent  = (cfg.mode==='braindump') ? '—' : curAcc()+'%';
+  $('sScore').textContent= (cfg.mode==='braindump') ? dumpWordCount() : score.toLocaleString();
 }
 
 /* =========================================================
@@ -1345,11 +1592,21 @@ function startGame(){
   cursor=0; keystrokes=0; keystrokesCorrect=0; correctChars=0; errors=0;
   streak=0; score=0; remaining=cfg.dur; missedRun={};
   clearInterval(timerId);
-  renderStream(initialText());
-  setHint();
+  const isDump = cfg.mode==='braindump';
+  $('viewport').style.display = isDump ? 'none' : '';
+  $('dumpArea').style.display = isDump ? 'block' : 'none';
+  $('finishDump').style.display = isDump ? 'block' : 'none';
+  $('promptLabel').textContent = isDump ? 'BRAIN DUMP — WRITE FREELY:' : 'TYPE THE FOLLOWING:';
+  if(isDump){
+    const ta=$('dumpArea'); ta.value=''; setTimeout(()=>ta.focus(),50);
+  } else {
+    renderStream(initialText());
+    setHint();
+  }
   updateStats();
   $('startOverlay').classList.add('hidden');
   $('resultOverlay').classList.add('hidden');
+  $('dumpOverlay').classList.add('hidden');
   ensureAudio();
   if(audio.music) startMusic();
 }
@@ -1367,7 +1624,7 @@ function endGame(){
   $('rErr').textContent=errors;
   $('rScore').textContent=score.toLocaleString();
   $('rDur').textContent=fmt(cfg.dur);
-  $('rTag').textContent = ({words:'RANDOM WORDS',sentences:'REAL SENTENCES',dialog:'DIALOG PAGES',affirmations:'AFFIRMATIONS',learning:'LEARNING'})[cfg.mode]+' // '+fmt(cfg.dur);
+  $('rTag').textContent = ({words:'RANDOM WORDS',sentences:'REAL SENTENCES',dialog:'DIALOG PAGES',affirmations:'AFFIRMATIONS',learning:'LEARNING',sales:'SALES & PERSUASION',business:'BUSINESS PLAYBOOK',money:'MONEY MASTERY',wealth:'WEALTH MEGA MIX',claude:'CLAUDE AI MASTERY'})[cfg.mode]+' // '+fmt(cfg.dur);
 
   // --- commit to persistent records ---
   const g=loadMissed();
@@ -1379,10 +1636,155 @@ function endGame(){
   saveScores(arr);
 
   renderRecords($('rRecords'), lastEntryDate);
+  renderResultsAction();
   $('resultOverlay').classList.remove('hidden');
 }
 
-const MODE_LABEL={words:'WORDS',sentences:'SENT',dialog:'DIALOG',affirmations:'AFFIRM',learning:'LEARN'};
+/* =========================================================
+   MONEY ENGINE  (Freedom Meter + daily money-action tracker)
+========================================================= */
+function loadJSON(k,def){ try{ const v=store.get(k); return v?JSON.parse(v):def; }catch(e){ return def; } }
+function saveJSON(k,v){ store.set(k, JSON.stringify(v)); }
+function todayStr(){ const d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+function dayOffset(n){ const d=new Date(); d.setDate(d.getDate()+n); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+function dayNumber(){ return Math.floor(Date.now()/86400000); }
+
+const ACTIONS=[
+  "message one potential customer or client today.",
+  "raise the price on one product or service.",
+  "list one thing you own for sale.",
+  "share one genuinely helpful post publicly.",
+  "send one cold email or DM with a clear offer.",
+  "ask one happy customer for a testimonial.",
+  "reconnect with one past client or lead.",
+  "spend fifteen minutes learning a high-income skill.",
+  "write down three new business or offer ideas.",
+  "make one real offer to one new person.",
+  "follow up with one lead who went quiet.",
+  "post one helpful tip in a community you belong to.",
+  "identify one expense to cut and redirect to savings.",
+  "pitch one collaboration or partnership.",
+  "set a concrete price for something you can sell."
+];
+function todayAction(){ return ACTIONS[dayNumber() % ACTIONS.length]; }
+function actionState(){ return loadJSON('me_actions',{last:'',streak:0}); }
+function markActionDone(){
+  const t=todayStr(), s=actionState();
+  if(s.last!==t){ s.streak = (s.last===dayOffset(-1)) ? s.streak+1 : 1; s.last=t; saveJSON('me_actions',s); }
+  return s;
+}
+
+function renderResultsAction(){
+  const s=actionState(), done=s.last===todayStr();
+  const el=$('rAction');
+  el.innerHTML =
+    '<div class="mesec" style="margin-top:4px"><h3>TODAY\'S MONEY MOVE</h3>'+
+    '<div class="meaction">'+todayAction()+'</div>'+
+    (done
+      ? '<div class="medone">✓ done today — 🔥 '+s.streak+' day streak</div>'
+      : '<button class="mebtn" id="rActionDone">✓ I DID THIS</button> <span class="mesub">🔥 '+s.streak+' day streak</span>')+
+    '</div>';
+  const b=$('rActionDone');
+  if(b) b.addEventListener('click',()=>{ markActionDone(); renderResultsAction(); });
+}
+
+function renderMoney(){
+  const exp=Number(loadJSON('me_expenses',0))||0;
+  const income=loadJSON('me_income',[]);
+  const total=income.reduce((a,b)=>a+(Number(b.amt)||0),0);
+  const months = exp>0 ? total/exp : 0;
+  const goal=6;
+  const pct=Math.min(100, exp>0 ? months/goal*100 : 0);
+  const s=actionState(), done=s.last===todayStr();
+
+  let html='';
+  // Freedom meter
+  html+='<div class="mesec"><h3>FREEDOM METER</h3>';
+  html+='<div class="merow"><label>Monthly expenses ($)</label>'+
+        '<input class="meinput" id="meExp" type="number" min="0" value="'+(exp||'')+'" placeholder="e.g. 2500">'+
+        '<button class="mebtn" id="meExpSave">SAVE</button></div>';
+  html+='<div class="mebig">'+months.toFixed(1)+' <span style="font-size:14px">months of freedom banked</span></div>';
+  html+='<div class="mebar"><i style="width:'+pct+'%"></i></div>';
+  html+='<div class="mesub">$'+total.toLocaleString()+' banked'+(exp>0?' · goal '+goal+' months ($'+(exp*goal).toLocaleString()+')':' · set expenses to see your goal')+'</div>';
+  html+='<div class="merow" style="margin-top:12px"><label>Log income earned ($)</label>'+
+        '<input class="meinput" id="meInc" type="number" min="0" placeholder="e.g. 150">'+
+        '<button class="mebtn" id="meIncSave">LOG</button></div>';
+  if(income.length){
+    html+='<div class="melist">'+income.slice(-6).reverse().map(x=>'+ $'+(Number(x.amt)||0).toLocaleString()+'  <span style="opacity:.6">'+x.date+'</span>').join('<br>')+'</div>';
+    html+='<button class="mebtn ghost" id="meIncReset" style="margin-top:8px">RESET INCOME LOG</button>';
+  }
+  html+='<div class="mesub" style="margin-top:10px">Real goal: recurring monthly income above $'+(exp||'…')+' replaces your job.</div>';
+  html+='</div>';
+
+  // Action tracker
+  html+='<div class="mesec"><h3>DAILY MONEY ACTION</h3>';
+  html+='<div class="meaction">'+todayAction()+'</div>';
+  html+= done
+    ? '<div class="medone">✓ completed today</div><div class="mestreak" style="margin-top:6px">🔥 '+s.streak+' day streak</div>'
+    : '<button class="mebtn" id="meActionDone">✓ I DID THIS</button><div class="mestreak" style="margin-top:10px">🔥 '+s.streak+' day streak</div>';
+  html+='</div>';
+
+  $('moneyBody').innerHTML=html;
+
+  const eb=$('meExpSave'); if(eb) eb.addEventListener('click',()=>{ saveJSON('me_expenses', Number($('meExp').value)||0); renderMoney(); });
+  const ib=$('meIncSave'); if(ib) ib.addEventListener('click',()=>{ const v=Number($('meInc').value)||0; if(v>0){ const arr=loadJSON('me_income',[]); arr.push({amt:v,date:todayStr()}); saveJSON('me_income',arr); renderMoney(); } });
+  const rb=$('meIncReset'); if(rb) rb.addEventListener('click',()=>{ saveJSON('me_income',[]); renderMoney(); });
+  const ab=$('meActionDone'); if(ab) ab.addEventListener('click',()=>{ markActionDone(); renderMoney(); });
+}
+
+/* =========================================================
+   BRAIN DUMP  (free write -> AI-ready prompt + export)
+========================================================= */
+const DUMP_FORMATS={
+  blog:{label:'blog post', instr:"Turn it into a clear, engaging blog post written in my voice. Keep my key points and personality, fix grammar and flow, add a compelling headline and a strong opening hook, use short paragraphs with subheadings, and finish with a call to action."},
+  thread:{label:'X thread', instr:"Turn it into a punchy X (Twitter) thread of 6 to 10 posts. Open with a scroll-stopping hook, keep one idea per post, write in a natural voice, avoid hashtag spam, and end with a clear call to action."},
+  linkedin:{label:'LinkedIn post', instr:"Turn it into a professional but personable LinkedIn post. Start with a strong one-line hook, use short punchy lines with white space, share a concrete takeaway, and end with a question that invites comments."},
+  email:{label:'email', instr:"Turn it into a friendly, persuasive email. Write a subject line, an opening that earns attention, a clear single call to action, and keep it concise and skimmable."},
+  newsletter:{label:'newsletter section', instr:"Turn it into an engaging newsletter section with a catchy title, a warm conversational tone, clear structure, and a takeaway the reader can act on today."}
+};
+let dumpFormat='blog';
+function buildDumpPrompt(){
+  const f=DUMP_FORMATS[dumpFormat], text=$('dumpArea').value.trim();
+  return "You are an expert ghostwriter. Below is a raw, unedited brain dump of my ideas. "+
+    f.instr+" Preserve my meaning and do not invent facts I did not mention. "+
+    "Give me the finished "+f.label+" only.\n\n--- MY BRAIN DUMP ---\n"+text+"\n--- END ---";
+}
+function refreshDumpOut(){ $('dumpOut').value = buildDumpPrompt(); }
+
+function finishBrainDump(){
+  finished=true; clearInterval(timerId);
+  const words=dumpWordCount();
+  const elapsed=Math.max(cfg.dur-remaining, 1);
+  $('dWords').textContent=words;
+  $('dWpm').textContent=Math.round(words/Math.max(elapsed/60,1/60));
+  $('dTime').textContent=fmt(elapsed);
+  refreshDumpOut();
+  $('resultOverlay').classList.add('hidden');
+  $('dumpOverlay').classList.remove('hidden');
+}
+
+function copyText(str, btn){
+  const done=()=>{ if(btn){ const t=btn.textContent; btn.textContent='✓ COPIED'; btn.classList.add('copied'); setTimeout(()=>{btn.textContent=t;btn.classList.remove('copied');},1300); } };
+  try{
+    navigator.clipboard.writeText(str).then(done,()=>fallbackCopy(str,done));
+  }catch(e){ fallbackCopy(str,done); }
+}
+function fallbackCopy(str,done){
+  const ta=document.createElement('textarea'); ta.value=str; ta.style.position='fixed'; ta.style.opacity='0';
+  document.body.appendChild(ta); ta.select();
+  try{ document.execCommand('copy'); done&&done(); }catch(e){}
+  document.body.removeChild(ta);
+}
+function downloadDump(){
+  const blob=new Blob([buildDumpPrompt()], {type:'text/markdown'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download='brain-dump-'+todayStr()+'.md';
+  document.body.appendChild(a); a.click();
+  setTimeout(()=>{ URL.revokeObjectURL(a.href); document.body.removeChild(a); },100);
+}
+
+const MODE_LABEL={words:'WORDS',sentences:'SENT',dialog:'DIALOG',affirmations:'AFFIRM',learning:'LEARN',sales:'SALES',business:'BIZ',money:'MONEY',wealth:'WEALTH',claude:'CLAUDE'};
 function renderRecords(container, highlight){
   const scores=loadScores().slice(0,10);
   const missed=Object.entries(loadMissed()).sort((a,b)=>b[1]-a[1]).slice(0,5);
@@ -1488,15 +1890,53 @@ $('clearBtn').addEventListener('click',()=>{
   store.set('tr_scores','[]'); store.set('tr_missed','{}');
   renderRecords($('recBody'), 0);
 });
+$('moneyBtn').addEventListener('click',()=>{
+  renderMoney();
+  $('startOverlay').classList.add('hidden');
+  $('moneyOverlay').classList.remove('hidden');
+});
+$('moneyBackBtn').addEventListener('click',()=>{
+  $('moneyOverlay').classList.add('hidden');
+  $('startOverlay').classList.remove('hidden');
+});
+
+/* brain dump */
+$('dumpArea').addEventListener('input',()=>{ if(!started && cfg.mode==='braindump') startGameTimer(); updateStats(); });
+$('finishDump').addEventListener('click',()=>{ if(cfg.mode==='braindump') finishBrainDump(); });
+$('optFormat').addEventListener('click',e=>{
+  const o=e.target.closest('[data-format]'); if(!o) return;
+  dumpFormat=o.dataset.format;
+  document.querySelectorAll('#optFormat .opt').forEach(x=>x.classList.toggle('sel',x===o));
+  refreshDumpOut();
+});
+$('copyAllBtn').addEventListener('click',e=>copyText(buildDumpPrompt(), e.currentTarget));
+$('copyTextBtn').addEventListener('click',e=>copyText($('dumpArea').value.trim(), e.currentTarget));
+$('downloadBtn').addEventListener('click',downloadDump);
+$('shareXBtn').addEventListener('click',()=>{
+  const t=$('dumpArea').value.trim().slice(0,270);
+  window.open('https://twitter.com/intent/tweet?text='+encodeURIComponent(t),'_blank','noopener');
+});
+$('shareLiBtn').addEventListener('click',e=>{
+  copyText($('dumpArea').value.trim(), e.currentTarget);
+  window.open('https://www.linkedin.com/feed/','_blank','noopener');
+});
+$('dumpAgainBtn').addEventListener('click',startGame);
+$('dumpMenuBtn').addEventListener('click',()=>{
+  $('dumpOverlay').classList.add('hidden');
+  $('startOverlay').classList.remove('hidden');
+});
 
 /* keyboard input */
+function anyOverlayOpen(){
+  return ['startOverlay','resultOverlay','recordsOverlay','moneyOverlay','dumpOverlay']
+    .some(id=>!$(id).classList.contains('hidden'));
+}
 document.addEventListener('keydown',e=>{
   // don't hijack browser shortcuts
   if(e.ctrlKey||e.metaKey||e.altKey) return;
-  // ignore typing while any overlay is open
-  if(!$('startOverlay').classList.contains('hidden')) return;
-  if(!$('resultOverlay').classList.contains('hidden')) return;
-  if(!$('recordsOverlay').classList.contains('hidden')) return;
+  if(anyOverlayOpen()) return;
+  // brain dump: let the textarea handle input natively, just light the keys
+  if(cfg.mode==='braindump'){ flashKey(e.key); return; }
   if(e.key==='Backspace'){ e.preventDefault(); flashKey('Backspace'); backspace(); return; }
   if(e.key===' '){ e.preventDefault(); }
   if(e.key.length===1){
