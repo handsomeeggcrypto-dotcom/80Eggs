@@ -1,0 +1,1106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Signal — Solana Early Runner Scanner</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0d12;
+    --panel: #12161f;
+    --panel-2: #171c27;
+    --line: #232936;
+    --text: #e7ebf1;
+    --text-dim: #8a94a6;
+    --signal: #45e8c8;      /* cyan-teal: primary "hit" color */
+    --signal-dim: #1d3a36;
+    --amber: #f5a623;        /* runner mode accent */
+    --danger: #ff5c5c;
+    --danger-dim: #3a1d1d;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Inter', sans-serif;
+    min-height: 100vh;
+  }
+
+  header {
+    border-bottom: 1px solid var(--line);
+    padding: 20px 24px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 16px;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .brand {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .brand h1 {
+    font-family: 'Space Mono', monospace;
+    font-size: 20px;
+    letter-spacing: 0.5px;
+    margin: 0;
+  }
+
+  .brand .sub {
+    font-size: 12px;
+    color: var(--text-dim);
+    font-family: 'JetBrains Mono', monospace;
+  }
+
+  /* Radar signature element: a sweeping arc that pulses when scanning */
+  .radar {
+    width: 34px;
+    height: 34px;
+    border-radius: 50%;
+    border: 1px solid var(--line);
+    position: relative;
+    flex-shrink: 0;
+    background:
+      radial-gradient(circle at center, transparent 0%, transparent 55%, var(--signal-dim) 56%, transparent 58%);
+  }
+  .radar::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: 50%;
+    background: conic-gradient(from 0deg, var(--signal) 0deg, transparent 40deg, transparent 360deg);
+    opacity: 0.85;
+    animation: sweep 2.4s linear infinite;
+  }
+  .radar.idle::before { animation-play-state: paused; opacity: 0.25; }
+  @keyframes sweep { to { transform: rotate(360deg); } }
+
+  .controls {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+
+  .mode-toggle {
+    display: flex;
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    overflow: hidden;
+  }
+  .mode-toggle button {
+    background: transparent;
+    border: none;
+    color: var(--text-dim);
+    padding: 9px 16px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12.5px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+  }
+  .mode-toggle button.active[data-mode="gamble"] {
+    background: var(--danger-dim);
+    color: var(--danger);
+  }
+  .mode-toggle button.active[data-mode="runner"] {
+    background: var(--signal-dim);
+    color: var(--signal);
+  }
+
+  button.scan-btn {
+    background: var(--signal);
+    color: #06110f;
+    border: none;
+    font-family: 'JetBrains Mono', monospace;
+    font-weight: 700;
+    font-size: 13px;
+    padding: 10px 18px;
+    border-radius: 8px;
+    cursor: pointer;
+    letter-spacing: 0.3px;
+  }
+  button.scan-btn:disabled { opacity: 0.5; cursor: wait; }
+  button.scan-btn:hover:not(:disabled) { filter: brightness(1.08); }
+
+  main { padding: 24px; max-width: 1180px; margin: 0 auto; }
+
+  .status-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+    color: var(--text-dim);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12.5px;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .filters {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+  .filters label {
+    font-size: 12px;
+    color: var(--text-dim);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .filters input[type="number"] {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    color: var(--text);
+    border-radius: 6px;
+    padding: 5px 8px;
+    width: 80px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+  }
+
+  table { width: 100%; border-collapse: collapse; }
+  thead th {
+    text-align: left;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--text-dim);
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--line);
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  thead th:hover { color: var(--text); }
+
+  tbody tr {
+    border-bottom: 1px solid var(--line);
+    transition: background 0.1s ease;
+  }
+  tbody tr:hover { background: var(--panel); cursor: pointer; }
+
+  td { padding: 12px; font-size: 13px; vertical-align: middle; }
+
+  .token-cell { display: flex; flex-direction: column; gap: 2px; }
+  .token-name { font-weight: 600; }
+  .token-addr {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10.5px;
+    color: var(--text-dim);
+  }
+
+  .score-pill {
+    font-family: 'JetBrains Mono', monospace;
+    font-weight: 700;
+    font-size: 14px;
+    padding: 4px 10px;
+    border-radius: 6px;
+    display: inline-block;
+    min-width: 42px;
+    text-align: center;
+  }
+  .score-hi { background: var(--signal-dim); color: var(--signal); }
+  .score-mid { background: #3a3420; color: var(--amber); }
+  .score-lo { background: var(--panel-2); color: var(--text-dim); }
+
+  .flags { display: flex; gap: 4px; flex-wrap: wrap; margin-top: 3px; }
+  .flag {
+    font-size: 10px;
+    font-family: 'JetBrains Mono', monospace;
+    padding: 2px 6px;
+    border-radius: 4px;
+    background: var(--danger-dim);
+    color: var(--danger);
+    white-space: nowrap;
+  }
+  .flag-good {
+    background: var(--signal-dim);
+    color: var(--signal);
+  }
+
+  .mono { font-family: 'JetBrains Mono', monospace; }
+  .dim { color: var(--text-dim); }
+  .pos { color: var(--signal); }
+  .neg { color: var(--danger); }
+
+  .detail-row td {
+    background: var(--panel);
+    padding: 16px 20px;
+    font-size: 12.5px;
+    color: var(--text-dim);
+  }
+  .detail-row ul { margin: 6px 0 0; padding-left: 18px; }
+  .detail-row li { margin-bottom: 4px; }
+  .detail-row a {
+    color: var(--signal);
+    text-decoration: none;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+  }
+  .detail-row a:hover { text-decoration: underline; }
+
+  .empty, .err {
+    text-align: center;
+    padding: 60px 20px;
+    color: var(--text-dim);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px;
+  }
+  .err { color: var(--danger); }
+
+  footer {
+    text-align: center;
+    padding: 30px 20px;
+    color: var(--text-dim);
+    font-size: 11.5px;
+    font-family: 'JetBrains Mono', monospace;
+    border-top: 1px solid var(--line);
+    margin-top: 20px;
+  }
+
+  @media (max-width: 700px) {
+    thead th:nth-child(4), td:nth-child(4),
+    thead th:nth-child(5), td:nth-child(5) { display: none; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ===== Password Gate ===== -->
+<div id="pw-gate" style="position:fixed;inset:0;z-index:99999;background:#0a0d12;display:flex;align-items:center;justify-content:center;font-family:'Space Mono',monospace">
+  <div style="border:1px solid #232936;background:#12161f;padding:40px 48px;min-width:320px;text-align:center;box-shadow:0 0 40px rgba(69,232,200,0.08)">
+    <div style="font-size:36px;margin-bottom:16px">💩</div>
+    <div style="color:#45e8c8;font-size:18px;font-weight:bold;letter-spacing:2px;margin-bottom:8px">SHITTERS</div>
+    <div style="color:#8a94a6;font-size:12px;margin-bottom:28px;letter-spacing:1px">ACCESS RESTRICTED</div>
+    <input id="pw-input" type="password" placeholder="enter password"
+      style="width:100%;padding:10px 14px;background:#0a0d12;border:1px solid #232936;color:#45e8c8;font-family:'Space Mono',monospace;font-size:14px;outline:none;text-align:center;letter-spacing:2px;margin-bottom:12px"
+      onkeydown="if(event.key==='Enter')checkPw()">
+    <div id="pw-err" style="color:#ff5c5c;font-size:11px;min-height:16px;margin-bottom:10px"></div>
+    <button onclick="checkPw()" style="padding:10px 32px;background:#45e8c8;color:#0a0d12;border:none;font-family:'Space Mono',monospace;font-size:13px;font-weight:bold;cursor:pointer;letter-spacing:1px">ENTER</button>
+    <div style="margin-top:24px">
+      <a href="index.html" style="color:#8a94a6;font-size:11px;text-decoration:none;letter-spacing:1px">◂ MENU</a>
+    </div>
+  </div>
+</div>
+<script>
+function checkPw(){
+  const v = document.getElementById('pw-input').value;
+  if(v === 'eggface'){
+    document.getElementById('pw-gate').style.display = 'none';
+  } else {
+    document.getElementById('pw-err').textContent = 'incorrect password';
+    document.getElementById('pw-input').value = '';
+    document.getElementById('pw-input').focus();
+  }
+}
+</script>
+
+<!-- ===== Back button ===== -->
+<a id="back-btn" href="index.html" style="display:none;position:fixed;top:14px;left:14px;z-index:200;font-family:'Courier New',monospace;font-size:13px;letter-spacing:2px;color:#45e8c8;text-decoration:none;border:1.5px solid #45e8c8;padding:5px 12px;border-radius:4px;background:rgba(0,0,0,0.55);box-shadow:0 0 10px rgba(69,232,200,0.3)">◂ MENU</a>
+<script>
+(function(){
+  const gate = document.getElementById('pw-gate');
+  const btn = document.getElementById('back-btn');
+  const obs = new MutationObserver(function(){
+    if(gate.style.display === 'none') btn.style.display = 'block';
+  });
+  obs.observe(gate, {attributes:true, attributeFilter:['style']});
+})();
+</script>
+
+<header>
+  <div class="brand">
+    <div class="radar idle" id="radar"></div>
+    <div>
+      <h1>SIGNAL</h1>
+      <div class="sub">solana early-runner scanner &middot; manual scan</div>
+    </div>
+  </div>
+  <div class="controls">
+    <div class="mode-toggle">
+      <button data-mode="gamble" class="active" onclick="setMode('gamble')">GAMBLE (&lt;1H)</button>
+      <button data-mode="runner" onclick="setMode('runner')">RUNNER (1D-7D)</button>
+    </div>
+    <button class="scan-btn" id="scanBtn" onclick="runScan()">Scan now</button>
+    <button class="scan-btn" id="trackBtn" style="background:var(--panel-2); color:var(--text);" onclick="toggleTrackView()">Track record</button>
+  </div>
+</header>
+
+<main>
+  <div class="status-bar">
+    <div id="statusText">Ready. Pick a mode and hit scan.</div>
+    <div class="filters">
+      <label>Min liquidity $ <input type="number" id="minLiq" value="3000" step="500"></label>
+      <label>Min score <input type="number" id="minScore" value="0" step="5"></label>
+      <label id="ageFilterWrap">Max age (min) <input type="number" id="maxAgeMin" value="30" step="5"></label>
+      <label><input type="checkbox" id="hideDead" checked style="width:auto;"> Hide dead pools</label>
+    </div>
+  </div>
+
+  <table>
+    <thead>
+      <tr id="tableHead"></tr>
+    </thead>
+    <tbody id="tableBody">
+      <tr><td colspan="7" class="empty">No scan yet. Click "Scan now" above.</td></tr>
+    </tbody>
+  </table>
+
+  <div id="trackPanel" style="display:none; margin-top: 10px;">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
+      <h2 style="font-family:'Space Mono',monospace; font-size:15px; margin:0;">Track Record</h2>
+      <button class="scan-btn" style="background:var(--danger-dim); color:var(--danger);" onclick="clearTrackingData()">Reset tracking data</button>
+    </div>
+    <div id="trackStats" class="mono" style="font-size:12.5px; color:var(--text-dim); margin-bottom:18px;"></div>
+    <table>
+      <thead>
+        <tr>
+          <th>Token</th><th>Mode</th><th>First seen</th><th>Score then</th>
+          <th>Price then → now</th><th>Max multiple</th><th>Status</th>
+        </tr>
+      </thead>
+      <tbody id="trackLogBody"></tbody>
+    </table>
+  </div>
+</main>
+
+<footer>
+  Data: GeckoTerminal public API &middot; This tool surfaces statistical patterns only.
+  It is not financial advice and does not predict outcomes. Always verify contracts yourself before buying anything.
+</footer>
+
+<script>
+/* ============================================================
+   SIGNAL — Solana Early Runner Scanner
+   Single-file vanilla JS. No build step, no server required.
+   Data source: GeckoTerminal public API (free, no key, ~30 req/min)
+   ============================================================ */
+
+const GT_BASE = 'https://api.geckoterminal.com/api/v2';
+let currentMode = 'gamble';
+let lastResults = [];
+let sortKey = 'score';
+let sortDir = 'desc';
+
+const COLUMNS = [
+  { key: 'token',    label: 'Token' },
+  { key: 'age',      label: 'Age' },
+  { key: 'liquidity',label: 'Liquidity' },
+  { key: 'volume',   label: 'Vol (window)' },
+  { key: 'buyRatio', label: 'Buy %' },
+  { key: 'priceChg', label: 'Price Δ' },
+  { key: 'score',    label: 'Score' },
+];
+
+function setMode(mode) {
+  currentMode = mode;
+  document.querySelectorAll('.mode-toggle button').forEach(b => {
+    b.classList.toggle('active', b.dataset.mode === mode);
+  });
+  document.getElementById('ageFilterWrap').style.display = mode === 'gamble' ? 'flex' : 'none';
+  document.getElementById('hideDead').parentElement.style.display = mode === 'gamble' ? 'flex' : 'none';
+  document.getElementById('statusText').textContent =
+    mode === 'gamble'
+      ? 'Gamble mode: very fresh pools, filtered by age below. High risk, fast signal.'
+      : 'Runner mode: pools 1-7 days old showing sustained momentum.';
+}
+
+function fmtUsd(n) {
+  n = Number(n) || 0;
+  if (n >= 1_000_000) return '$' + (n / 1_000_000).toFixed(2) + 'M';
+  if (n >= 1_000) return '$' + (n / 1_000).toFixed(1) + 'K';
+  return '$' + n.toFixed(0);
+}
+
+function fmtAge(createdAt) {
+  const ms = Date.now() - new Date(createdAt).getTime();
+  const mins = ms / 60000;
+  if (mins < 60) return Math.round(mins) + 'm';
+  const hrs = mins / 60;
+  if (hrs < 24) return hrs.toFixed(1) + 'h';
+  return (hrs / 24).toFixed(1) + 'd';
+}
+
+function ageHours(createdAt) {
+  return (Date.now() - new Date(createdAt).getTime()) / 3600000;
+}
+
+/* ---------- Data fetching ---------- */
+
+// Shared lookup: GeckoTerminal "included" token id -> actual on-chain mint address
+let tokenMintMap = {};
+
+function mergeIncluded(json) {
+  (json.included || []).forEach(t => {
+    if (t.type === 'token' && t.attributes && t.attributes.address) {
+      tokenMintMap[t.id] = t.attributes.address;
+    }
+  });
+}
+
+function getMint(pool) {
+  const rel = pool.relationships && pool.relationships.base_token && pool.relationships.base_token.data;
+  if (!rel) return null;
+  return tokenMintMap[rel.id] || null;
+}
+
+async function fetchNewPools(pages = 3) {
+  const all = [];
+  for (let p = 1; p <= pages; p++) {
+    const url = `${GT_BASE}/networks/solana/new_pools?include=base_token&page=${p}`;
+    const res = await fetch(url, { headers: { 'Accept': 'application/json' } });
+    if (!res.ok) throw new Error(`new_pools request failed (${res.status})`);
+    const json = await res.json();
+    mergeIncluded(json);
+    if (!json.data || !json.data.length) break;
+    all.push(...json.data);
+  }
+  return all;
+}
+
+async function fetchTrendingPools() {
+  const url = `${GT_BASE}/networks/solana/trending_pools?include=base_token`;
+  const res = await fetch(url, { headers: { 'Accept': 'application/json' } });
+  if (!res.ok) throw new Error(`trending_pools request failed (${res.status})`);
+  const json = await res.json();
+  mergeIncluded(json);
+  return json.data || [];
+}
+
+/* ---------- RugCheck enrichment (mint/freeze authority, LP lock) ---------- */
+
+const rugCheckCache = {};
+let rugCheckBlocked = false; // set true if we hit a CORS/network wall, so we stop retrying every token
+
+async function fetchRugReport(mint) {
+  if (rugCheckCache[mint]) return rugCheckCache[mint];
+  const url = `https://api.rugcheck.xyz/v1/tokens/${mint}/report/summary`;
+  const res = await fetch(url, { headers: { 'Accept': 'application/json' } });
+  if (!res.ok) throw new Error(`rugcheck ${res.status}`);
+  const json = await res.json();
+  rugCheckCache[mint] = json;
+  return json;
+}
+
+// Turns a RugCheck report into a score penalty + human flags.
+// Defensive about shape since RugCheck's summary payload varies by token type.
+function applyRugCheck(entry, report) {
+  const risks = Array.isArray(report.risks) ? report.risks : [];
+  const riskScore = Number(report.score_normalised ?? report.score ?? 0) || 0;
+
+  const nameHas = (kw) => risks.some(r => (r.name || '').toLowerCase().includes(kw));
+  const mintFlag = nameHas('mint');
+  const freezeFlag = nameHas('freeze');
+  const lpFlag = nameHas('liquidity') || nameHas('lp provider') || nameHas('lp locked') || nameHas('unlocked');
+  const holderRiskFlag = nameHas('holder') || nameHas('concentrat');
+
+  // Some RugCheck report shapes include an explicit topHolders array with ownership %.
+  let topHolderPct = null;
+  if (Array.isArray(report.topHolders) && report.topHolders.length) {
+    topHolderPct = Number(report.topHolders[0].pct ?? report.topHolders[0].percentage ?? null);
+  }
+
+  let penalty = Math.min(40, riskScore * 0.4);
+  if (mintFlag) { entry.flags.push('Mint authority active (RugCheck)'); penalty += 5; }
+  if (freezeFlag) { entry.flags.push('Freeze authority active (RugCheck)'); penalty += 5; }
+  if (lpFlag) { entry.flags.push('LP not locked / thin (RugCheck)'); penalty += 5; }
+  if (holderRiskFlag) { entry.flags.push('High holder concentration (RugCheck)'); penalty += 8; }
+  if (Number.isFinite(topHolderPct) && topHolderPct > 25) {
+    entry.flags.push(`Top holder owns ${topHolderPct.toFixed(0)}% of supply`);
+    penalty += 8;
+  }
+
+  if (!mintFlag && !freezeFlag && !lpFlag && !holderRiskFlag && riskScore < 15) {
+    entry.goodFlags = entry.goodFlags || [];
+    entry.goodFlags.push('RugCheck: mint/freeze/LP look clean');
+  }
+
+  entry.score = Math.max(0, Math.round(entry.score - penalty));
+  entry.reasons.push(`RugCheck risk score ${riskScore.toFixed(0)}/100 → -${penalty.toFixed(0)} to score`);
+  entry.rugCheckDone = true;
+}
+
+// Enriches only the top N candidates with social presence data (website/X/Telegram).
+// Weak signal on its own — mainly useful as a tie-breaker — so capped low to
+// share GeckoTerminal's 30/min budget politely with the pool-discovery calls.
+async function enrichSocialPresence(scored, topN = 10) {
+  const ranked = [...scored].sort((a, b) => b.score - a.score).slice(0, topN);
+  const jobs = ranked.map(async (entry) => {
+    if (!entry.mint) return;
+    try {
+      const res = await fetch(`${GT_BASE}/networks/solana/tokens/${entry.mint}/info`, { headers: { Accept: 'application/json' } });
+      if (!res.ok) return;
+      const json = await res.json();
+      const attr = (json.data && json.data.attributes) || {};
+      const hasSocial = !!(attr.twitter_handle || attr.telegram_handle ||
+        (Array.isArray(attr.websites) && attr.websites.length));
+      entry.goodFlags = entry.goodFlags || [];
+      if (hasSocial) {
+        entry.score = Math.min(100, entry.score + 4);
+        entry.goodFlags.push('Has live social/website presence');
+        entry.reasons.push('Has a website, X, or Telegram link on record (+4)');
+      }
+    } catch (e) { /* non-critical, skip silently */ }
+  });
+  await Promise.allSettled(jobs);
+}
+
+/* ============================================================
+   TRACK RECORD — historical outcome logging
+   Stored in localStorage, per-browser. Lets the tool eventually
+   answer "of tokens scoring X, what % actually hit 2x/5x/10x?"
+   using real observed outcomes instead of a guessed number.
+   ============================================================ */
+
+const LOG_KEY = 'signal_track_log';
+const FINALIZE_HOURS = { gamble: 3, runner: 24 * 8 }; // observation window per mode
+const MAX_MISSES = 3; // consecutive failed refreshes before we give up on a pool
+
+function loadLog() {
+  try { return JSON.parse(localStorage.getItem(LOG_KEY)) || []; }
+  catch (e) { return []; }
+}
+function saveLog(log) {
+  try { localStorage.setItem(LOG_KEY, JSON.stringify(log)); }
+  catch (e) { console.warn('Could not save tracking log', e); }
+}
+
+function currentPrice(pool) {
+  const p = Number(pool.attributes && pool.attributes.base_token_price_usd);
+  return Number.isFinite(p) ? p : null;
+}
+
+// 1. Record/update every candidate from THIS scan (cheap — no extra API calls,
+//    we already have their current price from the scan itself).
+function upsertFromScan(scored, mode) {
+  const log = loadLog();
+  const byAddr = {};
+  log.forEach(e => byAddr[e.addr] = e);
+
+  scored.forEach(r => {
+    const addr = r.pool.attributes.address;
+    const price = currentPrice(r.pool);
+    if (!addr || price == null) return;
+    const existing = byAddr[addr];
+    if (!existing) {
+      const rec = {
+        addr, mint: r.mint, name: r.pool.attributes.name || 'Unknown',
+        mode, firstSeen: Date.now(), scoreAtFirst: r.score,
+        priceAtFirst: price, lastPrice: price, maxPrice: price,
+        lastCheck: Date.now(), misses: 0, finalized: false, finalMultiple: null
+      };
+      byAddr[addr] = rec;
+      log.push(rec);
+    } else {
+      existing.lastPrice = price;
+      existing.maxPrice = Math.max(existing.maxPrice, price);
+      existing.lastCheck = Date.now();
+      existing.misses = 0;
+    }
+  });
+  saveLog(log);
+}
+
+// 2. Refresh entries that didn't show up in this scan (dropped out of the
+//    top pages / no longer "new") using GeckoTerminal's multi-pool endpoint,
+//    so we don't need one request per token.
+async function refreshStaleEntries() {
+  const log = loadLog();
+  const now = Date.now();
+  const stale = log.filter(e => {
+    if (e.finalized) return false;
+    const ageH = (now - e.firstSeen) / 3600000;
+    const windowH = FINALIZE_HOURS[e.mode] || 24;
+    // only bother refreshing things still inside (or just past) their observation window
+    return ageH <= windowH * 1.5;
+  });
+  if (!stale.length) { saveLog(log); return; }
+
+  const chunkSize = 25;
+  for (let i = 0; i < stale.length; i += chunkSize) {
+    const chunk = stale.slice(i, i + chunkSize);
+    const addrs = chunk.map(e => e.addr).join(',');
+    try {
+      const res = await fetch(`${GT_BASE}/networks/solana/pools/multi/${addrs}`, { headers: { Accept: 'application/json' } });
+      if (!res.ok) throw new Error('multi-pool refresh failed');
+      const json = await res.json();
+      const byAddr = {};
+      (json.data || []).forEach(p => byAddr[p.attributes.address] = p);
+      chunk.forEach(e => {
+        const p = byAddr[e.addr];
+        const price = p ? currentPrice(p) : null;
+        if (price != null) {
+          e.lastPrice = price;
+          e.maxPrice = Math.max(e.maxPrice, price);
+          e.lastCheck = now;
+          e.misses = 0;
+        } else {
+          e.misses = (e.misses || 0) + 1;
+        }
+      });
+    } catch (err) {
+      chunk.forEach(e => e.misses = (e.misses || 0) + 1);
+    }
+  }
+  saveLog(log);
+}
+
+// 3. Once an entry has been observed long enough for its mode, lock in its
+//    outcome so the stats panel reflects a completed observation, not one
+//    still in progress.
+function finalizeMatured() {
+  const log = loadLog();
+  const now = Date.now();
+  log.forEach(e => {
+    if (e.finalized) return;
+    const ageH = (now - e.firstSeen) / 3600000;
+    const windowH = FINALIZE_HOURS[e.mode] || 24;
+    const gaveUp = (e.misses || 0) >= MAX_MISSES;
+    if (ageH >= windowH || gaveUp) {
+      e.finalized = true;
+      e.finalMultiple = e.priceAtFirst > 0 ? e.maxPrice / e.priceAtFirst : null;
+    }
+  });
+  // cap storage: keep all active entries, plus the most recent 400 finalized ones
+  const active = log.filter(e => !e.finalized);
+  const finalized = log.filter(e => e.finalized).sort((a, b) => b.firstSeen - a.firstSeen).slice(0, 400);
+  saveLog([...active, ...finalized]);
+}
+
+async function updateTracking(scored, mode) {
+  upsertFromScan(scored, mode);
+  await refreshStaleEntries();
+  finalizeMatured();
+}
+
+function scoreBand(score) {
+  if (score >= 65) return 'High (65+)';
+  if (score >= 40) return 'Mid (40-64)';
+  return 'Low (<40)';
+}
+
+let bandStatsCache = {};
+function histHint(mode, score) {
+  if (!bandStatsCache[mode]) bandStatsCache[mode] = computeBandStats(mode);
+  const s = bandStatsCache[mode][scoreBand(score)];
+  if (!s || s.n < 5) return '';
+  return `<div class="dim" style="font-size:10px; margin-top:2px;">hist: ${s.pct2.toFixed(0)}% hit 2x (n=${s.n})</div>`;
+}
+
+function computeBandStats(mode) {
+  const log = loadLog();
+  const finalized = log.filter(e => e.finalized && e.finalMultiple != null && e.mode === mode);
+  const bands = ['High (65+)', 'Mid (40-64)', 'Low (<40)'];
+  const out = {};
+  bands.forEach(band => {
+    const entries = finalized.filter(e => scoreBand(e.scoreAtFirst) === band);
+    if (entries.length < 5) { out[band] = { n: entries.length }; return; }
+    const pct = (mult) => (entries.filter(e => e.finalMultiple >= mult).length / entries.length * 100);
+    out[band] = {
+      n: entries.length,
+      pct15: pct(1.5), pct2: pct(2), pct5: pct(5),
+      avg: entries.reduce((s, e) => s + e.finalMultiple, 0) / entries.length
+    };
+  });
+  return out;
+}
+
+function renderTrackPanel() {
+  const log = loadLog();
+  const finalized = log.filter(e => e.finalized && e.finalMultiple != null);
+
+  const statsDiv = document.getElementById('trackStats');
+  if (!finalized.length) {
+    statsDiv.innerHTML = 'No finalized outcomes yet — keep scanning over the next few days and this will fill in.';
+  } else {
+    const modes = ['gamble', 'runner'];
+    let html = '';
+    modes.forEach(mode => {
+      const bands = ['High (65+)', 'Mid (40-64)', 'Low (<40)'];
+      const modeEntries = finalized.filter(e => e.mode === mode);
+      if (!modeEntries.length) return;
+      html += `<div style="margin-bottom:14px;"><strong style="color:var(--text);">${mode === 'gamble' ? 'Gamble mode' : 'Runner mode'}</strong><ul style="margin:6px 0 0; padding-left:18px;">`;
+      const stats = computeBandStats(mode);
+      bands.forEach(band => {
+        const s = stats[band];
+        if (!s || s.n < 5) {
+          html += `<li>${band}: n=${s ? s.n : 0} — not enough data yet</li>`;
+          return;
+        }
+        html += `<li>${band}: n=${s.n} — reached 1.5x in ${s.pct15.toFixed(0)}%, 2x in ${s.pct2.toFixed(0)}%, 5x in ${s.pct5.toFixed(0)}% &middot; avg max ${s.avg.toFixed(2)}x</li>`;
+      });
+      html += `</ul></div>`;
+    });
+    statsDiv.innerHTML = html || 'Not enough finalized data yet.';
+  }
+
+  const body = document.getElementById('trackLogBody');
+  const recent = [...log].sort((a, b) => b.firstSeen - a.firstSeen).slice(0, 40);
+  if (!recent.length) {
+    body.innerHTML = '<tr><td colspan="7" class="empty">Nothing tracked yet. Run a scan first.</td></tr>';
+    return;
+  }
+  body.innerHTML = recent.map(e => {
+    const mult = e.priceAtFirst > 0 ? (e.maxPrice / e.priceAtFirst) : null;
+    const multClass = mult >= 2 ? 'pos' : mult < 0.7 ? 'neg' : '';
+    return `<tr>
+      <td>${escapeHtml(e.name)}</td>
+      <td class="dim">${e.mode}</td>
+      <td class="mono dim">${fmtAge(new Date(e.firstSeen).toISOString())} ago</td>
+      <td class="mono">${e.scoreAtFirst}</td>
+      <td class="mono">$${e.priceAtFirst.toPrecision(3)} → $${e.lastPrice.toPrecision(3)}</td>
+      <td class="mono ${multClass}">${mult != null ? mult.toFixed(2) + 'x' : '—'}</td>
+      <td class="dim">${e.finalized ? 'finalized' : 'tracking...'}</td>
+    </tr>`;
+  }).join('');
+}
+
+function toggleTrackView() {
+  const panel = document.getElementById('trackPanel');
+  const showing = panel.style.display !== 'none';
+  panel.style.display = showing ? 'none' : 'block';
+  document.querySelector('table').style.display = showing ? 'table' : 'none';
+  if (!showing) renderTrackPanel();
+}
+
+function clearTrackingData() {
+  if (!confirm('This permanently deletes all tracked history on this device. Continue?')) return;
+  localStorage.removeItem(LOG_KEY);
+  renderTrackPanel();
+}
+
+// Enriches only the top N candidates (by pre-RugCheck score) to stay well within
+// RugCheck's free-tier rate limits, since checking every row on every scan isn't necessary.
+async function enrichTopWithRugCheck(scored, topN = 20) {
+  if (rugCheckBlocked) return;
+  const ranked = [...scored].sort((a, b) => b.score - a.score).slice(0, topN);
+  const jobs = ranked.map(async (entry) => {
+    const mint = entry.mint;
+    if (!mint) return;
+    try {
+      const report = await fetchRugReport(mint);
+      applyRugCheck(entry, report);
+    } catch (e) {
+      // Swallow per-token errors; only treat it as "blocked" after several fail in a row
+      entry.rugCheckError = true;
+    }
+  });
+  await Promise.allSettled(jobs);
+  const failures = ranked.filter(e => e.rugCheckError).length;
+  if (failures >= Math.min(5, ranked.length) && ranked.length > 0) {
+    rugCheckBlocked = true;
+  }
+}
+
+/* ---------- Scoring ---------- */
+
+function safeNum(v) { const n = Number(v); return Number.isFinite(n) ? n : 0; }
+
+function buyRatio(tx) {
+  if (!tx) return 0.5;
+  const buys = safeNum(tx.buys), sells = safeNum(tx.sells);
+  const total = buys + sells;
+  return total === 0 ? 0.5 : buys / total;
+}
+
+// Gamble score: weighted on very short windows (m5 / h1)
+function scoreGamble(pool) {
+  const a = pool.attributes;
+  const liq = safeNum(a.reserve_in_usd);
+  const volH1 = safeNum(a.volume_usd && a.volume_usd.h1);
+  const volM5 = safeNum(a.volume_usd && a.volume_usd.m5);
+  const txH1 = a.transactions && a.transactions.h1;
+  const txM5 = a.transactions && a.transactions.m5;
+  const chgH1 = safeNum(a.price_change_percentage && a.price_change_percentage.h1);
+  const chgM5 = safeNum(a.price_change_percentage && a.price_change_percentage.m5);
+
+  const reasons = [];
+  let score = 0;
+
+  // Liquidity floor (0-20): needs enough to be tradeable, but this is gamble mode so we don't over-reward size
+  const liqScore = Math.min(20, (liq / 8000) * 20);
+  score += liqScore;
+  reasons.push(`Liquidity ${fmtUsd(liq)} → +${liqScore.toFixed(0)} (floor for tradeability)`);
+
+  // Turnover: volume relative to liquidity signals real interest vs a dead pool (0-30)
+  const turnover = liq > 0 ? volH1 / liq : 0;
+  const turnoverScore = Math.min(30, turnover * 15);
+  score += turnoverScore;
+  reasons.push(`1h volume is ${(turnover * 100).toFixed(0)}% of liquidity → +${turnoverScore.toFixed(0)} (turnover/interest)`);
+
+  // Buy pressure (0-25)
+  const br1 = buyRatio(txH1);
+  const brM5 = buyRatio(txM5);
+  const buyScore = Math.min(25, ((br1 - 0.5) * 2 * 15) + ((brM5 - 0.5) * 2 * 10));
+  score += Math.max(0, buyScore);
+  reasons.push(`Buy ratio 1h ${(br1*100).toFixed(0)}%, 5m ${(brM5*100).toFixed(0)}% → +${Math.max(0,buyScore).toFixed(0)} (buy pressure)`);
+
+  // Momentum (0-25)
+  const momScore = Math.max(0, Math.min(25, (chgH1 > 0 ? 12 : 0) + (chgM5 > 0 ? 13 : 0) + Math.min(10, chgH1 / 10)));
+  score += momScore;
+  reasons.push(`Price Δ 1h ${chgH1.toFixed(1)}%, 5m ${chgM5.toFixed(1)}% → +${momScore.toFixed(0)} (momentum)`);
+
+  // --- Liveness check: at gamble-mode ages, this matters more than anything else.
+  // A pool with zero trades in the last 5 minutes is very likely already dead
+  // (rugged, abandoned, or simply never caught on) regardless of what h1 looked like.
+  const m5Buys = txM5 ? safeNum(txM5.buys) : 0;
+  const m5Sells = txM5 ? safeNum(txM5.sells) : 0;
+  const m5Total = m5Buys + m5Sells;
+  const isDead = m5Total === 0;
+
+  // --- Risk flags (reduce score) ---
+  const flags = [];
+  if (isDead) { flags.push('Dead — no trades in last 5m'); score -= 60; }
+  if (liq < 3000) { score -= 15; flags.push('Very low liquidity'); }
+  if (br1 > 0.97 && liq < 15000) { flags.push('One-sided buys (possible bot/wash)'); score -= 10; }
+  const buyers1 = txH1 ? safeNum(txH1.buyers) : 0;
+  if (buyers1 > 0 && buyers1 < 5 && volH1 > liq) { flags.push('Few unique buyers vs volume'); score -= 10; }
+
+  reasons.push(`5m trades: ${m5Total} (${m5Buys} buy / ${m5Sells} sell) → ${isDead ? 'appears dead' : 'still active'}`);
+
+  // --- Graduation heuristic (free — reuses data we already have) ---
+  // When a pump.fun bonding-curve token "graduates," a brand-new pool gets
+  // created on a real AMM (Raydium/PumpSwap/Meteora) seeded with real
+  // migration liquidity. A pool that's minutes old, on one of those AMMs,
+  // and already has meaningful liquidity is a strong tell that this just
+  // happened — historically a moment of fresh attention and momentum.
+  const goodFlags = [];
+  const dexId = ((pool.relationships && pool.relationships.dex && pool.relationships.dex.data && pool.relationships.dex.data.id) || '').toLowerCase();
+  const ageMin = ageHours(a.pool_created_at) * 60;
+  const looksGraduated = !isDead && ageMin < 20 && liq > 8000 &&
+    (dexId.includes('raydium') || dexId.includes('pumpswap') || dexId.includes('meteora'));
+  if (looksGraduated) {
+    score += 12;
+    goodFlags.push('Possible pump.fun graduation 🚀');
+    reasons.push(`Fresh pool on ${dexId || 'AMM'} with ${fmtUsd(liq)} liquidity within ${ageMin.toFixed(0)}m of creation → looks like a bonding-curve graduation (+12)`);
+  }
+
+  return { score: Math.max(0, Math.round(score)), reasons, flags, goodFlags, liq, vol: volH1, volLabel: '1h vol', buyR: br1, chg: chgH1, isDead };
+}
+
+// Runner score: weighted on sustained windows (h6 / h24)
+function scoreRunner(pool) {
+  const a = pool.attributes;
+  const liq = safeNum(a.reserve_in_usd);
+  const volH6 = safeNum(a.volume_usd && a.volume_usd.h6);
+  const volH24 = safeNum(a.volume_usd && a.volume_usd.h24);
+  const txH6 = a.transactions && a.transactions.h6;
+  const txH24 = a.transactions && a.transactions.h24;
+  const chgH6 = safeNum(a.price_change_percentage && a.price_change_percentage.h6);
+  const chgH24 = safeNum(a.price_change_percentage && a.price_change_percentage.h24);
+
+  const reasons = [];
+  let score = 0;
+
+  // Liquidity size (0-20): runners need a real liquidity base, not just a spike
+  const liqScore = Math.min(20, (liq / 20000) * 20);
+  score += liqScore;
+  reasons.push(`Liquidity ${fmtUsd(liq)} → +${liqScore.toFixed(0)} (base size)`);
+
+  // Sustained turnover across 6h vs 24h — is volume still active, not fading? (0-30)
+  const rate6 = liq > 0 ? volH6 / liq : 0;
+  const rate24 = liq > 0 ? volH24 / liq : 0;
+  const avgHourly6 = volH6 / 6;
+  const avgHourly24 = volH24 / 24;
+  const sustaining = avgHourly24 > 0 ? avgHourly6 / avgHourly24 : 1;
+  const turnoverScore = Math.min(30, rate24 * 10 + Math.max(0, (sustaining - 1)) * 20);
+  score += turnoverScore;
+  reasons.push(`6h hourly pace is ${sustaining.toFixed(2)}x the 24h average → +${turnoverScore.toFixed(0)} (still accelerating vs fading)`);
+
+  // Buy pressure sustained (0-25)
+  const br6 = buyRatio(txH6);
+  const br24 = buyRatio(txH24);
+  const buyScore = Math.max(0, Math.min(25, ((br6 - 0.5) * 2 * 15) + ((br24 - 0.5) * 2 * 10)));
+  score += buyScore;
+  reasons.push(`Buy ratio 6h ${(br6*100).toFixed(0)}%, 24h ${(br24*100).toFixed(0)}% → +${buyScore.toFixed(0)} (sustained demand)`);
+
+  // Momentum without single-window mania (0-25)
+  const momScore = Math.max(0, Math.min(25, (chgH24 > 0 ? 12 : 0) + (chgH6 > 0 ? 8 : 0) + Math.min(5, chgH24 / 20)));
+  score += momScore;
+  reasons.push(`Price Δ 24h ${chgH24.toFixed(1)}%, 6h ${chgH6.toFixed(1)}% → +${momScore.toFixed(0)} (trend, not a single spike)`);
+
+  const flags = [];
+  if (liq < 8000) { score -= 15; flags.push('Thin liquidity for this age'); }
+  if (sustaining < 0.3) { flags.push('Volume fading hard'); score -= 15; }
+  if (br24 > 0.97) { flags.push('Almost no sells (unusual)'); score -= 8; }
+
+  return { score: Math.max(0, Math.round(score)), reasons, flags, goodFlags: [], liq, vol: volH24, volLabel: '24h vol', buyR: br24, chg: chgH24 };
+}
+
+/* ---------- Scan orchestration ---------- */
+
+async function runScan() {
+  const btn = document.getElementById('scanBtn');
+  const radar = document.getElementById('radar');
+  const status = document.getElementById('statusText');
+  btn.disabled = true;
+  radar.classList.remove('idle');
+  status.textContent = 'Scanning GeckoTerminal for Solana pools...';
+  document.getElementById('tableBody').innerHTML = '<tr><td colspan="7" class="empty">Scanning…</td></tr>';
+
+  try {
+    let pools = [];
+    let scored = [];
+
+    if (currentMode === 'gamble') {
+      const maxAgeMin = Number(document.getElementById('maxAgeMin').value) || 30;
+      pools = await fetchNewPools(3);
+      pools = pools.filter(p => ageHours(p.attributes.pool_created_at) * 60 <= maxAgeMin);
+      scored = pools.map(p => ({ pool: p, mint: getMint(p), ...scoreGamble(p) }));
+      const hideDead = document.getElementById('hideDead').checked;
+      if (hideDead) scored = scored.filter(s => !s.isDead);
+    } else {
+      const trending = await fetchTrendingPools();
+      const newer = await fetchNewPools(4);
+      const combined = [...trending, ...newer];
+      const seen = new Set();
+      pools = combined.filter(p => {
+        if (seen.has(p.id)) return false;
+        seen.add(p.id);
+        const h = ageHours(p.attributes.pool_created_at);
+        return h >= 18 && h <= 24 * 8;
+      });
+      scored = pools.map(p => ({ pool: p, mint: getMint(p), ...scoreRunner(p) }));
+    }
+
+    const minLiq = Number(document.getElementById('minLiq').value) || 0;
+    scored = scored.filter(s => s.liq >= minLiq);
+
+    status.textContent = `Checking mint/freeze authority + LP lock + social presence on top candidates...`;
+    await Promise.all([
+      enrichTopWithRugCheck(scored, 20),
+      enrichSocialPresence(scored, 10)
+    ]);
+
+    status.textContent = `Updating track record...`;
+    await updateTracking(scored, currentMode);
+
+    lastResults = scored;
+    const rcNote = rugCheckBlocked ? ' (RugCheck unavailable this session — see README)' : '';
+    status.textContent = `Scan complete — ${scored.length} candidates (${new Date().toLocaleTimeString()})${rcNote}`;
+    renderTable();
+  } catch (err) {
+    console.error(err);
+    document.getElementById('tableBody').innerHTML =
+      `<tr><td colspan="7" class="err">Scan failed: ${err.message}. If this is a CORS error in your browser console, see the note in the README about adding a small proxy function.</td></tr>`;
+    status.textContent = 'Scan failed.';
+  } finally {
+    btn.disabled = false;
+    radar.classList.add('idle');
+  }
+}
+
+function renderTable() {
+  bandStatsCache = {};
+  const head = document.getElementById('tableHead');
+  head.innerHTML = COLUMNS.map(c =>
+    `<th onclick="toggleSort('${c.key}')">${c.label}${sortKey === c.key ? (sortDir === 'desc' ? ' ↓' : ' ↑') : ''}</th>`
+  ).join('');
+
+  const minScore = Number(document.getElementById('minScore').value) || 0;
+  let rows = lastResults.filter(r => r.score >= minScore);
+
+  rows.sort((a, b) => {
+    const dir = sortDir === 'desc' ? -1 : 1;
+    if (sortKey === 'score') return dir * (a.score - b.score);
+    if (sortKey === 'liquidity') return dir * (a.liq - b.liq);
+    if (sortKey === 'volume') return dir * (a.vol - b.vol);
+    if (sortKey === 'buyRatio') return dir * (a.buyR - b.buyR);
+    if (sortKey === 'priceChg') return dir * (a.chg - b.chg);
+    if (sortKey === 'age') return dir * (ageHours(a.pool.attributes.pool_created_at) - ageHours(b.pool.attributes.pool_created_at));
+    return 0;
+  });
+
+  const body = document.getElementById('tableBody');
+  if (!rows.length) {
+    body.innerHTML = '<tr><td colspan="7" class="empty">No candidates match your filters.</td></tr>';
+    return;
+  }
+
+  body.innerHTML = rows.map((r, i) => {
+    const a = r.pool.attributes;
+    const name = a.name || 'Unknown pair';
+    const addr = a.address || '';
+    const scoreClass = r.score >= 65 ? 'score-hi' : r.score >= 40 ? 'score-mid' : 'score-lo';
+    const chgClass = r.chg > 0 ? 'pos' : r.chg < 0 ? 'neg' : '';
+    const flagsHtml = r.flags.length
+      ? `<div class="flags">${r.flags.map(f => `<span class="flag">${f}</span>`).join('')}</div>` : '';
+    const goodFlagsHtml = (r.goodFlags && r.goodFlags.length)
+      ? `<div class="flags">${r.goodFlags.map(f => `<span class="flag flag-good">${f}</span>`).join('')}</div>` : '';
+    const checkNote = !r.rugCheckDone
+      ? (r.rugCheckError ? '' : '<div class="dim" style="font-size:10.5px;margin-top:2px;">not in top 20 — no RugCheck pass yet</div>')
+      : '';
+
+    return `
+      <tr onclick="toggleDetail(${i})">
+        <td>
+          <div class="token-cell">
+            <span class="token-name">${escapeHtml(name)}</span>
+            <span class="token-addr">${addr.slice(0, 4)}...${addr.slice(-4)}</span>
+          </div>
+          ${flagsHtml}
+          ${goodFlagsHtml}
+          ${checkNote}
+        </td>
+        <td class="mono dim">${fmtAge(a.pool_created_at)}</td>
+        <td class="mono">${fmtUsd(r.liq)}</td>
+        <td class="mono">${fmtUsd(r.vol)} <span class="dim">(${r.volLabel})</span></td>
+        <td class="mono">${(r.buyR * 100).toFixed(0)}%</td>
+        <td class="mono ${chgClass}">${r.chg > 0 ? '+' : ''}${r.chg.toFixed(1)}%</td>
+        <td>
+          <span class="score-pill ${scoreClass}">${r.score}</span>
+          ${histHint(currentMode, r.score)}
+        </td>
+      </tr>
+      <tr class="detail-row" id="detail-${i}" style="display:none;">
+        <td colspan="7">
+          <strong>Why this score:</strong>
+          <ul>${r.reasons.map(rs => `<li>${escapeHtml(rs)}</li>`).join('')}</ul>
+          <div style="margin-top:8px;">
+            <a href="https://www.geckoterminal.com/solana/pools/${addr}" target="_blank" rel="noopener">View on GeckoTerminal ↗</a>
+            &nbsp;&middot;&nbsp;
+            <a href="https://dexscreener.com/solana/${addr}" target="_blank" rel="noopener">View on DexScreener ↗</a>
+            ${r.mint ? `&nbsp;&middot;&nbsp;<a href="https://rugcheck.xyz/tokens/${r.mint}" target="_blank" rel="noopener">Full RugCheck report ↗</a>` : ''}
+          </div>
+        </td>
+      </tr>
+    `;
+  }).join('');
+}
+
+function toggleDetail(i) {
+  const row = document.getElementById(`detail-${i}`);
+  if (row) row.style.display = row.style.display === 'none' ? 'table-row' : 'none';
+}
+
+function toggleSort(key) {
+  if (sortKey === key) sortDir = sortDir === 'desc' ? 'asc' : 'desc';
+  else { sortKey = key; sortDir = 'desc'; }
+  renderTable();
+}
+
+function escapeHtml(str) {
+  const div = document.createElement('div');
+  div.textContent = str;
+  return div.innerHTML;
+}
+
+// init
+setMode('gamble');
+</script>
+
+</body>
+</html>
