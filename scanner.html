@@ -300,6 +300,7 @@ function checkPw(){
   const v = document.getElementById('pw-input').value;
   if(v === 'eggface'){
     document.getElementById('pw-gate').style.display = 'none';
+    document.getElementById('back-btn').style.display = 'block';
   } else {
     document.getElementById('pw-err').textContent = 'incorrect password';
     document.getElementById('pw-input').value = '';
@@ -310,16 +311,6 @@ function checkPw(){
 
 <!-- ===== Back button ===== -->
 <a id="back-btn" href="index.html" style="display:none;position:fixed;top:14px;left:14px;z-index:200;font-family:'Courier New',monospace;font-size:13px;letter-spacing:2px;color:#45e8c8;text-decoration:none;border:1.5px solid #45e8c8;padding:5px 12px;border-radius:4px;background:rgba(0,0,0,0.55);box-shadow:0 0 10px rgba(69,232,200,0.3)">◂ MENU</a>
-<script>
-(function(){
-  const gate = document.getElementById('pw-gate');
-  const btn = document.getElementById('back-btn');
-  const obs = new MutationObserver(function(){
-    if(gate.style.display === 'none') btn.style.display = 'block';
-  });
-  obs.observe(gate, {attributes:true, attributeFilter:['style']});
-})();
-</script>
 
 <header>
   <div class="brand">
@@ -332,7 +323,7 @@ function checkPw(){
   <div class="controls">
     <div class="mode-toggle">
       <button data-mode="gamble" class="active" onclick="setMode('gamble')">GAMBLE (&lt;1H)</button>
-      <button data-mode="runner" onclick="setMode('runner')">RUNNER (1D-7D)</button>
+      <button data-mode="runner" onclick="setMode('runner')">RUNNER (ANY AGE)</button>
     </div>
     <button class="scan-btn" id="scanBtn" onclick="runScan()">Scan now</button>
     <button class="scan-btn" id="trackBtn" style="background:var(--panel-2); color:var(--text);" onclick="toggleTrackView()">Track record</button>
@@ -347,6 +338,7 @@ function checkPw(){
       <label>Min score <input type="number" id="minScore" value="0" step="5"></label>
       <label id="ageFilterWrap">Max age (min) <input type="number" id="maxAgeMin" value="30" step="5"></label>
       <label><input type="checkbox" id="hideDead" checked style="width:auto;"> Hide dead pools</label>
+      <label id="fdvFilterWrap" style="display:none;">Max market cap $ <input type="number" id="maxFdv" value="200000000" step="10000000"></label>
     </div>
   </div>
 
@@ -412,10 +404,11 @@ function setMode(mode) {
   });
   document.getElementById('ageFilterWrap').style.display = mode === 'gamble' ? 'flex' : 'none';
   document.getElementById('hideDead').parentElement.style.display = mode === 'gamble' ? 'flex' : 'none';
+  document.getElementById('fdvFilterWrap').style.display = mode === 'runner' ? 'flex' : 'none';
   document.getElementById('statusText').textContent =
     mode === 'gamble'
       ? 'Gamble mode: very fresh pools, filtered by age below. High risk, fast signal.'
-      : 'Runner mode: pools 1-7 days old showing sustained momentum.';
+      : 'Runner mode: any age, filtered by market cap below — catches dormant coins waking up too, not just young ones.';
 }
 
 function fmtUsd(n) {
@@ -967,11 +960,17 @@ async function runScan() {
       const newer = await fetchNewPools(4);
       const combined = [...trending, ...newer];
       const seen = new Set();
+      const maxFdv = Number(document.getElementById('maxFdv').value) || 200_000_000;
       pools = combined.filter(p => {
         if (seen.has(p.id)) return false;
         seen.add(p.id);
         const h = ageHours(p.attributes.pool_created_at);
-        return h >= 18 && h <= 24 * 8;
+        const fdv = safeNum(p.attributes.fdv_usd);
+        // No upper age bound anymore — an old coin having a fresh spike (e.g. a
+        // dormant meme coin suddenly waking up) is exactly what Runner mode
+        // should catch, not exclude. We filter out mega-caps by FDV instead,
+        // since that's the real distinction you care about (not token age).
+        return h >= 18 && (fdv === 0 || fdv <= maxFdv);
       });
       scored = pools.map(p => ({ pool: p, mint: getMint(p), ...scoreRunner(p) }));
     }
