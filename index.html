@@ -189,6 +189,14 @@ body{
 }
 .playbtn.locked-btn::after{content:' 🔒'}
 
+/* ===== Nap Time — secret link: type "eepy" to wake it ===== */
+#naptime-icon{ pointer-events:none; cursor:default; }
+#naptime-icon .ico{ width:40px;height:40px; }
+#naptime-icon img{ width:40px;height:40px;object-fit:contain;image-rendering:auto;
+  -webkit-user-drag:none;user-drag:none; }
+#naptime-icon.awake{ pointer-events:auto; cursor:pointer; animation:unlock-flash .5s ease; }
+#naptime-icon.awake img{ filter:drop-shadow(0 0 6px #ffe08a); }
+
 .statusbar{
   display:flex;align-items:center;gap:2px;padding:2px 4px;font-size:11px;
 }
@@ -437,6 +445,9 @@ body{
           <div class="ico">💩</div>
           <div class="lab">Shitters</div>
         </a>
+        <a class="icon" id="naptime-icon" href="nap_time/index.html">
+          <div class="ico"><img id="naptime-img" src="egg_talk.png" alt=""></div>
+        </a>
       </div>
     </div>
 
@@ -580,6 +591,25 @@ function powerOn(){
   off.style.opacity = '0';
   setTimeout(()=>{ off.style.display = 'none'; }, 800);
 }
+
+// ===== Nap Time secret: type "eepy" anywhere on the desktop to wake the link =====
+(function(){
+  let buf = '';
+  const CODE = 'eepy';
+  document.addEventListener('keydown', function(e){
+    if (e.key && e.key.length === 1) {
+      buf = (buf + e.key.toLowerCase()).slice(-CODE.length);
+      if (buf === CODE) wakeNapTime();
+    }
+  });
+  function wakeNapTime(){
+    const a = document.getElementById('naptime-icon');
+    if (!a || a.classList.contains('awake')) return;
+    a.classList.add('awake');
+    const img = document.getElementById('naptime-img');
+    if (img) img.src = 'egg_sleep.png';
+  }
+})();
 
 </script>
 </body>
