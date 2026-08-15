@@ -31,6 +31,7 @@
     egg:       { /* balanced -> uses BASE */ },
     neogaucha: { maxHp: 85, damage: 27, moveSpeed: 200 },  // glass-cannon oni
     lua:       { maxHp: 95, moveSpeed: 205, xpFind: 1.15 }, // nimble, dream-lucky star girl
+    beek:      { maxHp: 120, damage: 24, moveSpeed: 175, dmgResist: 0.05 }, // sturdy orca-loving pond keeper
   };
 
   // Small automatic growth per level (skill points add the rest on top).

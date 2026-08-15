@@ -45,6 +45,11 @@
         per: { xpFind: 0.25, maxHp: 15 }, flag: "empower",
         desc: "Dreams shine brighter — extra XP and a little more pep." },
     ]),
+    beek: passives().concat([
+      { id: "capstone", branch: "body", tier: 3, name: "Big Orca Energy", max: 1, reqLevel: 8, req: "res",
+        per: { maxHp: 30, dmgResist: 0.05 }, flag: "empower",
+        desc: "Chonky and unbothered — big HP and extra armor." },
+    ]),
   };
 
   NAP.skillTree = charId => NAP.SKILLS[charId] || [];

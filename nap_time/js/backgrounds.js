@@ -140,6 +140,15 @@
     ctx.globalAlpha = 1;
   };
 
+  // Lua's cloud library (uses the library art as a scene backdrop)
+  BG.library = function (ctx, w, h, t) {
+    const im = NAP.img(NAP.META.misc.bg_library.file);
+    if (!im) { BG.dream_void(ctx, w, h, t); return; }
+    const s = Math.max(w / im.width, h / im.height), dw = im.width * s, dh = im.height * s;
+    ctx.drawImage(im, (w - dw) / 2, (h - dh) / 2 + Math.sin(t * 0.2) * 5, dw, dh);
+    ctx.fillStyle = "rgba(20,12,40,0.08)"; ctx.fillRect(0, 0, w, h);
+  };
+
   BG.paint = function (name, ctx, w, h, t) {
     (BG[name] || BG.bedroom_night)(ctx, w, h, t);
   };

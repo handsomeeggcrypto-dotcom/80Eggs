@@ -24,7 +24,7 @@ transparent backgrounds, so no white-stripping is needed. The real work:
 Outputs individual PNGs + meta.json.  Run once:  python3 preprocess.py
 """
 import json, os
-from PIL import Image
+from PIL import Image, ImageChops
 
 SRC = os.path.expanduser("~/Desktop/diablo yumemono")
 OUT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets", "processed")
@@ -136,6 +136,16 @@ def process_tile(name, out, size=128):
         .save(os.path.join(OUT, out))
 
 
+def process_overlay(name, out, size=128, thresh=236):
+    """Tile drawn OVER the floor (reeds/bush): strip near-white bg to transparent."""
+    im = load(name)  # RGBA
+    r, g, b, a = im.split()
+    mn = ImageChops.darker(ImageChops.darker(r, g), b)   # per-pixel min channel
+    newA = mn.point(lambda v: 0 if v >= thresh else 255)
+    im.putalpha(ImageChops.darker(a, newA))
+    im.resize((size, size), Image.LANCZOS).save(os.path.join(OUT, out))
+
+
 def player_set(prefix, base):
     """Standard playable-character anim set (idle single frames, 4-frame walk/attack)."""
     return pack_entity(prefix, {
@@ -173,6 +183,7 @@ def main():
     })
     neogaucha = player_set("neo", "110")
     lua = player_set("lua", "lua")
+    beek = player_set("beek", "beek")
 
     # ---- Nightmares (enemies) ----------------------------------------------
     shadow_egg = pack_entity("enemy", {
@@ -182,10 +193,11 @@ def main():
         "death":  (slice_strip(load("enemy_zombie_egg_death.png"), 4), 0),
     })
     oni = foe_set("oni", "enemy_oni")
-    siren = foe_set("siren", "enemy_nightmarelua")   # Nightmare Lua
+    siren = foe_set("siren", "enemy_nightmarelua")            # Nightmare Lua
+    nightmarebeek = foe_set("nbeek", "enemy_nightmarebeek")   # demon-bunny Beek
 
-    meta["chars"] = {"egg": egg, "neogaucha": neogaucha, "lua": lua}
-    meta["foes"] = {"shadow_egg": shadow_egg, "oni": oni, "siren": siren}
+    meta["chars"] = {"egg": egg, "neogaucha": neogaucha, "lua": lua, "beek": beek}
+    meta["foes"] = {"shadow_egg": shadow_egg, "oni": oni, "siren": siren, "nightmarebeek": nightmarebeek}
     meta["player"] = egg          # legacy aliases (kept for safety)
     meta["enemy"] = shadow_egg
 
@@ -204,6 +216,13 @@ def main():
     process_tile("tile_wall_curtain.png", "tile_library_wall2.png")
     process_tile("tile_floor_library_corrupted.png", "tile_library_corrupt_floor.png")
     process_tile("tile_wall_bookshelf_corrupted.png", "tile_library_corrupt_wall.png")
+    # pond meadow: solid floor/water/edge, overlay foliage (reeds/bush)
+    process_tile("tile_floor_grass.png", "tile_pond_floor.png")
+    process_tile("tile_floor_grass_var2.png", "tile_pond_floor2.png")
+    process_tile("tile_water_pond.png", "tile_pond_water.png")
+    process_tile("tile_water_pond_edge.png", "tile_pond_edge.png")
+    process_overlay("tile_wall_reeds.png", "tile_pond_reeds.png")
+    process_overlay("tile_wall_bush.png", "tile_pond_bush.png")
 
     # ---- Potion (single centred icon) --------------------------------------
     potion = trim(load("item_potion_health.png"))
@@ -268,6 +287,14 @@ def main():
     meta["misc"]["bg_library"] = {"file": "bg_library.png", "w": lw, "h": lh}
     meta["misc"]["vn_lua"] = vn_sprite("lua_idle_down.png", "vn_lua.png")
     meta["misc"]["vn_siren"] = vn_sprite("enemy_nightmarelua_idle.png", "vn_siren.png")
+
+    # ---- Pond Meadow background + Beek/bunny VN sprites -------------------
+    pond = load("background_pond_meadow.png").convert("RGB")
+    pw2 = 1280; ph2 = round(pond.height * pw2 / pond.width)
+    pond.resize((pw2, ph2), Image.LANCZOS).save(os.path.join(OUT, "bg_pond.png"))
+    meta["misc"]["bg_pond"] = {"file": "bg_pond.png", "w": pw2, "h": ph2}
+    meta["misc"]["vn_beek"] = vn_sprite("beek_idle_down.png", "vn_beek.png")
+    meta["misc"]["vn_nightmarebeek"] = vn_sprite("enemy_nightmarebeek_idle.png", "vn_nightmarebeek.png")
 
     with open(os.path.join(OUT, "meta.json"), "w") as f:
         json.dump(meta, f, indent=2)

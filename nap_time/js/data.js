@@ -32,6 +32,7 @@
     vn: M.misc.vn_egg,
     nightmareVN: M.misc.vn_shadow,
     tutorial: true,
+    buddy: "cloud",
     active: { id: "sweetdreams", name: "Sweet Dweams", cooldown: 12 },
 
     // shown on the LOSE card only (chapter wins flow straight into the next scene)
@@ -155,6 +156,7 @@
     vn: M.misc.vn_neogaucha,
     nightmareVN: M.misc.vn_oni,
     tutorial: false,
+    buddy: "teddy",
     active: { id: "oniform", name: "Oni Mode", cooldown: 14, dur: 6 },
     lose: { title: "You Woke With a Gasp", text: "The rooftop dream shoved you out. The Oni's still up there, waiting." },
     win: { title: "Nightmare Silenced", text: "The Oni dissolved into static and smoke. The rooftop is quiet — just the city and the stars." },
@@ -254,7 +256,9 @@
     vn: M.misc.vn_lua,
     nightmareVN: M.misc.vn_siren,
     tutorial: false,
-    active: null,                // signature move TBD
+    buddy: "glorp",
+    // Summons a little helper that seeks & attacks enemies (art placeholder for now).
+    active: { id: "summon", name: "Star Pal", cooldown: 14, dur: 8 },
     lose: { title: "You Woke With a Gasp", text: "The siren's song faded, and the dream spat you out. The library waits." },
     win: { title: "Sweet Dream", text: "The siren's song broke into quiet. The clouds hush; the books settle." },
     // standalone Cloud Library level vs the Nightmare-Lua siren
@@ -263,9 +267,105 @@
       bossName: "NIGHTMARE LUA", cols: 20, rows: 15, objective: "defeat",
       spawnEnemies: 2, boss: true, title: "Cloud Library",
     },
+
+    // ---- Lua's night (placeholder script) ----
+    chapter: {
+      segments: [
+        // SEG 0: library story + food choice
+        { type: "story", beats: [
+          { bg: "library", side: null, speaker: "",
+            text: "High in the cloud library, the lamps dim for the night. Lua tucks the last book back onto its shelf." },
+          { bg: "library", side: "lua", speaker: "Lua", mood: "daydreaming",
+            text: "The stories always get restless right before sleep... like they don't want the day to end. I know the feeling." },
+          { bg: "library", side: "lua", speaker: "Lua", mood: "worried",
+            text: "...But lately something's been getting in. A corner of the library gone all wrong. Grey. Whispery." },
+          { bg: "library", side: "lua", speaker: "Lua", mood: "neutral",
+            text: "If I'm tidying it up in my dreams, I should bring a snack. Reading fuel.",
+            choice: { prompt: "What does Lua nibble on?", persist: true, options: [
+              { label: "Bogir", icon: "borgir", reply: "A warm Bogir. Cozy reading food.", mods: { food: "borgir" } },
+              { label: "Apol", icon: "apol", reply: "An Apol. Crunchy and bright, like a good ending.", mods: { food: "apol" } },
+              { label: "Tenddie", icon: "tendie", reply: "Tenddies! One for every chapter.", mods: { food: "tendie" } },
+              { label: "Pizza", icon: "pizza", reply: "Pizza. Read a page, take a bite. Perfect.", mods: { food: "pizza" } },
+            ] } },
+          { bg: "galaxy", side: "lua", speaker: "Lua", mood: "sleepy",
+            text: "Okay. Deep breath. Into the pages I go..." },
+        ] },
+        // SEG 1: Dream 1 — collect the scattered pages
+        { type: "dream", title: "Library · Dream 1", dream: {
+          enemyFoe: "siren", theme: "library", bg: "bg_library", cols: 20, rows: 15,
+          objective: "collect", spawnEnemies: 2, boss: false,
+        } },
+        // SEG 2: wake up — the grey is spreading
+        { type: "story", beats: [
+          { bg: "library", side: null, speaker: "",
+            text: "Lua blinks awake in her reading nook, a page still faintly glowing in her hand." },
+          { bg: "library", side: "lua", speaker: "Lua", mood: "surprised",
+            text: "Oh! I found some of the lost pages. They were so frightened, poor things." },
+          { bg: "library", side: "lua", speaker: "Lua", mood: "worried",
+            text: "But the grey is still spreading. It isn't just messy — it's hungry. I have to go back." },
+          { bg: "galaxy", side: "lua", speaker: "Lua", mood: "sleepy",
+            text: "Back into the story..." },
+        ] },
+        // SEG 3: Dream 2 — survive the corruption's waves
+        { type: "dream", title: "Library · Dream 2", dream: {
+          enemyFoe: "siren", theme: "library", bg: "bg_library", cols: 20, rows: 15,
+          objective: "survive", spawnEnemies: 3, waves: 3, boss: false,
+        } },
+        // SEG 4: wake up + a line + into the boss
+        { type: "story", beats: [
+          { bg: "library", side: null, speaker: "",
+            text: "She wakes with a start, hugging her little glorp plush a bit too tight." },
+          { bg: "library", side: "lua", speaker: "Lua", mood: "worried",
+            text: "It's her, isn't it. The one who sings. She wears my face, but... starving. So sad." },
+          { bg: "library", side: "lua", speaker: "Lua", mood: "neutral",
+            text: "I don't want to fight her. But I can't let her swallow the whole library. One more dream." },
+          { bg: "galaxy", side: "lua", speaker: "Lua", mood: "sleepy",
+            text: "Wait for me. I'm coming." },
+        ] },
+        // SEG 5: Dream 3 — the siren, Nightmare Lua
+        { type: "dream", title: "Final · Nightmare Lua", dream: {
+          enemyFoe: "siren", theme: "library", bg: "bg_library", cols: 20, rows: 15,
+          objective: "defeat", spawnEnemies: 2, boss: true, bossName: "NIGHTMARE LUA",
+        } },
+        // SEG 6: victory + end
+        { type: "story", end: true, beats: [
+          { bg: "library", side: "shadow", speaker: "???", mood: "sad",
+            text: "( ...you'd really share your stories with me? even after all this? )" },
+          { bg: "library", side: "lua", speaker: "Lua", mood: "happy",
+            text: "Of course. There's always room for one more reader. Come sit." },
+          { bg: "library", side: null, speaker: "",
+            text: "The grey unwinds into soft starlight. The library breathes out, whole again." },
+          { bg: "library", side: "lua", speaker: "Lua", mood: "happy",
+            text: "Sweet dreams, everyone. See you in the next chapter." },
+          { bg: "library", side: null, speaker: "",
+            text: "—  End of Lua's Night  —" },
+        ] },
+      ],
+    },
   };
 
-  NAP.DATA = { characters: { egg, neogaucha, lua }, order: ["egg", "neogaucha", "lua"] };
+  // ---- Beek (playable character #4) --------------------------------------
+  const beek = {
+    id: "beek",
+    name: "Beek",
+    title: "Pond Keeper",
+    accent: "#8fd3ff",
+    vn: M.misc.vn_beek,
+    nightmareVN: M.misc.vn_nightmarebeek,
+    tutorial: false,
+    buddy: "orca",
+    active: null,                // signature move TBD
+    lose: { title: "You Woke With a Gasp", text: "The pond rippled and the dream slipped under. The meadow waits, still and green." },
+    win: { title: "Sweet Dream", text: "The demon bunny hopped off into the reeds, harmless again. The pond goes quiet." },
+    // standalone Pond Meadow level vs the demon-bunny nightmare
+    pond: {
+      playerChar: "beek", enemyFoe: "nightmarebeek", theme: "pond", bg: "bg_pond",
+      bossName: "NIGHTMARE BEEK", cols: 20, rows: 15, objective: "defeat",
+      spawnEnemies: 2, boss: true, title: "Pond Meadow",
+    },
+  };
+
+  NAP.DATA = { characters: { egg, neogaucha, lua, beek }, order: ["egg", "neogaucha", "lua", "beek"] };
 
   // Merge a dream's base config with persistent (whole-night) + pending (next
   // dream only) choice modifiers.

@@ -11,8 +11,8 @@
    ============================================================= */
 (function (NAP) {
   "use strict";
-  const THEMES = ["cloud", "rooftop", "library"];
-  const FOES = ["shadow_egg", "oni", "siren"];
+  const THEMES = ["cloud", "rooftop", "library", "pond"];
+  const FOES = ["shadow_egg", "oni", "siren", "nightmarebeek"];
   const pick = a => a[(Math.random() * a.length) | 0];
 
   NAP.rift = null;
@@ -23,7 +23,7 @@
     const theme = pick(THEMES), foe = pick(FOES);
     return {
       charId: r.charId, playerChar: r.charId, enemyFoe: foe,
-      theme, bg: theme === "rooftop" ? "bg_rooftop" : theme === "library" ? "bg_library" : null,
+      theme, bg: theme === "rooftop" ? "bg_rooftop" : theme === "library" ? "bg_library" : theme === "pond" ? "bg_pond" : null,
       objective: "rift", difficulty: NAP.riftDifficulty(d), depth: d,
       boss: false, bossName: "RIFT GUARDIAN" + (foe === "oni" ? " · ONI" : ""),
       cols: 20, rows: 15, title: "Deep Sleep · Depth " + d,

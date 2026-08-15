@@ -11,12 +11,14 @@
           go: () => NAP.startChapter("egg") },
         { label: "Neogaucha — Rooftop Night", sub: "punk-rock oni · her story",
           go: () => NAP.startChapter("neogaucha") },
-        { label: "Lua — Cloud Library", sub: "star dreamling · corruption creeping in",
-          go: () => NAP.playDream("lua", NAP.DATA.characters.lua.library) },
+        { label: "Lua — Cloud Library", sub: "star dreamling · her story",
+          go: () => NAP.startChapter("lua") },
+        { label: "Beek — Pond Meadow", sub: "pond keeper · vs demon bunny",
+          go: () => NAP.playDream("beek", NAP.DATA.characters.beek.pond) },
         { label: "🌙 Deep Sleep", sub: "endless rift · grind & descend",
           go: () => NAP.go(NAP.scenes.deepsleep, {}, { type: "fade" }) },
-        { label: "✦ Skill Trees", sub: "spend skill points",
-          go: () => NAP.go(NAP.scenes.skills, { charId: "egg", back: "select" }, { type: "fade" }) },
+        { label: "✦ Characters", sub: "view dreamers · spend skill points",
+          go: () => NAP.go(NAP.scenes.characters, {}, { type: "fade" }) },
         { label: "← Back", sub: "", go: () => NAP.go(NAP.scenes.title, {}, { type: "fade" }) },
       ];
       this.layout();

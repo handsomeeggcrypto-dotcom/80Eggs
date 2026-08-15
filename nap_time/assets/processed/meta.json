@@ -186,6 +186,68 @@
         "canvasH": 230,
         "baselineY": 224
       }
+    },
+    "beek": {
+      "idle_down": {
+        "files": [
+          "beek_idle_down_0.png"
+        ],
+        "canvasW": 121,
+        "canvasH": 221,
+        "baselineY": 215
+      },
+      "idle_up": {
+        "files": [
+          "beek_idle_up_0.png"
+        ],
+        "canvasW": 118,
+        "canvasH": 221,
+        "baselineY": 215
+      },
+      "walk_down": {
+        "files": [
+          "beek_walk_down_0.png",
+          "beek_walk_down_1.png",
+          "beek_walk_down_2.png",
+          "beek_walk_down_3.png"
+        ],
+        "canvasW": 123,
+        "canvasH": 227,
+        "baselineY": 221
+      },
+      "walk_up": {
+        "files": [
+          "beek_walk_up_0.png",
+          "beek_walk_up_1.png",
+          "beek_walk_up_2.png",
+          "beek_walk_up_3.png"
+        ],
+        "canvasW": 117,
+        "canvasH": 223,
+        "baselineY": 217
+      },
+      "attack_down": {
+        "files": [
+          "beek_attack_down_0.png",
+          "beek_attack_down_1.png",
+          "beek_attack_down_2.png",
+          "beek_attack_down_3.png"
+        ],
+        "canvasW": 170,
+        "canvasH": 265,
+        "baselineY": 259
+      },
+      "attack_up": {
+        "files": [
+          "beek_attack_up_0.png",
+          "beek_attack_up_1.png",
+          "beek_attack_up_2.png",
+          "beek_attack_up_3.png"
+        ],
+        "canvasW": 190,
+        "canvasH": 265,
+        "baselineY": 259
+      }
     }
   },
   "foes": {
@@ -317,6 +379,49 @@
         "canvasH": 234,
         "baselineY": 228
       }
+    },
+    "nightmarebeek": {
+      "idle": {
+        "files": [
+          "nbeek_idle_0.png"
+        ],
+        "canvasW": 118,
+        "canvasH": 215,
+        "baselineY": 209
+      },
+      "walk": {
+        "files": [
+          "nbeek_walk_0.png",
+          "nbeek_walk_1.png",
+          "nbeek_walk_2.png",
+          "nbeek_walk_3.png"
+        ],
+        "canvasW": 106,
+        "canvasH": 217,
+        "baselineY": 211
+      },
+      "attack": {
+        "files": [
+          "nbeek_attack_0.png",
+          "nbeek_attack_1.png",
+          "nbeek_attack_2.png",
+          "nbeek_attack_3.png"
+        ],
+        "canvasW": 142,
+        "canvasH": 220,
+        "baselineY": 214
+      },
+      "death": {
+        "files": [
+          "nbeek_death_0.png",
+          "nbeek_death_1.png",
+          "nbeek_death_2.png",
+          "nbeek_death_3.png"
+        ],
+        "canvasW": 134,
+        "canvasH": 214,
+        "baselineY": 208
+      }
     }
   },
   "misc": {
@@ -400,6 +505,21 @@
     "vn_siren": {
       "file": "vn_siren.png",
       "w": 269,
+      "h": 620
+    },
+    "bg_pond": {
+      "file": "bg_pond.png",
+      "w": 1280,
+      "h": 720
+    },
+    "vn_beek": {
+      "file": "vn_beek.png",
+      "w": 324,
+      "h": 620
+    },
+    "vn_nightmarebeek": {
+      "file": "vn_nightmarebeek.png",
+      "w": 324,
       "h": 620
     }
   },

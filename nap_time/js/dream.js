@@ -34,8 +34,11 @@
     rooftop: { floor: "tile_rooftop_floor.png", floor2: "tile_rooftop_floor2.png", wall: "tile_rooftop_wall.png", wall2: "tile_rooftop_wall2.png" },
     library: { floor: "tile_library_floor.png", floor2: "tile_library_floor2.png", wall: "tile_library_wall.png", wall2: "tile_library_wall2.png",
       corruptFloor: "tile_library_corrupt_floor.png", corruptWall: "tile_library_corrupt_wall.png" },
+    pond: { floor: "tile_pond_floor.png", floor2: "tile_pond_floor2.png", wall: "tile_pond_reeds.png", wall2: "tile_pond_bush.png",
+      water: "tile_pond_water.png", edge: "tile_pond_edge.png", overlayWalls: true },
   };
-  // grid tile types: 0 floor, 1 floor2, 2 wall, 3 wall2(interior), 4 corrupt-floor(hazard), 5 corrupt-wall
+  // grid tile types: 0 floor, 1 floor2, 2 wall, 3 wall2(interior), 4 corrupt-floor(hazard),
+  //                  5 corrupt-wall, 6 water(non-walkable), 7 pond-edge(non-walkable diagonal shore)
   const CORRUPT_DPS = 7;
 
   const dream = NAP.scenes.dream = {
@@ -71,6 +74,8 @@
     this.activeCd = 0;
     this.empowered = NAP.hasFlag(this.charId, "empower");
     this.healZones = [];
+    this.buddyType = (NAP.DATA.characters[this.charId] || {}).buddy || "cloud";
+    this.minions = [];         // Lua's summoned attackers
     this.enemies = [];
     this.projectiles = [];
     this.particles = [];
@@ -137,11 +142,20 @@
       for (const [dx, dy] of patch) { const x = ox + dx, y = oy + dy; if (x > 0 && y > 0 && x < C - 1 && y < R - 1) g[y][x] = 4; }
       for (const [dx, dy] of [[0, 0], [1, 0], [3, 1], [3, 3]]) { const x = ox + dx, y = oy + dy; if (x > 0 && y > 0 && x < C - 1 && y < R - 1) g[y][x] = 5; }
     }
+    // pond: carve a corner pond (bottom-left) with a diagonal shoreline of edge tiles
+    if (this.tiles && this.tiles.water) {
+      const T = 6;
+      for (let y = 1; y < R - 1; y++) for (let x = 1; x < C - 1; x++) {
+        const m = y - x;
+        if (m >= T + 1) g[y][x] = 6;        // open water
+        else if (m === T) g[y][x] = 7;      // shoreline (diagonal edge tile)
+      }
+    }
     this.grid = g;
   },
   isWall(tx, ty) {
     if (tx < 0 || ty < 0 || tx >= this.cols || ty >= this.rows) return true;
-    const t = this.grid[ty][tx]; return t === 2 || t === 3 || t === 5;
+    const t = this.grid[ty][tx]; return t === 2 || t === 3 || t === 5 || t === 6 || t === 7;
   },
   freeCell(minDistFromPlayer) {
     for (let i = 0; i < 400; i++) {
@@ -301,6 +315,44 @@
     this.activeCd = this.activeMax;
     if (this.active.id === "sweetdreams") this.castSweetDreams();
     else if (this.active.id === "oniform") this.castOniForm();
+    else if (this.active.id === "summon") this.castSummon();
+  },
+  castSummon() {
+    const p = this.player, emp = this.empowered;
+    this.minions.push({ x: p.x + (Math.random() - 0.5) * 20, y: p.y + 16, t: 0,
+      life: (this.active.dur || 8) * (emp ? 1.4 : 1), atkCd: 0, bob: Math.random() * 6.28,
+      dmg: (12 + (this.charProg.level - 1) * 1.2) * (emp ? 1.4 : 1) });
+    this.spawnPoof(p.x, p.y - 18, "#ffe08a"); this.popup(p.x, p.y - 56, "go get 'em!", "#ffe08a"); this.addShake(2);
+  },
+  updateMinions(dt) {
+    for (const m of this.minions) {
+      m.t += dt; m.bob += dt * 6; if (m.atkCd > 0) m.atkCd -= dt;
+      // seek nearest living enemy
+      let best = null, bd = 1e9;
+      for (const en of this.enemies) { if (en.dead || en.dying) continue; const d = U.dist(m.x, m.y, en.x, en.y); if (d < bd) { bd = d; best = en; } }
+      if (best) {
+        const dx = best.x - m.x, dy = best.y - m.y, d = Math.hypot(dx, dy) || 1;
+        if (d > 34) { const s = 200 * dt; m.x += dx / d * s; m.y += dy / d * s; }
+        else if (m.atkCd <= 0) { this.hitEnemy(best, m.dmg); m.atkCd = 0.6; this.spawnBurst(best.x, best.y - best.h * 0.4, "#ffe08a"); }
+      }
+    }
+    this.minions = this.minions.filter(m => m.t < m.life);
+  },
+  drawMinion(ctx, cam, m) {
+    const sx = m.x - cam.x, sy = m.y - cam.y + Math.sin(m.bob) * 3;
+    D.shadow(sx, sy + 12, 12, 5);
+    // placeholder: a little glowing star pal (swap for Lua's art later)
+    const fade = m.life - m.t < 1 ? (m.life - m.t) : 1;
+    ctx.save(); ctx.globalAlpha = U.clamp(fade, 0, 1);
+    ctx.globalCompositeOperation = "lighter";
+    ctx.fillStyle = "rgba(255,224,138,0.5)"; ctx.beginPath(); ctx.arc(sx, sy, 16, 0, 6.28); ctx.fill();
+    ctx.globalCompositeOperation = "source-over";
+    ctx.fillStyle = "#ffd35e"; ctx.strokeStyle = "#fff3c0"; ctx.lineWidth = 2;
+    ctx.beginPath();
+    for (let i = 0; i < 10; i++) { const a = -Math.PI / 2 + i * Math.PI / 5, r = i % 2 ? 5 : 12; ctx.lineTo(sx + Math.cos(a) * r, sy + Math.sin(a) * r); }
+    ctx.closePath(); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = "#5b4a2a"; ctx.beginPath(); ctx.arc(sx - 3, sy, 1.6, 0, 6.28); ctx.arc(sx + 3, sy, 1.6, 0, 6.28); ctx.fill();
+    ctx.restore();
   },
   castSweetDreams() {
     const p = this.player, emp = this.empowered;
@@ -372,6 +424,7 @@
     this.updateProjectiles(dt);
     this.updatePickups(dt);
     this.updateBuddy(dt);
+    this.updateMinions(dt);
     this.updateParticles(dt);
     this.checkObjective(dt);
   },
@@ -693,6 +746,14 @@
     for (let y = y0; y < y1; y++) for (let x = x0; x < x1; x++) {
       if (x < 0 || y < 0 || x >= this.cols || y >= this.rows) continue;
       const sx = x * TILE - cam.x, sy = y * TILE - cam.y, tt = this.grid[y][x];
+      if (tt === 6) { const im = NAP.img(T.water); if (im) ctx.drawImage(im, sx, sy, TILE, TILE); continue; }
+      if (tt === 7) { const im = NAP.img(T.edge); if (im) ctx.drawImage(im, sx, sy, TILE, TILE); continue; }
+      if (T.overlayWalls && (tt === 2 || tt === 3)) {
+        // foliage drawn OVER grass (transparent corners), not as a solid tile
+        const fl = NAP.img(T.floor); if (fl) ctx.drawImage(fl, sx, sy, TILE, TILE);
+        const ov = NAP.img(tt === 2 ? T.wall : T.wall2); if (ov) ctx.drawImage(ov, sx, sy, TILE, TILE);
+        continue;
+      }
       const key = tt === 2 ? T.wall : tt === 3 ? T.wall2 : tt === 1 ? T.floor2
         : tt === 4 ? (T.corruptFloor || T.floor) : tt === 5 ? (T.corruptWall || T.wall) : T.floor;
       const im = NAP.img(key);
@@ -769,6 +830,7 @@
       else if (ac.k === "e") this.drawEnemy(ctx, cam, ac.e);
       else this.drawBuddy(ctx, cam);
     }
+    for (const m of this.minions) this.drawMinion(ctx, cam, m);
 
     // projectiles
     for (const pr of this.projectiles) { const sx = pr.x - cam.x, sy = pr.y - cam.y;
@@ -907,10 +969,83 @@
   drawBuddy(ctx, cam) {
     const b = this.buddy, sx = b.x - cam.x, sy = b.y - cam.y + Math.sin(b.bob) * 4;
     D.shadow(sx, sy + 14, 16, 6);
+    if (this.buddyType === "teddy") this.drawTeddy(ctx, sx, sy);
+    else if (this.buddyType === "glorp") this.drawGlorp(ctx, sx, sy);
+    else if (this.buddyType === "orca") this.drawOrca(ctx, sx, sy);
+    else this.drawCloud(ctx, sx, sy);
+  },
+  drawOrca(ctx, sx, sy) {
+    const blk = "#2a2f38", wht = "#f4f8ff", blue = "#8fd3ff";
+    // light-blue spout
+    ctx.fillStyle = blue; ctx.globalAlpha = 0.85;
+    ctx.beginPath(); ctx.arc(sx, sy - 20, 2, 0, 6.28); ctx.arc(sx - 3, sy - 17, 1.6, 0, 6.28); ctx.arc(sx + 3, sy - 17, 1.6, 0, 6.28); ctx.fill(); ctx.globalAlpha = 1;
+    // dorsal fin + flippers + body
+    ctx.fillStyle = blk;
+    ctx.beginPath(); ctx.moveTo(sx - 4, sy - 8); ctx.lineTo(sx, sy - 17); ctx.lineTo(sx + 4, sy - 8); ctx.closePath(); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(sx - 12, sy + 5, 4, 6, 0.5, 0, 6.28); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(sx + 12, sy + 5, 4, 6, -0.5, 0, 6.28); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(sx, sy + 3, 13, 12, 0, 0, 6.28); ctx.fill();
+    // white belly + eye patches
+    ctx.fillStyle = wht; ctx.beginPath(); ctx.ellipse(sx, sy + 7, 8, 6, 0, 0, 6.28); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(sx - 4.5, sy - 2, 3, 2.4, 0.2, 0, 6.28); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(sx + 4.5, sy - 2, 3, 2.4, -0.2, 0, 6.28); ctx.fill();
+    // eyes + smile
+    ctx.fillStyle = blk; ctx.beginPath(); ctx.arc(sx - 4.5, sy - 2, 1.5, 0, 6.28); ctx.arc(sx + 4.5, sy - 2, 1.5, 0, 6.28); ctx.fill();
+    ctx.fillStyle = wht; ctx.beginPath(); ctx.arc(sx - 5, sy - 2.6, 0.6, 0, 6.28); ctx.arc(sx + 4, sy - 2.6, 0.6, 0, 6.28); ctx.fill();
+    ctx.strokeStyle = "#3a2a30"; ctx.lineWidth = 1.2; ctx.beginPath(); ctx.arc(sx, sy + 2, 3, 0.15 * Math.PI, 0.85 * Math.PI); ctx.stroke();
+  },
+  drawCloud(ctx, sx, sy) {
     ctx.fillStyle = "#f2ecff";
     ctx.beginPath(); ctx.arc(sx - 8, sy, 11, 0, 6.28); ctx.arc(sx + 8, sy, 11, 0, 6.28); ctx.arc(sx, sy - 8, 13, 0, 6.28); ctx.arc(sx, sy + 4, 14, 0, 6.28); ctx.fill();
     ctx.fillStyle = "#5b4a7a"; ctx.beginPath(); ctx.arc(sx - 5, sy - 2, 1.8, 0, 6.28); ctx.arc(sx + 5, sy - 2, 1.8, 0, 6.28); ctx.fill();
     ctx.fillStyle = "#ffb0cf"; ctx.globalAlpha = .6; ctx.beginPath(); ctx.arc(sx - 8, sy + 2, 2.4, 0, 6.28); ctx.arc(sx + 8, sy + 2, 2.4, 0, 6.28); ctx.fill(); ctx.globalAlpha = 1;
+  },
+  drawTeddy(ctx, sx, sy) {
+    const brown = "#8a6a44", tan = "#c9a06a", dk = "#3a2814";
+    ctx.strokeStyle = dk; ctx.lineWidth = 1.5;
+    // limbs + body
+    ctx.fillStyle = brown;
+    for (const [dx, dy, r] of [[-11, 5, 5], [11, 5, 5], [-6, 15, 5], [6, 15, 5]]) { ctx.beginPath(); ctx.arc(sx + dx, sy + dy, r, 0, 6.28); ctx.fill(); }
+    ctx.beginPath(); ctx.ellipse(sx, sy + 6, 12, 11, 0, 0, 6.28); ctx.fill();
+    // ears
+    for (const dx of [-8, 8]) { ctx.fillStyle = brown; ctx.beginPath(); ctx.arc(sx + dx, sy - 15, 5, 0, 6.28); ctx.fill(); ctx.fillStyle = tan; ctx.beginPath(); ctx.arc(sx + dx, sy - 15, 2.4, 0, 6.28); ctx.fill(); }
+    // head + muzzle
+    ctx.fillStyle = brown; ctx.beginPath(); ctx.arc(sx, sy - 8, 11, 0, 6.28); ctx.fill();
+    ctx.fillStyle = tan; ctx.beginPath(); ctx.ellipse(sx, sy - 5, 6, 4.5, 0, 0, 6.28); ctx.fill();
+    ctx.fillStyle = dk; ctx.beginPath(); ctx.arc(sx, sy - 7, 1.8, 0, 6.28); ctx.fill();
+    // x-eyes
+    ctx.strokeStyle = dk; ctx.lineWidth = 1.6; ctx.lineCap = "round";
+    for (const ex of [-4.5, 4.5]) { ctx.beginPath(); ctx.moveTo(sx + ex - 2, sy - 11); ctx.lineTo(sx + ex + 2, sy - 7); ctx.moveTo(sx + ex + 2, sy - 11); ctx.lineTo(sx + ex - 2, sy - 7); ctx.stroke(); }
+    // little bow
+    ctx.fillStyle = "#c0446a"; ctx.beginPath(); ctx.moveTo(sx, sy + 1); ctx.lineTo(sx - 6, sy - 2); ctx.lineTo(sx - 6, sy + 4); ctx.closePath(); ctx.moveTo(sx, sy + 1); ctx.lineTo(sx + 6, sy - 2); ctx.lineTo(sx + 6, sy + 4); ctx.closePath(); ctx.fill();
+    ctx.beginPath(); ctx.arc(sx, sy + 1, 1.8, 0, 6.28); ctx.fill();
+  },
+  drawGlorp(ctx, sx, sy) {
+    // pink alien-bear plush: antennae, big blue eyes, purple nose/feet
+    const pink = "#e83cc0", eye = "#2b2a7c", purp = "#5a2a9a";
+    ctx.lineCap = "round";
+    // antennae
+    ctx.strokeStyle = pink; ctx.lineWidth = 2.4;
+    ctx.beginPath(); ctx.moveTo(sx - 4, sy - 15); ctx.lineTo(sx - 6, sy - 23);
+    ctx.moveTo(sx + 4, sy - 15); ctx.lineTo(sx + 6, sy - 23); ctx.stroke();
+    ctx.fillStyle = pink; ctx.beginPath(); ctx.arc(sx - 6, sy - 24, 2.6, 0, 6.28); ctx.arc(sx + 6, sy - 24, 2.6, 0, 6.28); ctx.fill();
+    // ears, arms, body
+    ctx.beginPath(); ctx.arc(sx - 8, sy - 13, 4.5, 0, 6.28); ctx.arc(sx + 8, sy - 13, 4.5, 0, 6.28); ctx.fill();
+    ctx.beginPath(); ctx.arc(sx - 11, sy + 3, 4, 0, 6.28); ctx.arc(sx + 11, sy + 3, 4, 0, 6.28); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(sx, sy + 5, 12, 11, 0, 0, 6.28); ctx.fill();
+    // purple foot pads
+    ctx.fillStyle = purp;
+    ctx.beginPath(); ctx.ellipse(sx - 6, sy + 14, 4.5, 3, 0, 0, 6.28); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(sx + 6, sy + 14, 4.5, 3, 0, 0, 6.28); ctx.fill();
+    // head
+    ctx.fillStyle = pink; ctx.beginPath(); ctx.arc(sx, sy - 6, 11, 0, 6.28); ctx.fill();
+    // big angled blue eyes + highlights
+    ctx.fillStyle = eye;
+    for (const s of [-1, 1]) { ctx.save(); ctx.translate(sx + s * 4.5, sy - 7); ctx.rotate(s * 0.35); ctx.beginPath(); ctx.ellipse(0, 0, 3.2, 4.4, 0, 0, 6.28); ctx.fill(); ctx.restore(); }
+    ctx.fillStyle = "#cfe0ff"; ctx.beginPath(); ctx.arc(sx - 5.5, sy - 9, 1, 0, 6.28); ctx.arc(sx + 3.5, sy - 9, 1, 0, 6.28); ctx.fill();
+    // nose + smile
+    ctx.fillStyle = purp; ctx.beginPath(); ctx.arc(sx, sy - 3, 1.8, 0, 6.28); ctx.fill();
+    ctx.strokeStyle = "#7a2a6a"; ctx.lineWidth = 1.2; ctx.beginPath(); ctx.arc(sx, sy - 2, 3, 0.15 * Math.PI, 0.85 * Math.PI); ctx.stroke();
   },
 
   drawHUD(ctx) {

@@ -51,7 +51,7 @@
         if (x >= b.x && x <= b.x + b.w && y >= b.y && y <= b.y + b.h) { this.do(b.act); return; }
     },
     do(act) {
-      if (act === "skills") { NAP.go(NAP.scenes.skills, { charId: this._charId, back: "select" }, { type: "fade" }); }
+      if (act === "skills") { NAP.go(NAP.scenes.skills, { charId: this._charId, back: "characters" }, { type: "fade" }); }
       else if (act === "title") { if (NAP.chapter) NAP.chapterQuit(); else NAP.go(NAP.scenes.title, {}, { type: "fade" }); }
       else if (act === "retry") {
         if (NAP.chapter) NAP.chapterReplayDream();   // replay the same dream segment

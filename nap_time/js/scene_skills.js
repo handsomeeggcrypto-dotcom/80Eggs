@@ -15,18 +15,12 @@
       this.layout();
     },
     onResize() { this.layout(); },
-    tabs() { return NAP.progress.unlocked.filter(id => NAP.SKILLS[id]); },
 
     layout() {
       const w = NAP.view.w, h = NAP.view.h;
-      // character tabs
-      const tabs = this.tabs(), tw = 150, tgap = 10;
-      const totalTw = tabs.length * tw + (tabs.length - 1) * tgap;
-      let tx = (w - totalTw) / 2;
-      this.tabRects = tabs.map(id => { const r = { id, x: tx, y: h * 0.12, w: tw, h: 34 }; tx += tw + tgap; return r; });
       // three branch columns
       const colW = Math.min(228, (w - 100) / 3 - 16), cgap = 16;
-      const totalW = 3 * colW + 2 * cgap, sx = (w - totalW) / 2, top = h * 0.30;
+      const totalW = 3 * colW + 2 * cgap, sx = (w - totalW) / 2, top = h * 0.26;
       const nh = 74, vgap = 14;
       this.colTop = top; this.nh = nh;
       this.cols = BRANCHES.map((b, i) => ({ branch: b, x: sx + i * (colW + cgap), w: colW }));
@@ -42,11 +36,11 @@
 
     onKey(k) { if (k === "escape") this.goBack(); },
     goBack() {
-      if (this.back === "title") NAP.go(NAP.scenes.title, {}, { type: "fade" });
-      else NAP.go(NAP.scenes.select, {}, { type: "fade" });
+      const dest = this.back === "title" ? NAP.scenes.title
+        : this.back === "characters" ? NAP.scenes.characters : NAP.scenes.select;
+      NAP.go(dest, {}, { type: "fade" });
     },
     onDown(x, y) {
-      for (const t of this.tabRects) if (hit(t, x, y)) { this.char = t.id; this.layout(); return; }
       if (hit(this.backRect, x, y)) { this.goBack(); return; }
       for (const nr of this.nodeRects) if (hit(nr, x, y)) {
         if (NAP.buySkill(this.char, nr.node.id)) { this.flash = 0.4; } return;
@@ -67,17 +61,7 @@
       ctx.fillStyle = rec.points > 0 ? "#ffe08a" : "rgba(255,255,255,0.55)";
       ctx.fillText("Lv " + rec.level + "   ·   " + rec.points + " skill point" + (rec.points === 1 ? "" : "s"), w / 2, h * 0.075 + 24);
 
-      // character tabs
       const mx = NAP.input.mouse.x, my = NAP.input.mouse.y;
-      for (const tab of this.tabRects) {
-        const active = tab.id === this.char, hot = hit(tab, mx, my);
-        ctx.fillStyle = active ? "rgba(123,216,143,0.25)" : hot ? "rgba(255,255,255,0.10)" : "rgba(30,20,50,0.85)";
-        D.rr(tab.x, tab.y, tab.w, tab.h, 10); ctx.fill();
-        ctx.strokeStyle = active ? "#a8e6cf" : "rgba(255,255,255,0.18)"; ctx.lineWidth = 2;
-        D.rr(tab.x, tab.y, tab.w, tab.h, 10); ctx.stroke();
-        ctx.fillStyle = active ? "#fff" : "rgba(255,255,255,0.7)"; ctx.font = "bold 15px 'Trebuchet MS',sans-serif";
-        ctx.fillText(NAP.DATA.characters[tab.id].name, tab.x + tab.w / 2, tab.y + 22);
-      }
 
       // branch headers
       for (const col of this.cols) {
