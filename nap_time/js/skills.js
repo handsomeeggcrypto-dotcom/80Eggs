@@ -50,6 +50,11 @@
         per: { maxHp: 30, dmgResist: 0.05 }, flag: "empower",
         desc: "Chonky and unbothered — big HP and extra armor." },
     ]),
+    nap: passives().concat([
+      { id: "capstone", branch: "spark", tier: 3, name: "Two Fwiends", max: 1, reqLevel: 8, req: "cdr",
+        per: { cdr: 0.05, maxHp: 15 }, flag: "empower",
+        desc: "Yumemono! calls TWO dream-fwiends at once, stronger and longer." },
+    ]),
   };
 
   NAP.skillTree = charId => NAP.SKILLS[charId] || [];

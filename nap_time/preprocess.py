@@ -184,6 +184,7 @@ def main():
     neogaucha = player_set("neo", "110")
     lua = player_set("lua", "lua")
     beek = player_set("beek", "beek")
+    nap = player_set("nap", "nap")   # Napling, the daydreamer who made Yumemono
 
     # ---- Nightmares (enemies) ----------------------------------------------
     shadow_egg = pack_entity("enemy", {
@@ -196,8 +197,17 @@ def main():
     siren = foe_set("siren", "enemy_nightmarelua")            # Nightmare Lua
     nightmarebeek = foe_set("nbeek", "enemy_nightmarebeek")   # demon-bunny Beek
 
-    meta["chars"] = {"egg": egg, "neogaucha": neogaucha, "lua": lua, "beek": beek}
+    # ---- Allies (summoned helpers) -----------------------------------------
+    leech = pack_entity("leech", {   # Lua's Star Pal summon: a little axe guy
+        "idle":   ([trim(load("companion_leech_idle.png"))], 0),
+        "walk":   (slice_strip(load("companion_leech_walk.png"), 4), "median"),
+        "attack": (slice_strip(load("companion_leech_attack.png"), 4), "median"),
+        "summon": ([trim(load("companion_leech_summon.png"))], 0),
+    })
+
+    meta["chars"] = {"egg": egg, "neogaucha": neogaucha, "lua": lua, "beek": beek, "nap": nap}
     meta["foes"] = {"shadow_egg": shadow_egg, "oni": oni, "siren": siren, "nightmarebeek": nightmarebeek}
+    meta["allies"] = {"leech": leech}
     meta["player"] = egg          # legacy aliases (kept for safety)
     meta["enemy"] = shadow_egg
 
@@ -223,6 +233,12 @@ def main():
     process_tile("tile_water_pond_edge.png", "tile_pond_edge.png")
     process_overlay("tile_wall_reeds.png", "tile_pond_reeds.png")
     process_overlay("tile_wall_bush.png", "tile_pond_bush.png")
+    # sunny meadow (all solid tiles + a picnic-blanket floor variant)
+    process_tile("tile_floor_meadow_pink.png", "tile_meadow_floor.png")
+    process_tile("tile_floor_meadow_flowers.png", "tile_meadow_floor2.png")
+    process_tile("tile_floor_picnic_blanket.png", "tile_meadow_picnic.png")
+    process_tile("tile_wall_blossomtree.png", "tile_meadow_wall.png")
+    process_tile("tile_wall_cloudhedge.png", "tile_meadow_wall2.png")
 
     # ---- Potion (single centred icon) --------------------------------------
     potion = trim(load("item_potion_health.png"))
@@ -295,6 +311,13 @@ def main():
     meta["misc"]["bg_pond"] = {"file": "bg_pond.png", "w": pw2, "h": ph2}
     meta["misc"]["vn_beek"] = vn_sprite("beek_idle_down.png", "vn_beek.png")
     meta["misc"]["vn_nightmarebeek"] = vn_sprite("enemy_nightmarebeek_idle.png", "vn_nightmarebeek.png")
+
+    # ---- Sunny Meadow background + Napling VN sprite ---------------------
+    mead = load("background_sunny_meadow.png").convert("RGB")
+    mw = 1280; mh = round(mead.height * mw / mead.width)
+    mead.resize((mw, mh), Image.LANCZOS).save(os.path.join(OUT, "bg_meadow.png"))
+    meta["misc"]["bg_meadow"] = {"file": "bg_meadow.png", "w": mw, "h": mh}
+    meta["misc"]["vn_nap"] = vn_sprite("nap_idle_down.png", "vn_nap.png")
 
     with open(os.path.join(OUT, "meta.json"), "w") as f:
         json.dump(meta, f, indent=2)

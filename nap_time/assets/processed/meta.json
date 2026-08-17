@@ -248,6 +248,68 @@
         "canvasH": 265,
         "baselineY": 259
       }
+    },
+    "nap": {
+      "idle_down": {
+        "files": [
+          "nap_idle_down_0.png"
+        ],
+        "canvasW": 154,
+        "canvasH": 217,
+        "baselineY": 211
+      },
+      "idle_up": {
+        "files": [
+          "nap_idle_up_0.png"
+        ],
+        "canvasW": 127,
+        "canvasH": 215,
+        "baselineY": 209
+      },
+      "walk_down": {
+        "files": [
+          "nap_walk_down_0.png",
+          "nap_walk_down_1.png",
+          "nap_walk_down_2.png",
+          "nap_walk_down_3.png"
+        ],
+        "canvasW": 168,
+        "canvasH": 234,
+        "baselineY": 228
+      },
+      "walk_up": {
+        "files": [
+          "nap_walk_up_0.png",
+          "nap_walk_up_1.png",
+          "nap_walk_up_2.png",
+          "nap_walk_up_3.png"
+        ],
+        "canvasW": 136,
+        "canvasH": 219,
+        "baselineY": 213
+      },
+      "attack_down": {
+        "files": [
+          "nap_attack_down_0.png",
+          "nap_attack_down_1.png",
+          "nap_attack_down_2.png",
+          "nap_attack_down_3.png"
+        ],
+        "canvasW": 178,
+        "canvasH": 250,
+        "baselineY": 244
+      },
+      "attack_up": {
+        "files": [
+          "nap_attack_up_0.png",
+          "nap_attack_up_1.png",
+          "nap_attack_up_2.png",
+          "nap_attack_up_3.png"
+        ],
+        "canvasW": 153,
+        "canvasH": 247,
+        "baselineY": 241
+      }
     }
   },
   "foes": {
@@ -521,6 +583,58 @@
       "file": "vn_nightmarebeek.png",
       "w": 324,
       "h": 620
+    },
+    "bg_meadow": {
+      "file": "bg_meadow.png",
+      "w": 1280,
+      "h": 720
+    },
+    "vn_nap": {
+      "file": "vn_nap.png",
+      "w": 430,
+      "h": 620
+    }
+  },
+  "allies": {
+    "leech": {
+      "idle": {
+        "files": [
+          "leech_idle_0.png"
+        ],
+        "canvasW": 153,
+        "canvasH": 223,
+        "baselineY": 217
+      },
+      "walk": {
+        "files": [
+          "leech_walk_0.png",
+          "leech_walk_1.png",
+          "leech_walk_2.png",
+          "leech_walk_3.png"
+        ],
+        "canvasW": 191,
+        "canvasH": 233,
+        "baselineY": 227
+      },
+      "attack": {
+        "files": [
+          "leech_attack_0.png",
+          "leech_attack_1.png",
+          "leech_attack_2.png",
+          "leech_attack_3.png"
+        ],
+        "canvasW": 177,
+        "canvasH": 232,
+        "baselineY": 226
+      },
+      "summon": {
+        "files": [
+          "leech_summon_0.png"
+        ],
+        "canvasW": 236,
+        "canvasH": 234,
+        "baselineY": 228
+      }
     }
   },
   "player": {

@@ -13,7 +13,7 @@
 
   // --- tuning ---
   const TILE = 72;
-  const PLAYER_H = 104, ENEMY_H = 92, BOSS_H = 158;
+  const PLAYER_H = 104, ENEMY_H = 92, BOSS_H = 158, MINION_H = 72;
   const PLAYER_SPEED = 190, ENEMY_SPEED = 92, BOSS_SPEED = 70;
   const PLAYER_MAX_HP = 100, PLAYER_DMG = 22;
   const ENEMY_MAX_HP = 40, ENEMY_DMG = 9;
@@ -36,9 +36,11 @@
       corruptFloor: "tile_library_corrupt_floor.png", corruptWall: "tile_library_corrupt_wall.png" },
     pond: { floor: "tile_pond_floor.png", floor2: "tile_pond_floor2.png", wall: "tile_pond_reeds.png", wall2: "tile_pond_bush.png",
       water: "tile_pond_water.png", edge: "tile_pond_edge.png", overlayWalls: true },
+    meadow: { floor: "tile_meadow_floor.png", floor2: "tile_meadow_floor2.png", wall: "tile_meadow_wall.png", wall2: "tile_meadow_wall2.png",
+      picnic: "tile_meadow_picnic.png" },
   };
   // grid tile types: 0 floor, 1 floor2, 2 wall, 3 wall2(interior), 4 corrupt-floor(hazard),
-  //                  5 corrupt-wall, 6 water(non-walkable), 7 pond-edge(non-walkable diagonal shore)
+  //                  5 corrupt-wall, 6 water(non-walkable), 7 pond-edge, 8 picnic(walkable variant)
   const CORRUPT_DPS = 7;
 
   const dream = NAP.scenes.dream = {
@@ -141,6 +143,11 @@
       const patch = [[0, 1], [1, 1], [2, 1], [1, 2], [2, 2], [3, 2], [2, 3]];
       for (const [dx, dy] of patch) { const x = ox + dx, y = oy + dy; if (x > 0 && y > 0 && x < C - 1 && y < R - 1) g[y][x] = 4; }
       for (const [dx, dy] of [[0, 0], [1, 0], [3, 1], [3, 3]]) { const x = ox + dx, y = oy + dy; if (x > 0 && y > 0 && x < C - 1 && y < R - 1) g[y][x] = 5; }
+    }
+    // meadow: a cozy picnic-blanket cluster in a corner (walkable floor variant)
+    if (this.tiles && this.tiles.picnic) {
+      const ox = C - 5, oy = R - 5;
+      for (const [dx, dy] of [[0, 0], [1, 0], [0, 1], [1, 1]]) { const x = ox + dx, y = oy + dy; if (x > 0 && y > 0 && x < C - 1 && y < R - 1 && g[y][x] !== 2 && g[y][x] !== 3) g[y][x] = 8; }
     }
     // pond: carve a corner pond (bottom-left) with a diagonal shoreline of edge tiles
     if (this.tiles && this.tiles.water) {
@@ -316,43 +323,72 @@
     if (this.active.id === "sweetdreams") this.castSweetDreams();
     else if (this.active.id === "oniform") this.castOniForm();
     else if (this.active.id === "summon") this.castSummon();
+    else if (this.active.id === "summonchar") this.castSummonChar();
+  },
+  castSummonChar() {
+    const p = this.player, emp = this.empowered;
+    const pool = NAP.DATA.order.filter(id => id !== "nap" && M.chars[id]);
+    const count = emp ? 2 : 1;   // capstone: summon two
+    for (let i = 0; i < count; i++) {
+      const id = pool[(Math.random() * pool.length) | 0];
+      this.minions.push({ kind: "char", charId: id,
+        x: p.x + (Math.random() - 0.5) * 30, y: p.y + 16, t: 0,
+        life: (this.active.dur || 9), atkCd: 0, animT: 0, moving: false, dir: "down", flip: false, atkAnim: 0,
+        dmg: (16 + (this.charProg.level - 1) * 1.5) });
+      this.popup(p.x + (i ? 24 : -24), p.y - 58, NAP.DATA.characters[id].name + "!", "#ff9ecf");
+    }
+    this.spawnPoof(p.x, p.y - 18, "#ffd0ea"); this.spawnPoof(p.x, p.y - 18, "#c8b0ff");
+    this.spawnHearts(p.x, p.y - 24); this.addShake(4);
   },
   castSummon() {
     const p = this.player, emp = this.empowered;
     this.minions.push({ x: p.x + (Math.random() - 0.5) * 20, y: p.y + 16, t: 0,
-      life: (this.active.dur || 8) * (emp ? 1.4 : 1), atkCd: 0, bob: Math.random() * 6.28,
+      life: (this.active.dur || 8) * (emp ? 1.4 : 1), atkCd: 0, animT: 0, moving: false, flip: false, atkAnim: 0,
       dmg: (12 + (this.charProg.level - 1) * 1.2) * (emp ? 1.4 : 1) });
-    this.spawnPoof(p.x, p.y - 18, "#ffe08a"); this.popup(p.x, p.y - 56, "go get 'em!", "#ffe08a"); this.addShake(2);
+    this.spawnPoof(p.x, p.y - 18, "#ffe08a"); this.popup(p.x, p.y - 56, "go, Leech!", "#ffe08a"); this.addShake(2);
   },
   updateMinions(dt) {
     for (const m of this.minions) {
-      m.t += dt; m.bob += dt * 6; if (m.atkCd > 0) m.atkCd -= dt;
+      m.t += dt; m.animT += dt; if (m.atkCd > 0) m.atkCd -= dt; if (m.atkAnim > 0) m.atkAnim -= dt;
       // seek nearest living enemy
       let best = null, bd = 1e9;
       for (const en of this.enemies) { if (en.dead || en.dying) continue; const d = U.dist(m.x, m.y, en.x, en.y); if (d < bd) { bd = d; best = en; } }
+      m.moving = false;
       if (best) {
         const dx = best.x - m.x, dy = best.y - m.y, d = Math.hypot(dx, dy) || 1;
-        if (d > 34) { const s = 200 * dt; m.x += dx / d * s; m.y += dy / d * s; }
-        else if (m.atkCd <= 0) { this.hitEnemy(best, m.dmg); m.atkCd = 0.6; this.spawnBurst(best.x, best.y - best.h * 0.4, "#ffe08a"); }
+        m.flip = best.x < m.x;
+        if (Math.abs(dy) >= Math.abs(dx)) m.dir = dy < 0 ? "up" : "down"; else m.dir = dx < 0 ? "left" : "right";
+        const burst = m.kind === "char" ? "#ff9ecf" : "#ffe08a";
+        if (d > 40) { const s = 210 * dt; m.x += dx / d * s; m.y += dy / d * s; m.moving = true; }
+        else if (m.atkCd <= 0) { this.hitEnemy(best, m.dmg); m.atkCd = 0.6; m.atkAnim = 0.4; this.spawnBurst(best.x, best.y - best.h * 0.4, burst); }
       }
     }
     this.minions = this.minions.filter(m => m.t < m.life);
   },
   drawMinion(ctx, cam, m) {
-    const sx = m.x - cam.x, sy = m.y - cam.y + Math.sin(m.bob) * 3;
-    D.shadow(sx, sy + 12, 12, 5);
-    // placeholder: a little glowing star pal (swap for Lua's art later)
+    const sx = m.x - cam.x, sy = m.y - cam.y;
     const fade = m.life - m.t < 1 ? (m.life - m.t) : 1;
-    ctx.save(); ctx.globalAlpha = U.clamp(fade, 0, 1);
-    ctx.globalCompositeOperation = "lighter";
-    ctx.fillStyle = "rgba(255,224,138,0.5)"; ctx.beginPath(); ctx.arc(sx, sy, 16, 0, 6.28); ctx.fill();
-    ctx.globalCompositeOperation = "source-over";
-    ctx.fillStyle = "#ffd35e"; ctx.strokeStyle = "#fff3c0"; ctx.lineWidth = 2;
-    ctx.beginPath();
-    for (let i = 0; i < 10; i++) { const a = -Math.PI / 2 + i * Math.PI / 5, r = i % 2 ? 5 : 12; ctx.lineTo(sx + Math.cos(a) * r, sy + Math.sin(a) * r); }
-    ctx.closePath(); ctx.fill(); ctx.stroke();
-    ctx.fillStyle = "#5b4a2a"; ctx.beginPath(); ctx.arc(sx - 3, sy, 1.6, 0, 6.28); ctx.arc(sx + 3, sy, 1.6, 0, 6.28); ctx.fill();
-    ctx.restore();
+    if (m.kind === "char") {
+      const C = M.chars[m.charId], scale = (PLAYER_H * 0.86) / M.storeBody;
+      D.shadow(sx, sy, 20, 7);
+      const vk = m.dir === "up" ? "up" : "down", flip = m.dir === "left";
+      let anim, file;
+      if (m.atkAnim > 0) { anim = C["attack_" + vk]; file = anim.files[U.clamp(Math.floor((1 - m.atkAnim / 0.4) * anim.files.length), 0, anim.files.length - 1)]; }
+      else if (m.moving) { anim = C["walk_" + vk]; file = this.frameOf(anim, m.animT, 8); }
+      else { anim = C["idle_" + vk]; file = anim.files[0]; }
+      // sparkly summon ring on arrival
+      if (m.t < 0.35) { ctx.save(); ctx.globalAlpha = (0.35 - m.t) / 0.35; ctx.strokeStyle = "#ffd0ea"; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(sx, sy - PLAYER_H * 0.3, PLAYER_H * 0.5 * (m.t / 0.35 + 0.3), 0, 6.283); ctx.stroke(); ctx.restore(); }
+      NAP.drawSprite(file, anim, sx, sy, scale, flip, U.clamp(fade, 0, 1));
+      return;
+    }
+    const A = M.allies.leech, scale = MINION_H / M.storeBody;
+    D.shadow(sx, sy, 16, 6);
+    let anim, file;
+    if (m.t < 0.3) { anim = A.summon; file = anim.files[0]; }
+    else if (m.atkAnim > 0) { anim = A.attack; file = anim.files[U.clamp(Math.floor((1 - m.atkAnim / 0.4) * anim.files.length), 0, anim.files.length - 1)]; }
+    else if (m.moving) { anim = A.walk; file = this.frameOf(A.walk, m.animT, 8); }
+    else { anim = A.idle; file = anim.files[0]; }
+    NAP.drawSprite(file, anim, sx, sy, scale, m.flip, U.clamp(fade, 0, 1));
   },
   castSweetDreams() {
     const p = this.player, emp = this.empowered;
@@ -755,6 +791,7 @@
         continue;
       }
       const key = tt === 2 ? T.wall : tt === 3 ? T.wall2 : tt === 1 ? T.floor2
+        : tt === 8 ? (T.picnic || T.floor)
         : tt === 4 ? (T.corruptFloor || T.floor) : tt === 5 ? (T.corruptWall || T.wall) : T.floor;
       const im = NAP.img(key);
       if (im) ctx.drawImage(im, sx, sy, TILE, TILE);
@@ -972,6 +1009,9 @@
     if (this.buddyType === "teddy") this.drawTeddy(ctx, sx, sy);
     else if (this.buddyType === "glorp") this.drawGlorp(ctx, sx, sy);
     else if (this.buddyType === "orca") this.drawOrca(ctx, sx, sy);
+    else if (this.buddyType === "leech" && M.allies && M.allies.leech) {
+      const A = M.allies.leech; NAP.drawSprite(A.idle.files[0], A.idle, sx, sy + 14, 50 / M.storeBody, b.flip, 1);
+    }
     else this.drawCloud(ctx, sx, sy);
   },
   drawOrca(ctx, sx, sy) {

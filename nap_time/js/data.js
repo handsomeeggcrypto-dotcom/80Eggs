@@ -257,8 +257,8 @@
     nightmareVN: M.misc.vn_siren,
     tutorial: false,
     buddy: "glorp",
-    // Summons a little helper that seeks & attacks enemies (art placeholder for now).
-    active: { id: "summon", name: "Star Pal", cooldown: 14, dur: 8 },
+    // Summons Leech, a little axe guy who seeks & attacks enemies.
+    active: { id: "summon", name: "Leech", cooldown: 14, dur: 8 },
     lose: { title: "You Woke With a Gasp", text: "The siren's song faded, and the dream spat you out. The library waits." },
     win: { title: "Sweet Dream", text: "The siren's song broke into quiet. The clouds hush; the books settle." },
     // standalone Cloud Library level vs the Nightmare-Lua siren
@@ -365,7 +365,27 @@
     },
   };
 
-  NAP.DATA = { characters: { egg, neogaucha, lua, beek }, order: ["egg", "neogaucha", "lua", "beek"] };
+  const napling = {
+    id: "nap",
+    name: "Napling",
+    title: "Dream-Weaver of Yumemono",
+    accent: "#ffc0d8",
+    vn: M.misc.vn_nap,
+    nightmareVN: M.misc.vn_nap,   // Napling has no nightmare of her own (placeholder)
+    tutorial: false,
+    buddy: "leech",
+    active: { id: "summonchar", name: "Yumemono!", cooldown: 16, dur: 9 },
+    lose: { title: "The Dream Faded", text: "The blossoms drifted down and the meadow dimmed. Napling blinked awake, still sleepy." },
+    win: { title: "Sweet Dream", text: "The last bad dream popped like a soap bubble. The meadow glowed warm and pink again." },
+    // standalone Sunny Meadow level. She has no nightmare, so foes are random bad-dreams.
+    meadow: {
+      playerChar: "nap", enemyFoe: "shadow_egg", theme: "meadow", bg: "bg_meadow",
+      bossName: "BAD DREAM", cols: 20, rows: 15, objective: "defeat",
+      spawnEnemies: 4, boss: false, title: "Sunny Meadow",
+    },
+  };
+
+  NAP.DATA = { characters: { egg, neogaucha, lua, beek, nap: napling }, order: ["egg", "neogaucha", "lua", "beek", "nap"] };
 
   // Merge a dream's base config with persistent (whole-night) + pending (next
   // dream only) choice modifiers.

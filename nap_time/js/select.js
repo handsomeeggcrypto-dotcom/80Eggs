@@ -15,6 +15,10 @@
           go: () => NAP.startChapter("lua") },
         { label: "Beek — Pond Meadow", sub: "pond keeper · vs demon bunny",
           go: () => NAP.playDream("beek", NAP.DATA.characters.beek.pond) },
+        { label: "Napling — Sunny Meadow", sub: "dream-weaver · summons fwiends",
+          go: () => { const foes = ["shadow_egg", "oni", "siren", "nightmarebeek"];
+            const cfg = Object.assign({}, NAP.DATA.characters.nap.meadow, { enemyFoe: foes[(Math.random() * foes.length) | 0] });
+            NAP.playDream("nap", cfg); } },
         { label: "🌙 Deep Sleep", sub: "endless rift · grind & descend",
           go: () => NAP.go(NAP.scenes.deepsleep, {}, { type: "fade" }) },
         { label: "✦ Characters", sub: "view dreamers · spend skill points",

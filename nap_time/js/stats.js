@@ -32,6 +32,7 @@
     neogaucha: { maxHp: 85, damage: 27, moveSpeed: 200 },  // glass-cannon oni
     lua:       { maxHp: 95, moveSpeed: 205, xpFind: 1.15 }, // nimble, dream-lucky star girl
     beek:      { maxHp: 120, damage: 24, moveSpeed: 175, dmgResist: 0.05 }, // sturdy orca-loving pond keeper
+    nap:       { maxHp: 105, damage: 18, moveSpeed: 190, cdr: 0.12 },       // summoner — weaker poke, faster fwiends
   };
 
   // Small automatic growth per level (skill points add the rest on top).
