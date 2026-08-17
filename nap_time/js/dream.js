@@ -78,6 +78,8 @@
     this.healZones = [];
     this.buddyType = (NAP.DATA.characters[this.charId] || {}).buddy || "cloud";
     this.minions = [];         // Lua's summoned attackers
+    this.zaps = [];            // Excited! chain-lightning arcs (visual)
+    this.element = NAP.elementOf ? NAP.elementOf(this.charId) : null;   // basic-attack vibe
     this.enemies = [];
     this.projectiles = [];
     this.particles = [];
@@ -96,6 +98,7 @@
     this.treatCd = 2 + Math.random() * 3;
     this.buddy = null;
     this.boss = null;
+    this.bosses = [];          // supports multi-boss finales (e.g. Napling's Dream 3)
     this.cam = { x: 0, y: 0 };
     this.time = 0;
     // survive waves
@@ -185,9 +188,17 @@
       for (let i = 0; i < start; i++) this.enemies.push(this.makeEnemy(this.freeCell(TILE * 5)));
     } else {
       const n = Math.round((cfg.spawnEnemies || 0) * this.diff);
-      for (let i = 0; i < n; i++) this.enemies.push(this.makeEnemy(this.freeCell(TILE * 5)));
+      const foeList = cfg.foes || [cfg.enemyFoe || "shadow_egg"];   // wisps may be mixed types
+      for (let i = 0; i < n; i++) this.enemies.push(this.makeEnemy(this.freeCell(TILE * 5), foeList[i % foeList.length]));
     }
-    if (cfg.boss) { this.boss = this.makeBoss(this.freeCell(TILE * 6)); this.enemies.push(this.boss); }
+    // boss(es): cfg.bosses = [foeKey,...] for a multi-boss finale, else cfg.boss = single
+    const bossKeys = cfg.bosses || (cfg.boss ? [cfg.enemyFoe || "shadow_egg"] : []);
+    for (let bi = 0; bi < bossKeys.length; bi++) {
+      const b = this.makeBoss(this.freeCell(TILE * 6), bossKeys[bi]);
+      b.bossName = (cfg.bossNames && cfg.bossNames[bi]) || this.bossName;
+      this.enemies.push(b); this.bosses.push(b);
+    }
+    this.boss = this.bosses[0] || null;
     if (cfg.objective === "collect") {
       const target = 5;
       for (let i = 0; i < target; i++) this.fragments.push(Object.assign(this.freeCell(TILE * 2), { bob: Math.random() * 6.28 }));
@@ -247,16 +258,18 @@
   },
 
   // ---------- entity factories ----------
-  makeEnemy(pos) {
+  makeEnemy(pos, foeKey) {
     return { x: pos.x, y: pos.y, radius: 16, hp: Math.round(ENEMY_MAX_HP * this.diff), maxhp: Math.round(ENEMY_MAX_HP * this.diff),
       state: "idle", animT: 0, faceLeft: false, attacking: false, atkT: 0, atkCd: 0, atkDealt: false,
-      hurtT: 0, dying: false, deathT: 0, dead: false, isBoss: false, h: ENEMY_H };
+      hurtT: 0, dying: false, deathT: 0, dead: false, isBoss: false, h: ENEMY_H,
+      foe: foeKey || this.cfg.enemyFoe || "shadow_egg" };
   },
-  makeBoss(pos) {
+  makeBoss(pos, foeKey) {
     return { x: pos.x, y: pos.y, radius: 24, hp: Math.round(BOSS_MAX_HP * this.diff), maxhp: Math.round(BOSS_MAX_HP * this.diff),
       state: "idle", animT: 0, faceLeft: false, attacking: false, atkT: 0, atkCd: 1, atkDealt: false,
       hurtT: 0, dying: false, deathT: 0, dead: false, isBoss: true, h: BOSS_H, blastCd: BOSS_BLAST_CD,
-      phase: 1, novaCd: 2.0, novaCharge: 0 };
+      phase: 1, novaCd: 2.0, novaCharge: 0,
+      foe: foeKey || this.cfg.enemyFoe || "shadow_egg" };
   },
 
   // ---------- collision ----------
@@ -302,7 +315,7 @@
   },
   spawnGuardian() {
     this.riftGuardianSpawned = true;
-    this.boss = this.makeBoss(this.freeCell(TILE * 6)); this.enemies.push(this.boss);
+    this.boss = this.makeBoss(this.freeCell(TILE * 6)); this.enemies.push(this.boss); this.bosses = [this.boss];
     this.bannerT = 2.2; this.addShake(9); this.bossFlash = 0.5;
   },
   riftFinish() {
@@ -324,6 +337,7 @@
     else if (this.active.id === "oniform") this.castOniForm();
     else if (this.active.id === "summon") this.castSummon();
     else if (this.active.id === "summonchar") this.castSummonChar();
+    else if (this.active.id === "puddlesplash") this.castPuddleSplash();
   },
   castSummonChar() {
     const p = this.player, emp = this.empowered;
@@ -406,6 +420,37 @@
     this.spawnPoof(p.x, p.y - 24, "#c98be0"); this.spawnPoof(p.x, p.y - 24, "#7a3bb0");
     this.popup(p.x, p.y - 60, "RAWR", "#e0a0ff");
   },
+  castPuddleSplash() {
+    const p = this.player, emp = this.empowered;
+    p.hopDur = 0.5; p.hopT = 0; p.hopH = emp ? 64 : 50;   // jump arc height
+    this.pendingSplash = { emp, fired: false };
+    this.spawnPoof(p.x, p.y - 8, "#bfe9ff");
+    this.popup(p.x, p.y - 60, "up we go~", "#bfe9ff"); this.addShake(2);
+  },
+  doSplash(emp) {
+    const p = this.player;
+    const R = emp ? TILE * 3.4 : TILE * 2.5;
+    const dmg = this.pBaseDmg * (emp ? 3.0 : 2.2);
+    // expanding water rings
+    this.particles.push({ ring: true, x: p.x, y: p.y, t: 0, life: emp ? 0.6 : 0.5, r0: 12, r1: R, c: "#8fd3ff" });
+    this.particles.push({ ring: true, x: p.x, y: p.y, t: 0, life: emp ? 0.5 : 0.42, r0: 8, r1: R * 0.7, c: "#eaf9ff" });
+    // splash droplets flung outward
+    for (let i = 0; i < 24; i++) { const a = Math.random() * 6.28, s = 90 + Math.random() * 130;
+      this.particles.push({ x: p.x, y: p.y - 6, vx: Math.cos(a) * s, vy: Math.sin(a) * s - 50, t: 0, life: .5 + Math.random() * .3, c: i % 3 ? "#bfe9ff" : "#eaf9ff", r: 3 + Math.random() * 4 }); }
+    // damage + soak everyone in the ring
+    for (const en of this.enemies) {
+      if (en.dead || en.dying) continue;
+      const dx = en.x - p.x, dy = en.y - p.y, d = Math.hypot(dx, dy);
+      if (d >= R) continue;
+      this.hitEnemy(en, dmg * (en.isBoss ? 0.6 : 1));
+      en.lull = Math.max(en.lull || 0, en.isBoss ? 0.3 : (emp ? 0.9 : 0.6));   // splash-back stagger
+      en.wet = emp ? 2.6 : 1.8;                                                 // wet = slowed
+      const dd = d || 1, push = emp ? 26 : 20;
+      this.move(en, (dx / dd) * push, (dy / dd) * push);                        // shove outward (walls block)
+    }
+    this.addShake(emp ? 11 : 8); this.freeze(0.06);
+    this.popup(p.x, p.y - 40, "SPLOOSH!", "#8fd3ff", true);
+  },
   faceVec(dir) {
     return dir === "up" ? { x: 0, y: -1 } : dir === "down" ? { x: 0, y: 1 } :
       dir === "left" ? { x: -1, y: 0 } : { x: 1, y: 0 };
@@ -461,12 +506,23 @@
     this.updatePickups(dt);
     this.updateBuddy(dt);
     this.updateMinions(dt);
+    this.updateZaps(dt);
     this.updateParticles(dt);
     this.checkObjective(dt);
   },
 
   updatePlayer(dt) {
     const p = this.player, keys = NAP.input.keys;
+    // Beek's Sploosh: airborne hop — no movement/attack while in the air, splash on the way down
+    if (p.hopDur > 0) {
+      p.hopT += dt; p.animT += dt * 0.6; p.moving = false;
+      if (this.pendingSplash && !this.pendingSplash.fired && p.hopT >= p.hopDur * 0.82) {
+        this.pendingSplash.fired = true; this.doSplash(this.pendingSplash.emp);
+      }
+      if (p.hopT >= p.hopDur) { p.hopDur = 0; p.hopT = 0; this.pendingSplash = null; }
+      if (p.hurtT > 0) p.hurtT -= dt;
+      return;
+    }
     let mx = 0, my = 0;
     if (keys["a"] || keys["arrowleft"]) mx -= 1;
     if (keys["d"] || keys["arrowright"]) mx += 1;
@@ -493,7 +549,7 @@
           const dx = en.x - p.x, dy = (en.y - 20) - (p.y - 20), dist = Math.hypot(dx, dy);
           if (dist <= PLAYER_REACH + (en.isBoss ? 14 : 0)) {
             const pdmg = this.pBaseDmg * (p.buff.kind === "dmg" && p.buff.t > 0 ? 1.6 : 1) * (p.form > 0 ? 1.6 : 1);
-            if (dist < TILE * 0.5 || dx * v.x + dy * v.y > 0) this.hitEnemy(en, pdmg);
+            if (dist < TILE * 0.5 || dx * v.x + dy * v.y > 0) { this.hitEnemy(en, pdmg); this.applyElement(en, pdmg); }
           }
         }
       }
@@ -513,16 +569,27 @@
     const p = this.player;
     for (const en of this.enemies) {
       if (en.dead) continue;
-      if (en.dying) { en.deathT += dt; if (en.deathT >= this.deathDur()) en.dead = true; continue; }
+      if (en.dying) { en.deathT += dt; if (en.deathT >= this.deathDur(en)) en.dead = true; continue; }
       if (en.hurtT > 0) en.hurtT -= dt;
       if (en.hitPop > 0) en.hitPop = Math.max(0, en.hitPop - dt * 6);
+      if (en.wet > 0) en.wet -= dt;
+      if (en.burn && en.burn.t > 0) {                                  // Cozy flames: damage over time
+        en.burn.t -= dt; en.hp -= en.burn.dps * dt;
+        if (Math.random() < 0.25) this.particles.push({ x: en.x + (Math.random() - .5) * 20, y: en.y - en.h * 0.5, vx: (Math.random() - .5) * 18, vy: -46, t: 0, life: .45, c: Math.random() < .5 ? "#ff9a4d" : "#ffe0a8", r: 2 + Math.random() * 3 });
+        if (en.hp <= 0 && !en.dying) {
+          en.dying = true; en.deathT = 0;
+          this.spawnPoof(en.x, en.y - en.h * 0.4, en.isBoss ? "#c98be0" : "#ffb0d6");
+          if (this.isRift && !en.isBoss) this.riftProgress = Math.min(1, this.riftProgress + 1 / this.riftKillsNeeded);
+          this.gainXP(en.isBoss ? 12 : 1);
+        }
+      }
       if (en.lull > 0) { en.lull -= dt; en.state = "idle"; en.animT += dt * 0.4; en.attacking = false; continue; }
       en.faceLeft = p.x < en.x;
       const dx = p.x - en.x, dy = p.y - en.y, dist = Math.hypot(dx, dy);
       if (en.atkCd > 0) en.atkCd -= dt;
       const p2 = en.isBoss && en.phase === 2;
       const reach = en.isBoss ? ENEMY_REACH + 24 : ENEMY_REACH;
-      const speed = (en.isBoss ? BOSS_SPEED : ENEMY_SPEED) * (p2 ? BOSS_P2_SPEED : 1);
+      const speed = (en.isBoss ? BOSS_SPEED : ENEMY_SPEED) * (p2 ? BOSS_P2_SPEED : 1) * (en.wet > 0 ? 0.5 : 1);
       const atkTime = (en.isBoss ? BOSS_ATK_TIME : ENEMY_ATK_TIME) * (p2 ? BOSS_P2_ATK : 1);
       const atkCd = (en.isBoss ? BOSS_ATK_CD : ENEMY_ATK_CD) * (p2 ? BOSS_P2_ATK : 1);
       const dmg = en.isBoss ? BOSS_DMG : ENEMY_DMG;
@@ -564,7 +631,8 @@
       else { en.state = "idle"; en.animT += dt * 0.5; }
     }
     this.enemies = this.enemies.filter(e => !e.dead);
-    if (this.boss && this.boss.dead) this.boss = null;
+    this.bosses = this.bosses.filter(b => !b.dead);
+    this.boss = this.bosses[0] || null;
   },
 
   fireBlast(en, target) {
@@ -653,7 +721,8 @@
     if (this.outcome) return;
     const o = this.cfg.objective;
     if (o === "defeat") {
-      const bossGone = this.cfg.boss ? !this.boss : true;
+      const hadBoss = this.cfg.boss || (this.cfg.bosses && this.cfg.bosses.length);
+      const bossGone = hadBoss ? this.bosses.length === 0 : true;
       const wispsGone = this.enemies.filter(e => !e.isBoss && !e.dying).length === 0;
       if (bossGone && wispsGone) this.win();
     } else if (o === "survive") {
@@ -688,7 +757,7 @@
   },
 
   // ---------- combat fx ----------
-  deathDur() { return this.eMeta.death.files.length * 0.16; },
+  deathDur(en) { const m = (en && M.foes[en.foe]) || this.eMeta; return m.death.files.length * 0.16; },
   hitEnemy(en, dmg) {
     dmg = Math.round(dmg);
     en.hp -= dmg; en.hurtT = 0.18; en.hitPop = 1;
@@ -726,6 +795,30 @@
   spawnHearts(x, y) { for (let i = 0; i < 10; i++) { const a = -1.57 + (Math.random() - .5) * 1.2, s = 50 + Math.random() * 70;
     this.particles.push({ x, y, vx: Math.cos(a) * s, vy: Math.sin(a) * s - 70, t: 0, life: .8 + Math.random() * .4, c: "#8dffb0", r: 4 + Math.random() * 3, heart: true }); } },
 
+  // cute elemental on-hit effect for the basic attack
+  applyElement(en, baseDmg) {
+    const el = this.element; if (!el || en.dead || en.dying) return;
+    const p = this.player;
+    if (el.effect === "burn") {
+      en.burn = { t: 2.4, dps: baseDmg * 0.28 };                       // marshmallow flames
+    } else if (el.effect === "slow") {
+      en.wet = Math.max(en.wet || 0, 1.8);                             // soaked = slow
+    } else if (el.effect === "nudge") {
+      const dx = en.x - p.x, dy = en.y - p.y, d = Math.hypot(dx, dy) || 1;
+      if (!en.isBoss) this.move(en, (dx / d) * 16, (dy / d) * 16);     // breezy push
+    } else if (el.effect === "chain") {
+      let best = null, bd = 1e9;                                        // zap to one more nearby
+      for (const o of this.enemies) { if (o === en || o.dead || o.dying) continue;
+        const dd = U.dist(o.x, o.y, en.x, en.y); if (dd < bd && dd < TILE * 3) { bd = dd; best = o; } }
+      if (best) {
+        this.hitEnemy(best, baseDmg * 0.5);
+        this.zaps.push({ x1: en.x, y1: en.y - en.h * 0.4, x2: best.x, y2: best.y - best.h * 0.4, t: 0, life: 0.18, c: el.spark });
+      }
+    }
+    this.spawnBurst(en.x, en.y - en.h * 0.45, el.color);               // vibe-colored sparkle
+  },
+  updateZaps(dt) { for (const z of this.zaps) z.t += dt; this.zaps = this.zaps.filter(z => z.t < z.life); },
+
   // ---------- anim pickers ----------
   frameOf(a, t, fps) { return a.files[Math.floor(t * fps) % a.files.length]; },
   playerAnim() {
@@ -745,8 +838,8 @@
     const a = m["idle_" + vk]; return { file: a.files[0], meta: a, flip };
   },
   enemyAnim(en) {
-    const m = this.eMeta;
-    if (en.dying) { const a = m.death; const idx = U.clamp(Math.floor((en.deathT / this.deathDur()) * a.files.length), 0, a.files.length - 1);
+    const m = M.foes[en.foe] || this.eMeta;
+    if (en.dying) { const a = m.death; const idx = U.clamp(Math.floor((en.deathT / this.deathDur(en)) * a.files.length), 0, a.files.length - 1);
       return { file: a.files[idx], meta: a, flip: en.faceLeft }; }
     if (en.attacking) { const a = m.attack; const idx = U.clamp(Math.floor((en.atkT / (en.isBoss ? BOSS_ATK_TIME : ENEMY_ATK_TIME)) * a.files.length), 0, a.files.length - 1);
       return { file: a.files[idx], meta: a, flip: en.faceLeft }; }
@@ -869,6 +962,20 @@
     }
     for (const m of this.minions) this.drawMinion(ctx, cam, m);
 
+    // Excited! chain-lightning arcs
+    for (const z of this.zaps) {
+      const a = U.clamp(1 - z.t / z.life, 0, 1);
+      const x1 = z.x1 - cam.x, y1 = z.y1 - cam.y, x2 = z.x2 - cam.x, y2 = z.y2 - cam.y;
+      ctx.save(); ctx.lineCap = "round";
+      ctx.globalAlpha = a * 0.4; ctx.strokeStyle = "#ff5bd0"; ctx.lineWidth = 6;
+      ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+      ctx.globalAlpha = a; ctx.strokeStyle = z.c || "#ffd0f4"; ctx.lineWidth = 2.5;
+      ctx.beginPath(); ctx.moveTo(x1, y1);
+      for (let i = 1; i < 4; i++) { const f = i / 4; ctx.lineTo(x1 + (x2 - x1) * f + (Math.random() - .5) * 12, y1 + (y2 - y1) * f + (Math.random() - .5) * 12); }
+      ctx.lineTo(x2, y2); ctx.stroke(); ctx.restore();
+    }
+    ctx.globalAlpha = 1;
+
     // projectiles
     for (const pr of this.projectiles) { const sx = pr.x - cam.x, sy = pr.y - cam.y;
       ctx.fillStyle = "rgba(176,107,216,0.35)"; ctx.beginPath(); ctx.arc(sx, sy, pr.r + 5, 0, 6.28); ctx.fill();
@@ -943,8 +1050,12 @@
   },
 
   drawPlayer(ctx, cam) {
-    const p = this.player, scale = PLAYER_H / M.storeBody, sx = p.x - cam.x, sy = p.y - cam.y;
-    D.shadow(sx, sy, 24, 9);
+    const p = this.player, scale = PLAYER_H / M.storeBody, sx = p.x - cam.x;
+    // Beek's Sploosh hop: parabolic lift, shadow shrinks as she rises
+    let hop = 0;
+    if (p.hopDur > 0) hop = Math.sin(Math.PI * U.clamp(p.hopT / p.hopDur, 0, 1)) * (p.hopH || 50);
+    const sy = p.y - cam.y - hop;
+    D.shadow(sx, p.y - cam.y, 24 * (1 - Math.min(0.55, hop / 120)), 9 * (1 - Math.min(0.55, hop / 120)));
     // Oni Mode aura
     if (p.form > 0) {
       ctx.save(); ctx.globalAlpha = 0.28 + 0.12 * Math.sin(this.time * 8);
@@ -957,10 +1068,12 @@
       const ang = p.dir === "down" ? Math.PI / 2 : p.dir === "up" ? -Math.PI / 2 : p.dir === "left" ? Math.PI : 0;
       const cx = sx + Math.cos(ang) * 18, cy = sy - 22 + Math.sin(ang) * 18, r = PLAYER_REACH * 0.6, spread = 0.95;
       const lead = ang - spread + 2 * spread * f;
+      const arcC = (this.element && this.element.color) || "#ffffff";
+      const arcS = (this.element && this.element.spark) || "#ffe3f6";
       ctx.save(); ctx.lineCap = "round";
-      ctx.globalAlpha = 0.35 * fade; ctx.strokeStyle = "#ffffff"; ctx.lineWidth = 7;
+      ctx.globalAlpha = 0.35 * fade; ctx.strokeStyle = arcC; ctx.lineWidth = 7;
       ctx.beginPath(); ctx.arc(cx, cy, r, ang - spread, ang + spread); ctx.stroke();
-      ctx.globalAlpha = 0.85 * fade; ctx.strokeStyle = "#ffe3f6"; ctx.lineWidth = 4;
+      ctx.globalAlpha = 0.9 * fade; ctx.strokeStyle = arcS; ctx.lineWidth = 4;
       ctx.beginPath(); ctx.arc(cx, cy, r, lead - 0.14, lead + 0.14); ctx.stroke();
       ctx.restore(); ctx.globalAlpha = 1;
     }
@@ -976,7 +1089,7 @@
     if (!en.dying) D.shadow(sx, sy, en.isBoss ? 34 : 22, en.isBoss ? 12 : 8);
     const a = this.enemyAnim(en);
     let alpha = 1;
-    if (en.dying) alpha = U.clamp(1 - (en.deathT / this.deathDur()) * 0.9, 0.1, 1);
+    if (en.dying) alpha = U.clamp(1 - (en.deathT / this.deathDur(en)) * 0.9, 0.1, 1);
     if (en.hurtT > 0 && Math.floor(en.hurtT * 30) % 2 === 0) alpha *= 0.5;
     if (en.isBoss && !en.dying) {  // menacing aura (brighter/redder in phase 2)
       const p2 = en.phase === 2;
@@ -999,7 +1112,7 @@
     const pop = en.hitPop ? 1 + 0.16 * en.hitPop : 1;
     NAP.drawSprite(a.file, a.meta, sx, sy, scale * pop, a.flip, alpha);
     if (!en.dying && !en.isBoss) {
-      const headY = sy - this.eMeta.idle.canvasH * scale + 2;
+      const headY = sy - (M.foes[en.foe] || this.eMeta).idle.canvasH * scale + 2;
       D.bar(sx - 24, headY, 48, 6, en.hp / en.maxhp, "#ff6b8a");
     }
   },
@@ -1145,13 +1258,16 @@
     ctx.fillStyle = "rgba(25,15,45,0.6)"; D.rr(V.w - 14 - pw, 14, pw, 34, 12); ctx.fill();
     ctx.fillStyle = "#d9c8ff"; ctx.fillText(label, V.w - 28, 36);
 
-    // boss health bar (bottom center)
-    if (this.boss && !this.boss.dying) {
-      const bw = Math.min(420, V.w - 80), bx = (V.w - bw) / 2, by = V.h - 30;
-      const p2 = this.boss.phase === 2;
+    // boss health bar(s) (bottom center, stacked upward for multi-boss finales)
+    const liveBosses = (this.bosses || []).filter(b => !b.dying);
+    let bby = V.h - 30;
+    for (let i = 0; i < liveBosses.length; i++) {
+      const b = liveBosses[i], bw = Math.min(420, V.w - 80), bx = (V.w - bw) / 2;
+      const p2 = b.phase === 2;
       ctx.textAlign = "center"; ctx.fillStyle = p2 ? "#ff8be0" : "#e0b0ff"; ctx.font = "bold 13px 'Trebuchet MS',sans-serif";
-      ctx.fillText(this.bossName + (p2 ? "   ✦ ENRAGED ✦" : ""), V.w / 2, by - 8);
-      D.bar(bx, by, bw, 12, this.boss.hp / this.boss.maxhp, p2 ? "#ff3bb0" : "#a24bd8");
+      ctx.fillText((b.bossName || this.bossName) + (p2 ? "   ✦ ENRAGED ✦" : ""), V.w / 2, bby - 8);
+      D.bar(bx, bby, bw, 12, b.hp / b.maxhp, p2 ? "#ff3bb0" : "#a24bd8");
+      bby -= 36;
     }
 
     // rift descent meter (bottom center, before the guardian appears)

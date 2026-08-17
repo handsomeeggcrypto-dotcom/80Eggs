@@ -33,6 +33,7 @@
     nightmareVN: M.misc.vn_shadow,
     tutorial: true,
     buddy: "cloud",
+    element: "excited",   // pink lightning
     active: { id: "sweetdreams", name: "Sweet Dweams", cooldown: 12 },
 
     // shown on the LOSE card only (chapter wins flow straight into the next scene)
@@ -157,6 +158,7 @@
     nightmareVN: M.misc.vn_oni,
     tutorial: false,
     buddy: "teddy",
+    element: "cozy",      // marshmallow fire
     active: { id: "oniform", name: "Oni Mode", cooldown: 14, dur: 6 },
     lose: { title: "You Woke With a Gasp", text: "The rooftop dream shoved you out. The Oni's still up there, waiting." },
     win: { title: "Nightmare Silenced", text: "The Oni dissolved into static and smoke. The rooftop is quiet — just the city and the stars." },
@@ -257,6 +259,7 @@
     nightmareVN: M.misc.vn_siren,
     tutorial: false,
     buddy: "glorp",
+    element: "giggly",    // breezy sparkle
     // Summons Leech, a little axe guy who seeks & attacks enemies.
     active: { id: "summon", name: "Leech", cooldown: 14, dur: 8 },
     lose: { title: "You Woke With a Gasp", text: "The siren's song faded, and the dream spat you out. The library waits." },
@@ -354,7 +357,8 @@
     nightmareVN: M.misc.vn_nightmarebeek,
     tutorial: false,
     buddy: "orca",
-    active: null,                // signature move TBD
+    element: "sleepy",     // water (matches Sploosh!)
+    active: { id: "puddlesplash", name: "Sploosh!", cooldown: 11 },  // jump + 360° water splash
     lose: { title: "You Woke With a Gasp", text: "The pond rippled and the dream slipped under. The meadow waits, still and green." },
     win: { title: "Sweet Dream", text: "The demon bunny hopped off into the reeds, harmless again. The pond goes quiet." },
     // standalone Pond Meadow level vs the demon-bunny nightmare
@@ -374,6 +378,7 @@
     nightmareVN: M.misc.vn_nap,   // Napling has no nightmare of her own (placeholder)
     tutorial: false,
     buddy: "leech",
+    element: "excited",   // creator spark
     active: { id: "summonchar", name: "Yumemono!", cooldown: 16, dur: 9 },
     lose: { title: "The Dream Faded", text: "The blossoms drifted down and the meadow dimmed. Napling blinked awake, still sleepy." },
     win: { title: "Sweet Dream", text: "The last bad dream popped like a soap bubble. The meadow glowed warm and pink again." },
@@ -383,9 +388,101 @@
       bossName: "BAD DREAM", cols: 20, rows: 15, objective: "defeat",
       spawnEnemies: 4, boss: false, title: "Sunny Meadow",
     },
+
+    // Napling's night: she visits the other dreamers' nightmares.
+    // Dream boss types are resolved from the opening choice (see NAP.resolveNapArena):
+    //   napSlot "chosen" -> the boss the player picked, "other" -> the one they didn't,
+    //   napSlot "finale" -> Egg's shadow AND Beek's dream-bunny together.
+    chapter: {
+      segments: [
+
+        // ---- SEG 0: intro + the choice (persists all night) ----
+        { type: "story", beats: [
+          { bg: "dream_void", side: null, speaker: "",
+            text: "Yumemono sleeps. Its maker, Napling, drifts between her friends' dreams — and tonight, something has slipped loose in more than one of them." },
+          { bg: "dream_void", side: "egg", speaker: "Napling", mood: "happy",
+            text: "Wah~ so many sleepy heads! And so many bad dreams sneaking in where they don't belong. Nuh-uh. Not on my watch." },
+          { bg: "dream_void", side: "egg", speaker: "Napling", mood: "neutral",
+            text: "Two of them are crying out the loudest. I can only tuck into one dream first... which way do I go?",
+            choice: { prompt: "Which cry does Napling follow first?", persist: true, options: [
+              { label: "The one that sings", reply: "A song — sweet and sad — curling through the shelves of somebody's dream. I'm coming!",
+                mods: { napPick: "siren" } },
+              { label: "The one that smoulders", reply: "Something stubborn and hot, pacing back and forth up on the rooftops. Okay — you first.",
+                mods: { napPick: "oni" } },
+            ] } },
+          { bg: "dream_void", side: "egg", speaker: "Napling", mood: "sleepy",
+            text: "Here we go. Into the dream~" },
+        ] },
+
+        // ---- SEG 1: Dream 1 — the chosen nightmare ----
+        { type: "dream", title: "Dream One", dream: {
+          napSlot: "chosen", objective: "defeat", boss: true, cols: 20, rows: 15, spawnEnemies: 2,
+        } },
+
+        // ---- SEG 2: between dreams ----
+        { type: "story", beats: [
+          { bg: "dream_void", side: null, speaker: "",
+            text: "One nightmare stilled. Napling catches her breath in the hush between dreams." },
+          { bg: "dream_void", side: "egg", speaker: "Napling", mood: "happy",
+            text: "Phew! That one just wanted somebody to sit with it, I think. But the other's still out there..." },
+          { bg: "dream_void", side: "egg", speaker: "Napling", mood: "neutral",
+            text: "I hear it now. Louder than before. Take me there." },
+        ] },
+
+        // ---- SEG 3: Dream 2 — the one she DIDN'T choose ----
+        { type: "dream", title: "Dream Two", dream: {
+          napSlot: "other", objective: "defeat", boss: true, cols: 20, rows: 15, spawnEnemies: 2,
+        } },
+
+        // ---- SEG 4: before the finale ----
+        { type: "story", beats: [
+          { bg: "dream_void", side: null, speaker: "",
+            text: "Two dreams mended. But the deepest part of the night is still pulling at her — and it isn't alone down there." },
+          { bg: "dream_void", side: "egg", speaker: "Napling", mood: "surprised",
+            text: "Wah?! Two more?? The little grey shadow... and the dream-bunny. They found each other." },
+          { bg: "dream_void", side: "egg", speaker: "Napling", mood: "neutral",
+            text: "Okay. Okay! I made this whole world — I can hold two bad dreams at once. ...probably. Fwiends, lend me your strength!" },
+        ] },
+
+        // ---- SEG 5: Dream 3 — BOTH bosses at once (Egg's + Beek's) ----
+        { type: "dream", title: "The Deepest Dream", dream: {
+          napSlot: "finale", objective: "defeat", cols: 22, rows: 16, spawnEnemies: 2,
+        } },
+
+        // ---- SEG 6: victory ----
+        { type: "story", end: true, beats: [
+          { bg: "dream_void", side: null, speaker: "",
+            text: "Both nightmares unravel into soft light. The meadow exhales." },
+          { bg: "meadow", side: "egg", speaker: "Napling", mood: "happy",
+            text: "There. All tucked in. Sweet dreams, everyone~" },
+          { bg: "meadow", side: null, speaker: "",
+            text: "Napling curls up in the middle of her meadow and — for the first time all night — lets herself nap, too." },
+        ] },
+      ],
+    },
   };
 
   NAP.DATA = { characters: { egg, neogaucha, lua, beek, nap: napling }, order: ["egg", "neogaucha", "lua", "beek", "nap"] };
+
+  // Napling's dreams borrow the OTHER dreamers' nightmares. Each boss key maps to
+  // its home arena (foe sprites + theme + backdrop + a coy boss name).
+  const NAP_ARENA = {
+    siren:         { enemyFoe: "siren",         theme: "library", bg: "bg_library", bossName: "THE SIREN'S SONG" },
+    oni:           { enemyFoe: "oni",           theme: "rooftop", bg: "bg_rooftop", bossName: "THE RESTLESS ONI" },
+    shadow_egg:    { enemyFoe: "shadow_egg",    theme: "cloud",   bg: null,          bossName: "THE GREY SHADOW" },
+    nightmarebeek: { enemyFoe: "nightmarebeek", theme: "pond",    bg: "bg_pond",     bossName: "THE DREAM-BUNNY" },
+  };
+  // resolve a Napling dream slot -> a concrete arena, given the night's choice (napPick)
+  NAP.resolveNapArena = function (slot, pick) {
+    const PAIR = ["siren", "oni"];   // the two options in Napling's opening choice
+    if (slot === "chosen") return NAP_ARENA[pick] || NAP_ARENA.siren;
+    if (slot === "other") return NAP_ARENA[PAIR.find(k => k !== pick) || "oni"];
+    if (slot === "finale") return {   // Egg's shadow AND Beek's dream-bunny, in her own meadow
+      foes: ["shadow_egg", "nightmarebeek"], bosses: ["shadow_egg", "nightmarebeek"],
+      bossNames: ["THE GREY SHADOW", "THE DREAM-BUNNY"], theme: "meadow", bg: "bg_meadow",
+    };
+    return {};
+  };
 
   // Merge a dream's base config with persistent (whole-night) + pending (next
   // dream only) choice modifiers.

@@ -32,6 +32,11 @@
         }
       }
       this.backRect = { x: w / 2 - 90, y: h - 56, w: 180, h: 40 };
+      // attack-vibe (element) picker row, tucked between the subtitle and the columns
+      const order = NAP.ELEMENT_ORDER || [];
+      const ew = Math.min(150, (w - 80) / order.length - 10), eg = 10;
+      const etot = order.length * ew + (order.length - 1) * eg, esx = (w - etot) / 2;
+      this.elemRects = order.map((k, i) => ({ key: k, x: esx + i * (ew + eg), y: this.colTop - 60, w: ew, h: 40 }));
     },
 
     onKey(k) { if (k === "escape") this.goBack(); },
@@ -42,6 +47,9 @@
     },
     onDown(x, y) {
       if (hit(this.backRect, x, y)) { this.goBack(); return; }
+      for (const er of this.elemRects || []) if (hit(er, x, y)) {
+        NAP.setElement(this.char, er.key); this.flash = 0.4; return;
+      }
       for (const nr of this.nodeRects) if (hit(nr, x, y)) {
         if (NAP.buySkill(this.char, nr.node.id)) { this.flash = 0.4; } return;
       }
@@ -62,6 +70,20 @@
       ctx.fillText("Lv " + rec.level + "   ·   " + rec.points + " skill point" + (rec.points === 1 ? "" : "s"), w / 2, h * 0.075 + 24);
 
       const mx = NAP.input.mouse.x, my = NAP.input.mouse.y;
+
+      // attack-vibe (element) picker
+      const curEl = NAP.charElement(this.char);
+      ctx.textAlign = "center"; ctx.fillStyle = "rgba(255,255,255,0.5)"; ctx.font = "bold 11px 'Trebuchet MS',sans-serif";
+      ctx.fillText("ATTACK VIBE", w / 2, (this.elemRects[0] ? this.elemRects[0].y : 0) - 6);
+      for (const er of this.elemRects || []) {
+        const el = NAP.ELEMENTS[er.key], active = curEl === er.key, ehot = hit(er, mx, my);
+        ctx.fillStyle = active ? "rgba(255,208,244,0.20)" : ehot ? "rgba(255,255,255,0.12)" : "rgba(34,22,54,0.9)";
+        D.rr(er.x, er.y, er.w, er.h, 10); ctx.fill();
+        ctx.strokeStyle = active ? el.color : "rgba(255,255,255,0.18)"; ctx.lineWidth = active ? 3 : 2;
+        D.rr(er.x, er.y, er.w, er.h, 10); ctx.stroke();
+        ctx.fillStyle = active ? "#fff" : "rgba(255,255,255,0.82)"; ctx.font = "bold 14px 'Trebuchet MS',sans-serif";
+        ctx.fillText(el.emoji + " " + el.name, er.x + er.w / 2, er.y + er.h / 2 + 5);
+      }
 
       // branch headers
       for (const col of this.cols) {

@@ -224,6 +224,7 @@ window.NAP = window.NAP || {};
     try { s = JSON.parse(localStorage.getItem(SAVE_KEY)); } catch (e) {}
     if (!s) s = { unlocked: ["egg"], cleared: [], choices: {} };
     if (!s.chars) s.chars = {};
+    if (s.unlocked.indexOf("nap") < 0) s.unlocked.push("nap");   // Napling fully unlocked for now
     // migrate a legacy global level/xp onto egg
     if (s.level != null) { s.chars.egg = { level: s.level, xp: s.xp || 0, points: 0, nodes: {} };
       delete s.level; delete s.xp; }
@@ -284,7 +285,10 @@ window.NAP = window.NAP || {};
       NAP.go(NAP.scenes.vn, { charId: chap.charId, segment: seg },
         { type, outDur: 0.7, inDur: 0.7 });
     } else { // dream
-      const cfg = NAP.buildDreamConfig(chap.charId, seg.dream, chap.persist, chap.pending);
+      // Napling's dreams resolve their boss/arena from the opening choice
+      let base = seg.dream;
+      if (base.napSlot && NAP.resolveNapArena) base = Object.assign({}, base, NAP.resolveNapArena(base.napSlot, (chap.persist || {}).napPick));
+      const cfg = NAP.buildDreamConfig(chap.charId, base, chap.persist, chap.pending);
       cfg.title = seg.title;
       chap.pending = {};
       chap.prevType = "dream";
