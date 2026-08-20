@@ -218,11 +218,16 @@ window.NAP = window.NAP || {};
   // Gameplay: left stick / dpad move, A = attack (held), X or RB = active, Start = pause/back.
   // Menus: stick / dpad glide a cursor, A = click, B = back.
   NAP.pollGamepad = function (dt) {
-    const pads = navigator.getGamepads ? navigator.getGamepads() : [];
-    let gp = null; for (const g of pads) if (g) { gp = g; break; }
     // seed combined axis from the touch joystick each frame
     input.axis.x = input.touchVec.x; input.axis.y = input.touchVec.y;
-    if (!gp) { input.padActive = false; return; }
+    // getGamepads() can return null, throw, or be blocked by permissions policy on
+    // some browsers — never let that break the game loop.
+    let gp = null;
+    try {
+      const pads = (navigator.getGamepads && navigator.getGamepads()) || [];
+      for (const g of pads) if (g) { gp = g; break; }
+    } catch (e) { gp = null; }
+    if (!gp || !gp.buttons || !gp.axes) { input.padActive = false; return; }
     input.padActive = true;
     const dz = v => (Math.abs(v) < 0.28 ? 0 : v);
     const b = i => !!(gp.buttons[i] && gp.buttons[i].pressed);
@@ -445,17 +450,21 @@ window.NAP = window.NAP || {};
   function loop(ts) {
     const t = ts / 1000; let dt = last ? t - last : 0; last = t;
     dt = Math.min(dt, 0.05);
-    NAP.pollGamepad(dt);
-    // held attack (pad A / touch attack pad) — tryAttack guards its own rate
-    if (input.fireAttack && NAP.scene === NAP.scenes.dream && !NAP.transition && NAP.scene.tryAttack) NAP.scene.tryAttack();
-    if (NAP.scene) {
-      if (NAP.scene.update) NAP.scene.update(dt);
-      if (NAP.scene.draw) NAP.scene.draw(ctx);
+    try {
+      NAP.pollGamepad(dt);
+      // held attack (pad A / touch attack pad) — tryAttack guards its own rate
+      if (input.fireAttack && NAP.scene === NAP.scenes.dream && !NAP.transition && NAP.scene.tryAttack) NAP.scene.tryAttack();
+      if (NAP.scene) {
+        if (NAP.scene.update) NAP.scene.update(dt);
+        if (NAP.scene.draw) NAP.scene.draw(ctx);
+      }
+      NAP.drawInputOverlay(ctx);
+      updateTransition(dt);
+      drawTransition();
+    } catch (e) {
+      if (!loop._warned) { console.error("Nap Time loop error:", e); loop._warned = true; }
     }
-    NAP.drawInputOverlay(ctx);
-    updateTransition(dt);
-    drawTransition();
-    requestAnimationFrame(loop);
+    requestAnimationFrame(loop);   // always reschedule, even after an error
   }
 
   // ---- boot ----
