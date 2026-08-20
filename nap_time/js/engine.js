@@ -121,7 +121,13 @@ window.NAP = window.NAP || {};
   };
 
   // ---- input ----
-  const input = NAP.input = { keys: {}, mouse: { x: 0, y: 0, down: false } };
+  const input = NAP.input = { keys: {}, mouse: { x: 0, y: 0, down: false },
+    axis: { x: 0, y: 0 },        // combined analog move (gamepad stick + touch joystick)
+    touchVec: { x: 0, y: 0 },    // touch joystick vector
+    joy: { active: false, ox: 0, oy: 0, kx: 0, ky: 0, id: null },  // joystick visual
+    fireAttack: false,           // attack held (pad A / touch attack button)
+    padActive: false, padPrev: {},
+    touch: ("ontouchstart" in window) || (navigator.maxTouchPoints > 0) };
   window.addEventListener("keydown", e => {
     const k = e.key.toLowerCase();
     input.keys[k] = true;
@@ -145,14 +151,126 @@ window.NAP = window.NAP || {};
     if (NAP.scene && NAP.scene.onUp && !NAP.transition) NAP.scene.onUp(e.button);
   });
   canvas.addEventListener("contextmenu", e => e.preventDefault());
-  // basic touch -> click/move
+
+  // ---- touch controls ----
+  // Gameplay: left half = virtual joystick, two thumb-buttons on the right = attack / active.
+  // Menus: a tap is just a click (hit-tests the same rects the mouse would).
+  NAP.touchZones = function () {
+    const V = NAP.view;
+    return { atk: { x: V.w - 82, y: V.h - 92, r: 48 }, act: { x: V.w - 176, y: V.h - 148, r: 38 }, joyR: 78 };
+  };
+  function inCircle(x, y, c) { return Math.hypot(x - c.x, y - c.y) <= c.r; }
+  function inDreamPlay() { return NAP.scene === NAP.scenes.dream && !NAP.scene.outcome && !NAP.transition; }
+  function touchXY(t) { const r = canvas.getBoundingClientRect(); return { x: t.clientX - r.left, y: t.clientY - r.top }; }
+  const activeTouches = {};   // identifier -> role: "joy" | "atk" | "act" | "tap"
+
   canvas.addEventListener("touchstart", e => {
-    const t = e.touches[0]; if (!t) return; const r = canvas.getBoundingClientRect();
-    const x = t.clientX - r.left, y = t.clientY - r.top;
-    input.mouse.x = x; input.mouse.y = y; input.mouse.down = true;
-    if (NAP.scene && NAP.scene.onDown && !NAP.transition) NAP.scene.onDown(x, y, 0);
+    for (const t of e.changedTouches) {
+      const p = touchXY(t);
+      if (inDreamPlay()) {
+        const z = NAP.touchZones();
+        if (inCircle(p.x, p.y, z.act)) {                                     // active button (check first)
+          activeTouches[t.identifier] = "act"; if (NAP.scene.tryActive) NAP.scene.tryActive();
+        } else if (p.x > NAP.view.w * 0.5) {                                 // right half = attack
+          activeTouches[t.identifier] = "atk"; input.fireAttack = true;
+        } else {                                                            // left half = joystick
+          activeTouches[t.identifier] = "joy";
+          input.joy = { active: true, ox: p.x, oy: p.y, kx: p.x, ky: p.y, id: t.identifier };
+        }
+      } else {
+        activeTouches[t.identifier] = "tap";
+        input.mouse.x = p.x; input.mouse.y = p.y; input.mouse.down = true;
+        if (NAP.scene && NAP.scene.onDown && !NAP.transition) NAP.scene.onDown(p.x, p.y, 0);
+      }
+    }
     e.preventDefault();
   }, { passive: false });
+
+  canvas.addEventListener("touchmove", e => {
+    for (const t of e.changedTouches) {
+      if (activeTouches[t.identifier] !== "joy") continue;
+      const p = touchXY(t), z = NAP.touchZones();
+      let dx = p.x - input.joy.ox, dy = p.y - input.joy.oy;
+      const d = Math.hypot(dx, dy), R = z.joyR;
+      if (d > R) { dx = dx / d * R; dy = dy / d * R; }
+      input.joy.kx = input.joy.ox + dx; input.joy.ky = input.joy.oy + dy;
+      const dead = 0.18;
+      input.touchVec.x = Math.abs(dx / R) < dead ? 0 : dx / R;
+      input.touchVec.y = Math.abs(dy / R) < dead ? 0 : dy / R;
+    }
+    e.preventDefault();
+  }, { passive: false });
+
+  function touchAttackHeld() { for (const id in activeTouches) if (activeTouches[id] === "atk") return true; return false; }
+  function endTouch(e) {
+    for (const t of e.changedTouches) {
+      if (activeTouches[t.identifier] === "joy") { input.joy.active = false; input.touchVec.x = 0; input.touchVec.y = 0; }
+      delete activeTouches[t.identifier];
+      input.mouse.down = false;
+    }
+    input.fireAttack = touchAttackHeld();
+    e.preventDefault();
+  }
+  canvas.addEventListener("touchend", endTouch, { passive: false });
+  canvas.addEventListener("touchcancel", endTouch, { passive: false });
+
+  // ---- gamepad (console controller) ----
+  // Gameplay: left stick / dpad move, A = attack (held), X or RB = active, Start = pause/back.
+  // Menus: stick / dpad glide a cursor, A = click, B = back.
+  NAP.pollGamepad = function (dt) {
+    const pads = navigator.getGamepads ? navigator.getGamepads() : [];
+    let gp = null; for (const g of pads) if (g) { gp = g; break; }
+    // seed combined axis from the touch joystick each frame
+    input.axis.x = input.touchVec.x; input.axis.y = input.touchVec.y;
+    if (!gp) { input.padActive = false; return; }
+    input.padActive = true;
+    const dz = v => (Math.abs(v) < 0.28 ? 0 : v);
+    const b = i => !!(gp.buttons[i] && gp.buttons[i].pressed);
+    const prev = input.padPrev;
+    let sx = dz(gp.axes[0] || 0), sy = dz(gp.axes[1] || 0);
+    if (b(14)) sx = -1; if (b(15)) sx = 1; if (b(12)) sy = -1; if (b(13)) sy = 1;
+    const inDream = NAP.scene === NAP.scenes.dream && !NAP.transition;
+    const justActive = (b(2) && !prev[2]) || (b(5) && !prev[5]);
+    const justBack = b(1) && !prev[1];
+    const justStart = b(9) && !prev[9];
+    const justA = b(0) && !prev[0];
+    if (inDream) {
+      input.axis.x += sx; input.axis.y += sy;
+      input.fireAttack = touchAttackHeld() || b(0);       // A held = attack (or a held attack-pad touch)
+      if (justActive && NAP.scene.tryActive) NAP.scene.tryActive();
+      if (justStart && NAP.scene.onKey) NAP.scene.onKey("escape");
+    } else {
+      const spd = 640 * dt;
+      input.mouse.x = Math.max(0, Math.min(NAP.view.w, input.mouse.x + sx * spd));
+      input.mouse.y = Math.max(0, Math.min(NAP.view.h, input.mouse.y + sy * spd));
+      if ((justA || justStart) && NAP.scene.onDown && !NAP.transition) NAP.scene.onDown(input.mouse.x, input.mouse.y, 0);
+      if (justBack && NAP.scene.onKey && !NAP.transition) NAP.scene.onKey("escape");
+    }
+    const np = {}; for (let i = 0; i < gp.buttons.length; i++) np[i] = gp.buttons[i].pressed; input.padPrev = np;
+  };
+
+  // draw the on-screen thumbstick + buttons (touch) and a soft cursor (gamepad in menus)
+  NAP.drawInputOverlay = function (ctx) {
+    const V = NAP.view;
+    if (input.touch && inDreamPlay()) {
+      const z = NAP.touchZones();
+      ctx.save();
+      if (input.joy.active) {
+        ctx.globalAlpha = 0.22; ctx.fillStyle = "#fff"; ctx.beginPath(); ctx.arc(input.joy.ox, input.joy.oy, z.joyR, 0, 6.28); ctx.fill();
+        ctx.globalAlpha = 0.5; ctx.beginPath(); ctx.arc(input.joy.kx, input.joy.ky, 30, 0, 6.28); ctx.fill();
+      } else {
+        ctx.globalAlpha = 0.12; ctx.fillStyle = "#fff"; ctx.beginPath(); ctx.arc(110, V.h - 110, z.joyR, 0, 6.28); ctx.fill();
+      }
+      const btn = (c, label, col) => { ctx.globalAlpha = 0.28; ctx.fillStyle = col; ctx.beginPath(); ctx.arc(c.x, c.y, c.r, 0, 6.28); ctx.fill();
+        ctx.globalAlpha = 0.9; ctx.fillStyle = "#fff"; ctx.font = "bold 13px 'Trebuchet MS',sans-serif"; ctx.textAlign = "center"; ctx.fillText(label, c.x, c.y + 5); };
+      btn(z.atk, "TAP", "#ff6fae"); btn(z.act, "✦", "#8dffb0");
+      ctx.restore(); ctx.globalAlpha = 1; ctx.textAlign = "left";
+    }
+    if (input.padActive && NAP.scene !== NAP.scenes.dream) {   // gamepad cursor in menus
+      ctx.save(); ctx.globalAlpha = 0.85; ctx.fillStyle = "#fff"; ctx.strokeStyle = "rgba(0,0,0,0.5)"; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(input.mouse.x, input.mouse.y, 7, 0, 6.28); ctx.fill(); ctx.stroke(); ctx.restore(); ctx.globalAlpha = 1;
+    }
+  };
 
   // ---- scene manager ----
   NAP.scene = null;
@@ -327,10 +445,14 @@ window.NAP = window.NAP || {};
   function loop(ts) {
     const t = ts / 1000; let dt = last ? t - last : 0; last = t;
     dt = Math.min(dt, 0.05);
+    NAP.pollGamepad(dt);
+    // held attack (pad A / touch attack pad) — tryAttack guards its own rate
+    if (input.fireAttack && NAP.scene === NAP.scenes.dream && !NAP.transition && NAP.scene.tryAttack) NAP.scene.tryAttack();
     if (NAP.scene) {
       if (NAP.scene.update) NAP.scene.update(dt);
       if (NAP.scene.draw) NAP.scene.draw(ctx);
     }
+    NAP.drawInputOverlay(ctx);
     updateTransition(dt);
     drawTransition();
     requestAnimationFrame(loop);

@@ -149,6 +149,15 @@
     ctx.fillStyle = "rgba(20,12,40,0.08)"; ctx.fillRect(0, 0, w, h);
   };
 
+  // Beek's pond (uses the pond dream art as a scene backdrop)
+  BG.pond = function (ctx, w, h, t) {
+    const im = NAP.img(NAP.META.misc.bg_pond.file);
+    if (!im) { BG.dream_void(ctx, w, h, t); return; }
+    const s = Math.max(w / im.width, h / im.height), dw = im.width * s, dh = im.height * s;
+    ctx.drawImage(im, (w - dw) / 2, (h - dh) / 2 + Math.sin(t * 0.2) * 5, dw, dh);
+    ctx.fillStyle = "rgba(20,30,45,0.10)"; ctx.fillRect(0, 0, w, h);
+  };
+
   // Napling's sunny meadow (uses the meadow art as a scene backdrop)
   BG.meadow = function (ctx, w, h, t) {
     const im = NAP.img(NAP.META.misc.bg_meadow.file);

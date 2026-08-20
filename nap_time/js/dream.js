@@ -528,6 +528,9 @@
     if (keys["d"] || keys["arrowright"]) mx += 1;
     if (keys["w"] || keys["arrowup"]) my -= 1;
     if (keys["s"] || keys["arrowdown"]) my += 1;
+    const ax = NAP.input.axis;                       // gamepad stick / touch joystick
+    if (ax) { mx += ax.x; my += ax.y; }
+    if (Math.abs(mx) < 0.12 && Math.abs(my) < 0.12) { mx = 0; my = 0; }
     const moving = (mx || my) && !p.attacking;
     p.moving = !!moving;
     if (mx || my) {

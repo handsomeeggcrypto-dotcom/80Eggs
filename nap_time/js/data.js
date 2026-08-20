@@ -367,6 +367,97 @@
       bossName: "NIGHTMARE BEEK", cols: 20, rows: 15, objective: "defeat",
       spawnEnemies: 2, boss: true, title: "Pond Meadow",
     },
+
+    // Beek's night at the pond (placeholder story — ready for the Yumemono writer).
+    chapter: {
+      segments: [
+
+        // ---- SEG 0: opening + snack choice (persists all night) ----
+        { type: "story", beats: [
+          { bg: "pond", side: null, speaker: "",
+            text: "The pond meadow lies still under a low blue moon. Beek sits at the water's edge, feet dangling, refusing to look at his own reflection." },
+          { bg: "pond", side: "egg", speaker: "Beek", mood: "sleepy",
+            text: "Wah... every night the pond shows me something. A me that isn't me. Long ears. Sharp little grin." },
+          { bg: "pond", side: "egg", speaker: "Beek", mood: "sad",
+            text: "Big Orca says I shouldn't be scawed of a weflection. But it hops when I don't move. That's not how weflections work." },
+          { bg: "pond", side: "egg", speaker: "Beek", mood: "neutral",
+            text: "...Okay. If I'm going down there, I'm going down there with a snack. What sounds good, Big Orca?",
+            choice: { prompt: "What does Beek bring to the pond?", persist: true, options: [
+              { label: "Bogir", icon: "borgir", reply: "Bogir. Warm and heavy and brave. Perfect pond food.", mods: { food: "borgir" } },
+              { label: "Apol", icon: "apol", reply: "Apol! Crunchy and cool. Keeps me quick on the lily pads.", mods: { food: "apol" } },
+              { label: "Tenddie", icon: "tendie", reply: "Tenddie. Little sticks of courage, wah.", mods: { food: "tendie" } },
+              { label: "Pizza", icon: "pizza", reply: "Pizza — but Big Orca gets the middle bite. That's the wules.", mods: { food: "pizza" } },
+            ] } },
+          { bg: "galaxy", side: "egg", speaker: "Beek", mood: "sleepy",
+            text: "Deep breath. Into the water we go~" },
+        ] },
+
+        // ---- SEG 1: Dream 1 — gather the pond's scattered calm ----
+        { type: "dream", title: "Dream One", dream: {
+          playerChar: "beek", enemyFoe: "nightmarebeek", theme: "pond", bg: "bg_pond",
+          objective: "collect", cols: 18, rows: 13, spawnEnemies: 2, boss: false,
+        } },
+
+        // ---- SEG 2: wake + difficulty choice ----
+        { type: "story", beats: [
+          { bg: "pond", side: null, speaker: "",
+            text: "Beek surfaces with a gasp, pond water dripping off nothing at all. He's back on the bank." },
+          { bg: "pond", side: "egg", speaker: "Beek", mood: "surprised",
+            text: "I held it together! The pond went calm — just for a sec. But the bunny's still down there, hopping." },
+          { bg: "pond", side: "egg", speaker: "Beek", mood: "neutral",
+            text: "It comes in waves next. How far out do I swim?",
+            choice: { prompt: "How deep does Beek wade in?", options: [
+              { label: "Toes in", reply: "Just the shallows. Easy does it.", mods: { difficulty: 0.8 } },
+              { label: "Up to here", reply: "Waist deep. Let's see what the pond's got.", mods: { difficulty: 1.0 } },
+              { label: "All the way under", reply: "All the way down. Big Orca, don't let go.", mods: { difficulty: 1.4 } },
+            ] } },
+          { bg: "galaxy", side: "egg", speaker: "Beek", mood: "sleepy",
+            text: "Back under. Hold my flipper..." },
+        ] },
+
+        // ---- SEG 3: Dream 2 — survive the ripples ----
+        { type: "dream", title: "Dream Two", dream: {
+          playerChar: "beek", enemyFoe: "nightmarebeek", theme: "pond", bg: "bg_pond",
+          objective: "survive", cols: 20, rows: 15, spawnEnemies: 3, boss: false, waves: 3,
+        } },
+
+        // ---- SEG 4: wake + how-to-meet-it choice ----
+        { type: "story", beats: [
+          { bg: "pond", side: null, speaker: "",
+            text: "He wakes tangled in his blanket like a fishing net. Heart going fast. But steadier than before." },
+          { bg: "pond", side: "egg", speaker: "Beek", mood: "neutral",
+            text: "One left. The big one. The bunny that wears my face — down at the very bottom of the pond." },
+          { bg: "pond", side: "egg", speaker: "Beek", mood: "neutral",
+            text: "How do I meet it?",
+            choice: { prompt: "How does Beek face the dream-bunny?", options: [
+              { label: "Gently", reply: "It's just scared, I think. Like me. Maybe it wants a flipper to hold too.",
+                mods: { companion: true, extraPotion: true, mood: "kind" } },
+              { label: "Head-on", reply: "I'm not scawed of my own pond anymore. Splash time.",
+                mods: { difficulty: 1.25, mood: "fierce" } },
+            ] } },
+          { bg: "galaxy", side: "egg", speaker: "Beek", mood: "sleepy",
+            text: "One more dive. All the way to the bottom." },
+        ] },
+
+        // ---- SEG 5: Dream 3 — the demon-bunny boss ----
+        { type: "dream", title: "The Deepest Pond", dream: {
+          playerChar: "beek", enemyFoe: "nightmarebeek", theme: "pond", bg: "bg_pond",
+          bossName: "NIGHTMARE BEEK", objective: "defeat", cols: 20, rows: 15, spawnEnemies: 2, boss: true,
+        } },
+
+        // ---- SEG 6: victory ----
+        { type: "story", end: true, beats: [
+          { bg: "dream_void", side: null, speaker: "",
+            text: "The bunny stops hopping. Sits. Tilts its head. And, slowly, tilts it back the way Beek does." },
+          { bg: "dream_void", side: "shadow", speaker: "???", mood: "sad",
+            text: "( ...you came all the way down here. For me? )" },
+          { bg: "pond", side: "egg", speaker: "Beek", mood: "happy",
+            text: "'Course I did, wah. You're part of the pond. Part of me. No more hiding at the bottom." },
+          { bg: "pond", side: null, speaker: "",
+            text: "The reflection settles. Just Beek now — and a very sleepy orca, drifting belly-up in the calm water." },
+        ] },
+      ],
+    },
   };
 
   const napling = {
