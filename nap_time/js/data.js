@@ -22,6 +22,7 @@
     survive: { label: "Survive the waves", banner: "Three waves. Don't let up." },
     collect: { label: "Gather the dream", banner: "Collect the scattered pieces." },
     escort:  { label: "Guide your Cloud Buddy", banner: "Keep your Cloud Buddy safe." },
+    adventure: { label: "Adventure", banner: "Explore the dreamland." },
   };
 
   const egg = {
@@ -587,6 +588,18 @@
   NAP.playDream = function (charId, base) {
     NAP.chapter = null;
     const cfg = NAP.buildDreamConfig(charId, base);
+    NAP.go(NAP.scenes.dream, { config: cfg }, { type: "sleep", outDur: 1.0, inDur: 0.9 });
+  };
+
+  // Adventure Mode: a big mixed-biome map, free roam with bounties + treasure + hordes.
+  NAP.playAdventure = function (charId) {
+    NAP.chapter = null;
+    const cfg = NAP.buildDreamConfig(charId, {
+      playerChar: charId, adventure: true, objective: "adventure",
+      theme: "cloud",                                 // base tileset (no water/corruption features)
+      biomes: ["cloud", "rooftop", "library", "meadow"],
+      cols: 40, rows: 28, packs: 7, chests: 6, title: "Adventure",
+    });
     NAP.go(NAP.scenes.dream, { config: cfg }, { type: "sleep", outDur: 1.0, inDur: 0.9 });
   };
 })(window.NAP);

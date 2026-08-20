@@ -57,6 +57,9 @@
     this.tiles = TILESETS[this.cfg.theme] || TILESETS.cloud;
     this.bgImg = this.cfg.bg || null;                      // e.g. "bg_rooftop"
     this.bossName = this.cfg.bossName || "EGG — SHADOW NIGHTMARE";
+    this.adventure = !!this.cfg.adventure;                 // free-roam bounty mode
+    this.chests = [];
+    this.biomeGrid = (this.cfg.biomes && this.cfg.biomes.length) ? this.buildBiomeGrid(this.cfg.biomes) : null;
     this.buildLevel();
     // permanent stats come from the unified pipeline (base + char + level [+ skills/gear])
     this.charProg = NAP.charProgress(this.charId);
@@ -123,22 +126,49 @@
   },
 
   // ---------- level ----------
+  // organic, guaranteed-connected level: scattered wall blobs + pillars carved
+  // out of open floor, a jagged (non-rectangular) border, then connectivity repair.
   buildLevel() {
     const C = this.cols, R = this.rows;
+    const spawnX = 2, spawnY = 2;   // player starts near here (freeCell / player init)
     const g = [];
     for (let y = 0; y < R; y++) { const row = [];
       for (let x = 0; x < C; x++) {
-        let t = Math.random() < 0.17 ? 1 : 0;
+        let t = Math.random() < 0.16 ? 1 : 0;                 // floor / floor2 sprinkle
         if (x === 0 || y === 0 || x === C - 1 || y === R - 1) t = 2;
         row.push(t);
       } g.push(row);
     }
-    for (const [cx, cy] of [[6, 4], [13, 3], [9, 9], [15, 10], [4, 11]]) {
-      for (let i = 0; i < 3; i++) {
-        const x = U.clamp(cx + ((Math.random() * 3) | 0) - 1, 1, C - 2);
-        const y = U.clamp(cy + ((Math.random() * 3) | 0) - 1, 1, R - 2);
-        if (!(x <= 3 && y <= 3)) g[y][x] = 3;   // interior obstacle (wall2)
+    const inSpawn = (x, y) => Math.abs(x - spawnX) <= 2 && Math.abs(y - spawnY) <= 2;
+    const setWall = (x, y, t) => { if (x > 0 && y > 0 && x < C - 1 && y < R - 1 && !inSpawn(x, y)) g[y][x] = t; };
+    // random-walk wall blob (rooms/masses to weave around)
+    const blob = (cx, cy, steps, t) => {
+      let x = cx, y = cy;
+      for (let i = 0; i < steps; i++) {
+        setWall(x, y, t);
+        if (Math.random() < 0.5) setWall(x + 1, y, t);        // fatten a little
+        const d = (Math.random() * 4) | 0;
+        x = U.clamp(x + (d === 0 ? 1 : d === 1 ? -1 : 0), 1, C - 2);
+        y = U.clamp(y + (d === 2 ? 1 : d === 3 ? -1 : 0), 1, R - 2);
       }
+    };
+    const area = C * R;
+    const nBlobs = Math.max(4, Math.round(area / 42));
+    for (let i = 0; i < nBlobs; i++) {
+      const cx = 2 + ((Math.random() * (C - 4)) | 0), cy = 2 + ((Math.random() * (R - 4)) | 0);
+      blob(cx, cy, 5 + ((Math.random() * 9) | 0), Math.random() < 0.7 ? 2 : 3);
+    }
+    // lone pillars for cover
+    for (let i = 0; i < Math.round(area / 55); i++) {
+      setWall(1 + ((Math.random() * (C - 2)) | 0), 1 + ((Math.random() * (R - 2)) | 0), 3);
+    }
+    // jagged border: push a few wall "peninsulas" inward so the edge isn't a clean rectangle
+    for (let i = 0; i < Math.round((C + R) / 4); i++) {
+      const edge = (Math.random() * 4) | 0, depth = 1 + ((Math.random() * 3) | 0);
+      if (edge === 0) { const x = 1 + ((Math.random() * (C - 2)) | 0); for (let d = 1; d <= depth; d++) setWall(x, d, 2); }
+      else if (edge === 1) { const x = 1 + ((Math.random() * (C - 2)) | 0); for (let d = 1; d <= depth; d++) setWall(x, R - 1 - d, 2); }
+      else if (edge === 2) { const y = 1 + ((Math.random() * (R - 2)) | 0); for (let d = 1; d <= depth; d++) setWall(d, y, 2); }
+      else { const y = 1 + ((Math.random() * (R - 2)) | 0); for (let d = 1; d <= depth; d++) setWall(C - 1 - d, y, 2); }
     }
     // library: a contained "infected" corner — corrupt floor (hazard) + corrupt wall
     if (this.tiles && this.tiles.corruptFloor) {
@@ -161,7 +191,69 @@
         else if (m === T) g[y][x] = 7;      // shoreline (diagonal edge tile)
       }
     }
+    this.connectRepair(g, C, R, spawnX, spawnY);   // last: reconnect anything sealed off by features
     this.grid = g;
+  },
+  // Guarantee every open cell is reachable from the spawn: flood-fill, then drill
+  // an L-corridor from any stranded floor pocket back to the reachable region.
+  connectRepair(g, C, R, sx, sy) {
+    const blocked = t => (t === 2 || t === 3 || t === 5 || t === 6 || t === 7);
+    g[sy][sx] = 0;
+    for (let pass = 0; pass < 60; pass++) {
+      const seen = []; for (let y = 0; y < R; y++) seen.push(new Array(C).fill(false));
+      const st = [[sx, sy]]; seen[sy][sx] = true;
+      while (st.length) {
+        const [x, y] = st.pop();
+        for (const [nx, ny] of [[x + 1, y], [x - 1, y], [x, y + 1], [x, y - 1]]) {
+          if (nx < 0 || ny < 0 || nx >= C || ny >= R || seen[ny][nx]) continue;
+          if (blocked(g[ny][nx])) continue;
+          seen[ny][nx] = true; st.push([nx, ny]);
+        }
+      }
+      // find a stranded open cell
+      let sxc = -1, syc = -1;
+      for (let y = 1; y < R - 1 && sxc < 0; y++) for (let x = 1; x < C - 1; x++) {
+        if (!blocked(g[y][x]) && !seen[y][x]) { sxc = x; syc = y; break; }
+      }
+      if (sxc < 0) return;                          // fully connected
+      // drill an L-path toward the spawn until we touch reachable ground
+      let x = sxc, y = syc, guard = 0;
+      while (!(seen[y] && seen[y][x]) && guard++ < C + R) {
+        if (g[y][x] !== 6 && g[y][x] !== 7) g[y][x] = 0;   // never fill water/shoreline
+        if (x !== sx) x += x < sx ? 1 : -1;
+        else if (y !== sy) y += y < sy ? 1 : -1;
+        else break;
+      }
+    }
+    // terminal cleanup: any pocket still unreachable (e.g. sealed by water) -> scenery wall
+    const seen2 = []; for (let y = 0; y < R; y++) seen2.push(new Array(C).fill(false));
+    const st2 = [[sx, sy]]; seen2[sy][sx] = true;
+    const blk = t => (t === 2 || t === 3 || t === 5 || t === 6 || t === 7);
+    while (st2.length) { const [x, y] = st2.pop();
+      for (const [nx, ny] of [[x + 1, y], [x - 1, y], [x, y + 1], [x, y - 1]]) {
+        if (nx < 0 || ny < 0 || nx >= C || ny >= R || seen2[ny][nx] || blk(g[ny][nx])) continue;
+        seen2[ny][nx] = true; st2.push([nx, ny]);
+      } }
+    for (let y = 1; y < R - 1; y++) for (let x = 1; x < C - 1; x++)
+      if (!blk(g[y][x]) && !seen2[y][x]) g[y][x] = 2;
+  },
+  // mixed "dreamland": Voronoi regions, each cell painted by its nearest biome seed
+  buildBiomeGrid(biomes) {
+    const C = this.cols, R = this.rows;
+    const seeds = [];
+    const n = Math.max(biomes.length, Math.round((C * R) / 120));
+    for (let i = 0; i < n; i++) seeds.push({ x: (Math.random() * C) | 0, y: (Math.random() * R) | 0, b: biomes[i % biomes.length] });
+    // shuffle biome assignment so regions vary
+    for (const s of seeds) s.b = biomes[(Math.random() * biomes.length) | 0];
+    const grid = [];
+    for (let y = 0; y < R; y++) { const row = [];
+      for (let x = 0; x < C; x++) {
+        let best = seeds[0], bd = 1e9;
+        for (const s of seeds) { const d = (s.x - x) * (s.x - x) + (s.y - y) * (s.y - y); if (d < bd) { bd = d; best = s; } }
+        row.push(best.b);
+      } grid.push(row);
+    }
+    return grid;
   },
   isWall(tx, ty) {
     if (tx < 0 || ty < 0 || tx >= this.cols || ty >= this.rows) return true;
@@ -181,6 +273,7 @@
   // ---------- objective setup ----------
   setupObjective() {
     const cfg = this.cfg;
+    if (cfg.objective === "adventure") { this.setupAdventure(); return; }
     if (cfg.objective === "survive") {
       this.startWave(1);                          // wave-based tutorial
     } else if (cfg.objective === "rift") {
@@ -207,6 +300,56 @@
     if (cfg.objective === "escort") { this.exit = this.freeCell(TILE * 8); this.spawnBuddy(true); }
     // potions
     for (let i = 0; i < 2; i++) this.potions.push(Object.assign(this.freeCell(TILE * 2), { bob: Math.random() * 6.28 }));
+  },
+  // ---------- Adventure Mode: free roam, scattered hordes + treasure + bounties ----------
+  setupAdventure() {
+    const cfg = this.cfg;
+    const foes = cfg.foes || ["shadow_egg", "oni", "siren", "nightmarebeek"];
+    // scattered roaming hordes (packs) all over the map
+    const packs = cfg.packs || 6;
+    let hordeTotal = 0;
+    for (let p = 0; p < packs; p++) {
+      const c = this.freeCell(TILE * 7), foe = foes[(Math.random() * foes.length) | 0];
+      const size = 2 + ((Math.random() * 3) | 0);
+      for (let i = 0; i < size; i++) {
+        const e = this.makeEnemy({ x: c.x + (Math.random() - 0.5) * TILE * 2, y: c.y + (Math.random() - 0.5) * TILE * 2 }, foe);
+        this.clampToOpen(e); this.enemies.push(e); hordeTotal++;
+      }
+    }
+    // a wandering mini-boss
+    const bfoe = foes[(Math.random() * foes.length) | 0];
+    const boss = this.makeBoss(this.freeCell(TILE * 9), bfoe);
+    boss.bossName = "THE DREAM-HOARDER";
+    this.enemies.push(boss); this.bosses.push(boss); this.boss = boss;
+    // treasure chests to find
+    const chestGoal = cfg.chests || 5;
+    for (let i = 0; i < chestGoal; i++) this.chests.push(Object.assign(this.freeCell(TILE * 4), { bob: Math.random() * 6.28, opened: false }));
+    // potions sprinkled around
+    for (let i = 0; i < 4; i++) this.potions.push(Object.assign(this.freeCell(TILE * 3), { bob: Math.random() * 6.28 }));
+    // bounty checklist
+    this.advKills = 0; this.chestsOpened = 0;
+    this.bounties = [
+      { id: "boss", label: "Best the Dream-Hoarder", have: 0, need: 1, done: false },
+      { id: "chest", label: "Loot 3 Dream-Chests", have: 0, need: Math.min(3, chestGoal), done: false },
+      { id: "horde", label: "Rout the Hordes", have: 0, need: hordeTotal, done: false },
+    ];
+    this.advCleared = false;
+    this.bannerT = 2.4;
+  },
+  clampToOpen(e) {
+    let tx = Math.floor(e.x / TILE), ty = Math.floor(e.y / TILE);
+    if (this.isWall(tx, ty)) { const f = this.freeCell(0); e.x = f.x; e.y = f.y; }
+  },
+  bountyProgress(id, n) {
+    if (!this.bounties) return;
+    const b = this.bounties.find(q => q.id === id); if (!b || b.done) return;
+    b.have = Math.min(b.need, b.have + n);
+    if (b.have >= b.need) {
+      b.done = true;
+      this.popup(this.player.x, this.player.y - 64, "BOUNTY DONE!", "#ffe08a", true);
+      this.gainXP(10); this.addShake(4); this.spawnHearts(this.player.x, this.player.y - 24);
+      if (this.bounties.every(q => q.done)) { this.advCleared = true; this.bannerT = 2.4; }
+    }
   },
   startWave(n) {
     this.wave = n;
@@ -290,6 +433,7 @@
   // ---------- input ----------
   onKey(k) {
     if (this.outcome) { if (this.outcome === "riftlose") this.riftFinish(); return; }
+    if (this.adventure && (k === "e" || k === "escape")) { this.win(); return; }   // wake from Adventure
     if (k === " ") this.tryAttack();
     else if (k === "shift") this.tryActive();
   },
@@ -673,6 +817,15 @@
 
   updatePickups(dt) {
     const p = this.player;
+    // treasure chests (Adventure): walk into one to pop it open
+    for (const ch of this.chests) { if (ch.opened) continue; ch.bob += dt * 2.5;
+      if (U.dist(ch.x, ch.y, p.x, p.y - 12) < TILE * 0.7) {
+        ch.opened = true; ch.pop = 0.6; this.chestsOpened++;
+        p.hp = Math.min(p.maxhp, p.hp + 25); this.gainXP(6);
+        this.spawnPoof(ch.x, ch.y - 8, "#ffe08a"); this.spawnHearts(ch.x, ch.y - 20);
+        this.popup(ch.x, ch.y - 40, "✦ loot!", "#ffe08a"); this.addShake(3);
+        this.bountyProgress("chest", 1);
+      } }
     for (const pt of this.potions) { if (pt.taken) continue; pt.bob += dt * 2.5;
       if (U.dist(pt.x, pt.y, p.x, p.y - 18) < TILE * 0.6) {
         pt.taken = true; p.hp = Math.min(p.maxhp, p.hp + POTION_HEAL); this.spawnHearts(pt.x, pt.y - 30); } }
@@ -781,6 +934,7 @@
       if (en.isBoss) this.addShake(11);
       if (this.isRift && !en.isBoss) this.riftProgress = Math.min(1, this.riftProgress + 1 / this.riftKillsNeeded);
       this.gainXP(en.isBoss ? 12 : 1);
+      if (this.adventure) { if (en.isBoss) this.bountyProgress("boss", 1); else this.bountyProgress("horde", 1); }
     }
   },
   damagePlayer(dmg) {
@@ -872,11 +1026,11 @@
     }
 
     // tiles
-    const T = this.tiles;
     const x0 = Math.floor(cam.x / TILE), x1 = Math.ceil((cam.x + V.w) / TILE);
     const y0 = Math.floor(cam.y / TILE), y1 = Math.ceil((cam.y + V.h) / TILE);
     for (let y = y0; y < y1; y++) for (let x = x0; x < x1; x++) {
       if (x < 0 || y < 0 || x >= this.cols || y >= this.rows) continue;
+      const T = this.biomeGrid ? (TILESETS[this.biomeGrid[y][x]] || this.tiles) : this.tiles;  // mixed dreamland
       const sx = x * TILE - cam.x, sy = y * TILE - cam.y, tt = this.grid[y][x];
       if (tt === 6) { const im = NAP.img(T.water); if (im) ctx.drawImage(im, sx, sy, TILE, TILE); continue; }
       if (tt === 7) { const im = NAP.img(T.edge); if (im) ctx.drawImage(im, sx, sy, TILE, TILE); continue; }
@@ -916,6 +1070,23 @@
     }
 
     // ground pickups
+    // treasure chests (Adventure)
+    for (const ch of this.chests) {
+      const sx = ch.x - cam.x, sy = ch.y - cam.y, bob = ch.opened ? 0 : Math.sin(ch.bob) * 3;
+      D.shadow(sx, sy + 8, 20, 7);
+      if (!ch.opened && !((sx + TILE) < 0 || sx - TILE > V.w || (sy + TILE) < 0 || sy - TILE > V.h)) {
+        ctx.globalAlpha = 0.5 + 0.3 * Math.sin(t * 4); ctx.fillStyle = "#ffe08a";
+        ctx.beginPath(); ctx.arc(sx, sy - 8 + bob, 20, 0, 6.28); ctx.fill(); ctx.globalAlpha = 1;
+      }
+      // chest body
+      ctx.save(); ctx.translate(sx, sy - 6 + bob);
+      ctx.fillStyle = ch.opened ? "#6a5230" : "#8a6a3a"; ctx.strokeStyle = "#3a2814"; ctx.lineWidth = 2;
+      D.rr(-13, -8, 26, 18, 4); ctx.fill(); ctx.stroke();
+      ctx.fillStyle = "#c9a06a"; D.rr(-13, -8, 26, 7, 4); ctx.fill();  // lid band
+      ctx.fillStyle = "#ffd36b"; ctx.beginPath(); ctx.arc(0, -1, 2.4, 0, 6.28); ctx.fill();  // lock
+      if (ch.opened) { ctx.globalAlpha = 0.8; ctx.fillStyle = "#fff3c0"; ctx.font = "12px sans-serif"; ctx.textAlign = "center"; ctx.fillText("✓", 0, 3); ctx.globalAlpha = 1; }
+      ctx.restore();
+    }
     for (const pt of this.potions) { const sx = pt.x - cam.x, sy = pt.y - cam.y; D.shadow(sx, sy, 26, 10);
       const pm = M.misc.potion, ph = 52, pw = pm.w * ph / pm.h, bob = Math.sin(pt.bob) * 4;
       const im = NAP.img("potion.png"); if (im) ctx.drawImage(im, sx - pw / 2, sy - ph - 6 + bob, pw, ph); }
@@ -1246,20 +1417,40 @@
       D.bar(bx + 6, by + 37, 34, 5, p.buff.t / 8, "#c8f7d4");
     }
 
-    // objective tracker (top-right)
-    const o = this.cfg.objective, def = this.cfg.objDef;
-    let sub = "";
-    if (o === "defeat") sub = this.boss ? "Nightmare lives" : (this.enemies.length ? this.enemies.length + " wisps left" : "clear!");
-    else if (o === "survive") sub = this.waveClearing ? "wave " + (this.wave + 1) + " incoming…" : "wave " + this.wave + " / " + this.waves;
-    else if (o === "collect") sub = (this.fragTotal - this.fragments.length) + " / " + this.fragTotal;
-    else if (o === "escort") sub = "guide the buddy";
-    else if (o === "rift") sub = "Depth " + this.depth + (this.riftGuardianSpawned ? " · GUARDIAN" : " · " + Math.round(this.riftProgress * 100) + "%");
-    ctx.textAlign = "right";
-    const label = def.label + "  ·  " + sub;
-    ctx.font = "bold 14px 'Trebuchet MS',sans-serif";
-    const pw = ctx.measureText(label).width + 28;
-    ctx.fillStyle = "rgba(25,15,45,0.6)"; D.rr(V.w - 14 - pw, 14, pw, 34, 12); ctx.fill();
-    ctx.fillStyle = "#d9c8ff"; ctx.fillText(label, V.w - 28, 36);
+    // Adventure: bounty checklist (top-right) + wake hint
+    if (this.adventure && this.bounties) {
+      ctx.textAlign = "left";
+      const bx = V.w - 244, bw = 230, bh = 26 + this.bounties.length * 22;
+      ctx.fillStyle = "rgba(25,15,45,0.66)"; D.rr(bx, 14, bw, bh, 12); ctx.fill();
+      ctx.fillStyle = this.advCleared ? "#8dffb0" : "#ffe08a"; ctx.font = "bold 14px 'Trebuchet MS',sans-serif";
+      ctx.fillText(this.advCleared ? "★ Bounties Cleared!" : "Bounties", bx + 14, 34);
+      let ly = 52;
+      for (const b of this.bounties) {
+        ctx.fillStyle = b.done ? "#8dffb0" : "rgba(255,255,255,0.85)"; ctx.font = "12px 'Trebuchet MS',sans-serif";
+        const mark = b.done ? "✓ " : "○ ";
+        const prog = b.need > 1 ? "  (" + b.have + "/" + b.need + ")" : "";
+        ctx.fillText(mark + b.label + prog, bx + 14, ly); ly += 22;
+      }
+      ctx.textAlign = "right"; ctx.fillStyle = "rgba(255,255,255,0.6)"; ctx.font = "11px 'Trebuchet MS',sans-serif";
+      ctx.fillText("press E / Start to wake", V.w - 14, 14 + bh + 16); ctx.textAlign = "left";
+    }
+
+    // objective tracker (top-right) — non-adventure modes
+    if (!this.adventure) {
+      const o = this.cfg.objective, def = this.cfg.objDef;
+      let sub = "";
+      if (o === "defeat") sub = this.boss ? "Nightmare lives" : (this.enemies.length ? this.enemies.length + " wisps left" : "clear!");
+      else if (o === "survive") sub = this.waveClearing ? "wave " + (this.wave + 1) + " incoming…" : "wave " + this.wave + " / " + this.waves;
+      else if (o === "collect") sub = (this.fragTotal - this.fragments.length) + " / " + this.fragTotal;
+      else if (o === "escort") sub = "guide the buddy";
+      else if (o === "rift") sub = "Depth " + this.depth + (this.riftGuardianSpawned ? " · GUARDIAN" : " · " + Math.round(this.riftProgress * 100) + "%");
+      ctx.textAlign = "right";
+      const label = def.label + "  ·  " + sub;
+      ctx.font = "bold 14px 'Trebuchet MS',sans-serif";
+      const pw = ctx.measureText(label).width + 28;
+      ctx.fillStyle = "rgba(25,15,45,0.6)"; D.rr(V.w - 14 - pw, 14, pw, 34, 12); ctx.fill();
+      ctx.fillStyle = "#d9c8ff"; ctx.fillText(label, V.w - 28, 36);
+    }
 
     // boss health bar(s) (bottom center, stacked upward for multi-boss finales)
     const liveBosses = (this.bosses || []).filter(b => !b.dying);

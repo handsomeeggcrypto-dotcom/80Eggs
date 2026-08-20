@@ -17,6 +17,8 @@
           go: () => NAP.startChapter("beek") },
         { label: "Napling — Dream-Weaver's Night", sub: "visit the others' nightmares · her story",
           go: () => NAP.startChapter("nap") },
+        { label: "🗺 Adventure", sub: "free roam · bounties, treasure & hordes",
+          go: () => NAP.go(NAP.scenes.adventure, {}, { type: "fade" }) },
         { label: "🌙 Deep Sleep", sub: "endless rift · grind & descend",
           go: () => NAP.go(NAP.scenes.deepsleep, {}, { type: "fade" }) },
         { label: "✦ Characters", sub: "view dreamers · spend skill points",
