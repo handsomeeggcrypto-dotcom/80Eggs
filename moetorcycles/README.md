@@ -5,12 +5,13 @@ Pick a rider and a bike, then ride your dreams and color everything.
 
 Gameplay, menus, the sprite pipeline, and a real parallax background are done.
 
-## Background (parallax)
+## Backgrounds (parallax, per ride)
 
-Four image layers in `assets/bg/` scroll at different speeds for depth:
-`bg_sky.png` (opaque, slowest) → `bg_far.png` → `bg_mid.png` → `bg_near.png`
-(transparent, fastest). They're defined in the `BG_LAYERS` array in `game.js`;
-each is scaled to canvas height and tiled horizontally.
+Each ride has **its own map** — four layers in `assets/bg/` named
+`<ride>_sky/far/mid/near.png` (sky opaque & slowest → near transparent &
+fastest), scaled to canvas height and tiled horizontally. Built by `bgSet(id)`
+and attached to each ride's `bg` in `game.js`; the select screen previews the
+map as you switch characters. Crayons = neon city, Eggs = countryside.
 
 - `SKY_TINT` (top of `game.js`, 0–1) adds a dusk overlay to darken a bright sky
   toward night if you ever want the neon layers to pop more. Currently `0`.
@@ -34,16 +35,28 @@ Then open http://localhost:8777/ in your browser.
 | --- | --- | --- |
 | Jump / double-jump | `Space` / `↑` / `W` | tap left ~60% of screen |
 | Dash (speed burst, smashes obstacles) | `Shift` / `X` | tap right ~40% of screen |
-| Trail color (select screen) | `←` / `→` | tap a swatch |
+| Character (select screen) | `←` / `→` | tap left/right of the card |
 | Trail style (select screen) | `↑` / `↓` | tap a chip |
+| Trail color (select screen) | `C` | tap a swatch |
 | Start / menu select | `Space` | tap the ride card or "RIDE!" |
 | Back to select (on crash) | `Esc` | — |
+| Mute / unmute | `M` | tap the 🔊 button (bottom-right) |
 
 - **Jump** is variable-height — hold longer to jump higher. You get a **double jump**.
 - **Dash** gives a short speed burst and lets you smash through crayon-pillar
   obstacles. Without dashing, hitting one is a crash.
 - Fall into a gap = crash. Collect ⭐ stars for bonus points.
 - Speed ramps up the longer you survive. Best score is saved locally.
+
+## Sound
+
+All audio is **synthesized at runtime** with the Web Audio API — no audio files,
+no network. `audio.js` exposes a `Sound` module: procedural SFX (jump, dash,
+star, smash, land, crash, UI) plus a looping synthwave soundtrack (a small
+step-sequencer: arp + bass + drums over an Am–F–C–G loop). Browsers block audio
+until a user gesture, so `Sound.unlock()` fires on the first key/tap. Mute state
+persists in `localStorage` (`moetorcycles_muted`). Tune levels via the gain
+values in `audio.js` (`master`, `musicGain`, `sfxGain`) and the `BPM`/`PROG`.
 
 ## Trails (Tron-style)
 
@@ -71,20 +84,31 @@ Source art lives on the desktop in `~/Desktop/moetorcycle/`. Regenerate
 cd moetorcycles && python3 build_assets.py
 ```
 
-The pipeline crops every pose of a ride to **one shared bounding box** (not each
-trimmed individually) so the bike stays aligned across poses and doesn't hop when
-the pose changes. In `game.js`, `drawPlayer` anchors the sprite by its tyre line
-(`WHEEL_FRAC`) so the wheels rest on the road.
+The pipeline has two alignment modes (AI art framing varies between batches):
+
+- `build_ride(...)` — **shared-crop**: when every pose is on one canvas at a
+  consistent scale, crop them all to the union bbox. (Crayons.)
+- `build_ride_aligned(...)` — **trim + bottom-center**: when poses arrive on
+  *different* canvas sizes but the bike is drawn at a consistent pixel scale,
+  trim each and drop them onto one common canvas, tyres on a shared baseline.
+  (Eggs — its idle frames were a different size than its action poses.)
+
+In `game.js`, `drawPlayer` anchors each sprite by its tyre line and each ride
+carries its own `scale` (drawn height) and `wheelFrac` (tyre-contact fraction),
+since framing differs between rides — tune those two numbers per ride so the
+bike is the right size and the wheels sit on the road.
 
 ## Adding a new ride
 
 1. Generate the frames with the character **already on the bike**, one image per
    pose (`ride`, `ride2`, `wheelie`, `air`, `land`, `crash`), all on the same
    canvas so the bike scale/position is consistent between poses.
-2. Add a `build_ride("<id>", { pose: "file.png", ... })` call in `build_assets.py`
-   and re-run it.
-3. Add an entry to the `RIDES` array in `game.js` pointing at the new frame files
-   plus a `preview` image for the select screen.
+2. Add a `build_ride(...)` (same canvas) or `build_ride_aligned(...)` (mismatched
+   framing) call in `build_assets.py` and re-run it.
+3. Add its background layers as `assets/bg/<id>_sky/far/mid/near.png`.
+4. Add an entry to the `RIDES` array in `game.js` with the frame files, a
+   `preview`, `bg: bgSet("<id>")`, and per-ride `scale` / `wheelFrac` (tune by
+   screenshot).
 
 The select screen is a carousel — extra rides show up automatically with
 `←/→` (or tap the side arrows) to switch between them.
@@ -93,7 +117,11 @@ The select screen is a carousel — extra rides show up automatically with
 
 - [x] Real background art (4 parallax layers) — **done**
 - [x] Tron-style trails (6 colors × 6 styles, picker on select screen) — **done**
+- [x] Sound — synthesized SFX + looping soundtrack + mute — **done**
+- [ ] Combo multiplier + near-miss bonus
+- [ ] Star currency that unlocks trails / characters
 - [ ] More rides (character-on-bike combos), each as single-frame art
+- [ ] More maps / background sets
 - [ ] Sound + music
 - [ ] Power-ups, combos, wheelie/trick scoring
 - [ ] Mobile layout polish

@@ -8,16 +8,32 @@ const ctx = canvas.getContext("2d");
 const W = canvas.width;   // 1280
 const H = canvas.height;  // 720
 
+/* ---------- Backgrounds ----------
+   Each ride has its own parallax map (sky + far + mid + near), scaled to canvas
+   height and tiled horizontally. Speeds: far = slow, near = fast. */
+const BG_SPEEDS = [0.06, 0.20, 0.45, 0.80];
+function bgSet(prefix) {
+  return ["sky", "far", "mid", "near"].map((layer, i) => ({
+    url: `assets/bg/${prefix}_${layer}.png`,
+    speed: BG_SPEEDS[i],
+  }));
+}
+// Optional dusk tint to unify a bright sky with the neon night layers (0 = off).
+let SKY_TINT = 0.0;
+
 /* ---------- Roster ----------
    One RIDE = one character already on a bike (a fixed combo).
-   Each ride supplies single-frame sprites (character-on-bike) per pose.
-   `preview` is the image shown on the select screen.
-   To add a ride: drop its frame PNGs in assets/ and add an entry here. */
+   Each ride supplies single-frame sprites (character-on-bike) per pose, its own
+   parallax `bg` map, a `preview` image, and sprite draw tuning.
+   To add a ride: drop its frame + bg PNGs in assets/ and add an entry here. */
 const RIDES = [
   {
     id: "crayons",
     name: "Crayons",
     tagline: "Ride your dreams. Color everything.",
+    // sprite draw tuning (per ride, since art framing differs between rides)
+    scale: 1.36,      // drawn height = PLAYER_H * scale
+    wheelFrac: 0.935, // fraction of sprite height where the tyres touch ground
     frames: {
       ride:    "assets/player_crayons_ride.png",     // single cruise frame (+ bob)
       wheelie: "assets/player_crayons_wheelie.png",  // rising / takeoff
@@ -26,21 +42,25 @@ const RIDES = [
       crash:   "assets/player_crayons_crash.png",
     },
     preview: "assets/player_crayons_ride.png",
+    bg: bgSet("crayons"),
+  },
+  {
+    id: "eggs",
+    name: "Eggs",
+    tagline: "Egg power. Bear it all.",
+    scale: 1.58,
+    wheelFrac: 0.988,
+    frames: {
+      ride:    "assets/player_eggs_ride.png",
+      wheelie: "assets/player_eggs_wheelie.png",
+      air:     "assets/player_eggs_air.png",
+      land:    "assets/player_eggs_land.png",
+      crash:   "assets/player_eggs_crash.png",
+    },
+    preview: "assets/player_eggs_ride.png",
+    bg: bgSet("eggs"),
   },
 ];
-
-/* ---------- Parallax background layers ----------
-   Each layer is scaled to canvas height and tiled horizontally. `speed` is the
-   parallax factor vs world scroll (far = slow, near = fast). */
-const BG_LAYERS = [
-  { url: "assets/bg/bg_sky.png",  speed: 0.06 },
-  { url: "assets/bg/bg_far.png",  speed: 0.20 },
-  { url: "assets/bg/bg_mid.png",  speed: 0.45 },
-  { url: "assets/bg/bg_near.png", speed: 0.80 },
-];
-// Optional dusk tint to unify the bright day sky with the neon night layers.
-// 0 = show the sky art as-is; raise toward 1 to darken into dusk/night.
-let SKY_TINT = 0.0;
 
 /* ---------- Asset loading (by URL, cached) ---------- */
 const imgCache = {};
@@ -64,8 +84,8 @@ function img(url) { return imgCache[url] || loadImg(url); }
   for (const r of RIDES) {
     urls.add(r.preview);
     for (const k in r.frames) urls.add(r.frames[k]);
+    for (const L of r.bg) urls.add(L.url);
   }
-  for (const L of BG_LAYERS) urls.add(L.url);
   assetTotal = urls.size;
   urls.forEach(loadImg);
 })();
@@ -114,6 +134,8 @@ let anyPressQueued = false;
 
 window.addEventListener("keydown", (e) => {
   if (["ArrowUp","ArrowDown","ArrowLeft","ArrowRight","Space"].includes(e.code)) e.preventDefault();
+  Sound.unlock();
+  if (e.code === "KeyM") { Sound.toggleMute(); return; }
   if (keys[e.code]) return; // ignore auto-repeat
   keys[e.code] = true;
   if (e.code === "Space" || e.code === "ArrowUp" || e.code === "KeyW") jumpQueued = true;
@@ -126,6 +148,11 @@ window.addEventListener("keyup", (e) => { keys[e.code] = false; });
 // Pointer / touch: left half = jump, right half = dash (during play)
 canvas.addEventListener("pointerdown", (e) => {
   const r = canvas.getBoundingClientRect();
+  Sound.unlock();
+  // mute button (bottom-right) intercepts in every state
+  const mx = (e.clientX - r.left) / r.width * W;
+  const my = (e.clientY - r.top) / r.height * H;
+  if (Math.hypot(mx - MUTE_BTN.x, my - MUTE_BTN.y) <= MUTE_BTN.r + 6) { Sound.toggleMute(); return; }
   const x = (e.clientX - r.left) / r.width;
   anyPressQueued = true;
   if (state === STATE.PLAY) {
@@ -134,17 +161,18 @@ canvas.addEventListener("pointerdown", (e) => {
     pointerMenu(e, r);
   }
 });
+const MUTE_BTN = { x: W - 46, y: H - 42, r: 20 };
 
 function handleMenuKey(code) {
   if (state === STATE.TITLE) {
     if ((code === "Space" || code === "Enter") && menuCd <= 0) { state = STATE.SELECT; menuCd = 0.3; }
   } else if (state === STATE.SELECT) {
-    if (code === "ArrowLeft")  { selTrailColor = (selTrailColor - 1 + TRAIL_COLORS.length) % TRAIL_COLORS.length; saveTrail(); }
-    else if (code === "ArrowRight") { selTrailColor = (selTrailColor + 1) % TRAIL_COLORS.length; saveTrail(); }
+    // Left/Right switch character; Up/Down cycle trail style; C cycles color
+    if (code === "ArrowLeft")  { selRide = (selRide - 1 + RIDES.length) % RIDES.length; Sound.ui(); }
+    else if (code === "ArrowRight") { selRide = (selRide + 1) % RIDES.length; Sound.ui(); }
     else if (code === "ArrowUp")   { selTrailDesign = (selTrailDesign - 1 + TRAIL_DESIGNS.length) % TRAIL_DESIGNS.length; saveTrail(); }
     else if (code === "ArrowDown") { selTrailDesign = (selTrailDesign + 1) % TRAIL_DESIGNS.length; saveTrail(); }
-    else if (code === "BracketLeft")  selRide = (selRide - 1 + RIDES.length) % RIDES.length;
-    else if (code === "BracketRight") selRide = (selRide + 1) % RIDES.length;
+    else if (code === "KeyC") { selTrailColor = (selTrailColor + 1) % TRAIL_COLORS.length; saveTrail(); }
     else if ((code === "Space" || code === "Enter") && menuCd <= 0) {
       startGame();
     }
@@ -168,10 +196,10 @@ function pointerMenu(e, r) {
     for (const c of uiHits.chips) {
       if (mx >= c.x && mx <= c.x + c.w && my >= c.y && my <= c.y + c.h) { selTrailDesign = c.i; saveTrail(); menuCd = 0.15; return; }
     }
-    // ride chevrons at the far edges
-    const fx = mx / W;
-    if (RIDES.length > 1 && fx < 0.12) { selRide = (selRide - 1 + RIDES.length) % RIDES.length; menuCd = 0.2; return; }
-    if (RIDES.length > 1 && fx > 0.88) { selRide = (selRide + 1) % RIDES.length; menuCd = 0.2; return; }
+    // ride chevrons: anywhere left of the card = prev, right of the card = next
+    const cardL = W / 2 - 350, cardR = W / 2 + 350;
+    if (RIDES.length > 1 && mx < cardL) { selRide = (selRide - 1 + RIDES.length) % RIDES.length; Sound.ui(); menuCd = 0.2; return; }
+    if (RIDES.length > 1 && mx > cardR) { selRide = (selRide + 1) % RIDES.length; Sound.ui(); menuCd = 0.2; return; }
     // only start when the ride card or the bottom "RIDE!" prompt is tapped,
     // so a near-miss on the pickers doesn't launch a run
     const inCard = my > H * 0.18 && my < H * 0.49 && mx > W * 0.22 && mx < W * 0.78;
@@ -268,6 +296,7 @@ function startGame() {
   resetRun();
   state = STATE.PLAY;
   menuCd = 0.25;
+  Sound.ui();
   jumpQueued = false;
   dashQueued = false;
 }
@@ -307,6 +336,7 @@ function update(dt) {
   // dash input
   if (dashQueued && player.dashCd <= 0) {
     player.dashT = 0.42; player.dashCd = 0.9;
+    Sound.dash();
     for (let i = 0; i < 14; i++) spawnSpark(PLAYER_X - 30, player.y + PLAYER_H * 0.6);
   }
   // jump input (double jump)
@@ -315,6 +345,7 @@ function update(dt) {
       player.vy = JUMP_V;
       player.jumps++;
       player.onGround = false;
+      Sound.jump();
       for (let i = 0; i < 8; i++) spawnSpark(PLAYER_X, player.y + PLAYER_H, "#fff");
     }
   }
@@ -334,6 +365,7 @@ function update(dt) {
     player.y = surf - PLAYER_H;
     if (!player.onGround && player.vy > 400) {
       player.landT = 0.18;
+      Sound.land();
       for (let i = 0; i < 6; i++) spawnSpark(PLAYER_X - 10, surf, "#ffd23f");
     }
     player.vy = 0;
@@ -365,6 +397,7 @@ function update(dt) {
     if (Math.abs(sx - PLAYER_X) < 55 && Math.abs(s.y - (player.y + PLAYER_H * 0.5)) < 70) {
       s.got = true;
       score += 25;
+      Sound.star();
       for (let i = 0; i < 8; i++) spawnSpark(PLAYER_X, player.y + PLAYER_H * 0.4, "#ffe066");
     }
   }
@@ -381,6 +414,7 @@ function update(dt) {
     if (overlapX && overlapY) {
       if (player.dashT > 0) {
         o.dead = true; score += 15; screenShake = 10;
+        Sound.smash();
         for (let i = 0; i < 16; i++) spawnSpark(ox, oTop, ["#ff5bd0","#5bc8ff","#ffe066","#7dff9b"][i%4]);
       } else {
         return kill();
@@ -408,6 +442,7 @@ function kill() {
   deathTimer = 0;
   menuCd = 0.6; // block instant restart from the killing tap
   screenShake = 18;
+  Sound.crash();
   score = Math.floor(score);
   if (score > best) { best = score; localStorage.setItem("moetorcycles_best", best); }
   for (let i = 0; i < 40; i++) {
@@ -451,6 +486,23 @@ function render(dt) {
   else { drawWorld(); drawTrailInGame(); drawPlayer(); drawParticles(); drawHUD(); if (state === STATE.DEAD) drawDead(); }
 
   ctx.restore();
+  drawMuteButton(); // fixed overlay, unaffected by screen shake
+}
+
+function drawMuteButton() {
+  const b = MUTE_BTN;
+  ctx.save();
+  ctx.beginPath();
+  ctx.arc(b.x, b.y, b.r, 0, Math.PI * 2);
+  ctx.fillStyle = "rgba(20,4,40,0.5)";
+  ctx.fill();
+  ctx.strokeStyle = "rgba(255,255,255,0.3)";
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+  ctx.font = "18px system-ui, sans-serif";
+  ctx.textAlign = "center"; ctx.textBaseline = "middle";
+  ctx.fillText(Sound.muted ? "🔇" : "🔊", b.x, b.y + 1);
+  ctx.restore();
 }
 
 /* ---- parallax background scene (sky + far + mid + near) ---- */
@@ -467,15 +519,16 @@ function drawTiledLayer(url, speed) {
 }
 
 function drawScene() {
+  const layers = RIDES[selRide].bg; // current ride's map
   // sky (opaque) — gradient fallback until the art loads
-  if (!drawTiledLayer(BG_LAYERS[0].url, BG_LAYERS[0].speed)) {
+  if (!drawTiledLayer(layers[0].url, layers[0].speed)) {
     const g = ctx.createLinearGradient(0, 0, 0, H);
     g.addColorStop(0, "#2a0a52");
     g.addColorStop(1, "#12042e");
     ctx.fillStyle = g;
     ctx.fillRect(0, 0, W, H);
   }
-  // optional dusk tint to unify the bright sky with the neon night layers
+  // optional dusk tint to unify a bright sky with neon night layers
   if (SKY_TINT > 0) {
     const g = ctx.createLinearGradient(0, 0, 0, H);
     g.addColorStop(0, `rgba(18,4,48,${0.8 * SKY_TINT})`);
@@ -484,7 +537,7 @@ function drawScene() {
     ctx.fillRect(0, 0, W, H);
   }
   // parallax layers, far -> near
-  for (let i = 1; i < BG_LAYERS.length; i++) drawTiledLayer(BG_LAYERS[i].url, BG_LAYERS[i].speed);
+  for (let i = 1; i < layers.length; i++) drawTiledLayer(layers[i].url, layers[i].speed);
 }
 
 function drawWorld() {
@@ -715,12 +768,9 @@ function drawTrailInGame() {
   drawTrail(pts);
 }
 
-// Fraction of the (shared-crop) sprite height at which the tyres contact ground.
-const WHEEL_FRAC = 0.935;
-const SPRITE_H = PLAYER_H * 1.36;
-
 function drawPlayer() {
-  const f = RIDES[selRide].frames;
+  const ride = RIDES[selRide];
+  const f = ride.frames;
   let url, bob = 0;
   if (!player.alive) url = f.crash;
   else if (!player.onGround) url = player.vy < 0 ? f.wheelie : f.air; // rising vs falling
@@ -729,9 +779,10 @@ function drawPlayer() {
   const sprite = img(url);
   if (!sprite || !sprite.width) return;
 
-  const h = SPRITE_H;
+  const h = PLAYER_H * (ride.scale || 1.36);
+  const wheelFrac = ride.wheelFrac || 0.935;
   const w = h * (sprite.width / sprite.height);
-  const dx = -w / 2, dy = -WHEEL_FRAC * h + bob; // anchor tyres at the pivot
+  const dx = -w / 2, dy = -wheelFrac * h + bob; // anchor tyres at the pivot
 
   ctx.save();
   ctx.translate(PLAYER_X, player.y + PLAYER_H); // pivot on the road contact line
@@ -928,7 +979,8 @@ function drawTrailPickers() {
     cxp += cw + gap;
   }
 
-  centerText("←/→ color    ↑/↓ style", H * 0.855, 15, "rgba(255,255,255,0.5)");
+  const hint = RIDES.length > 1 ? "←/→ character   ↑/↓ style   C / tap = color" : "↑/↓ style   C / tap = color";
+  centerText(hint, H * 0.855, 15, "rgba(255,255,255,0.5)");
 }
 
 function drawChevron(cx, cy, dir) {

@@ -36,7 +36,8 @@ def save(im, name):
 
 
 def build_ride(prefix, poses, pad=8):
-    """poses: {pose_key: source_filename}. Cbrop all to a shared bbox."""
+    """Shared-crop: when every pose shares one canvas at a consistent scale,
+    crop them all to the union bbox so the bike stays registered. (Crayons.)"""
     imgs = {k: load(f) for k, f in poses.items()}
     boxes = [content_bbox(im) for im in imgs.values()]
     l = min(b[0] for b in boxes) - pad
@@ -48,6 +49,27 @@ def build_ride(prefix, poses, pad=8):
     print(f"Ride '{prefix}': shared crop {box} -> {(box[2]-box[0], box[3]-box[1])}")
     for key, im in imgs.items():
         save(im.crop(box), f"player_{prefix}_{key}.png")
+
+
+def build_ride_aligned(prefix, poses, pad=14, thresh=45):
+    """Trim + bottom-center align: when poses come on DIFFERENT canvas sizes
+    (mismatched framing) but the bike is drawn at a consistent pixel scale,
+    trim each to content and drop them onto one common canvas, bottom-aligned so
+    the tyres share a baseline and horizontally centred. (Eggs.)"""
+    trimmed = {}
+    for k, f in poses.items():
+        im = load(f)
+        bb = content_bbox(im, thresh)
+        trimmed[k] = im.crop(bb)
+    W = max(t.width for t in trimmed.values()) + pad * 2
+    H = max(t.height for t in trimmed.values()) + pad * 2
+    print(f"Ride '{prefix}': aligned canvas {(W, H)}  wheelFrac~{round((H - pad) / H, 3)}")
+    for key, t in trimmed.items():
+        canvas = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+        x = (W - t.width) // 2          # centre horizontally
+        y = H - pad - t.height          # bottom-align content (tyres share a line)
+        canvas.alpha_composite(t, (x, y))
+        save(canvas, f"player_{prefix}_{key}.png")
 
 
 # ===========================================================================
@@ -63,6 +85,18 @@ build_ride("crayons", {
     "air":     "crayons_ariborne_01.png",   # (source filename has a typo)
     "land":    "crayons_landing_01.png",
     "crash":   "crayons_crash_01.png",
+})
+
+# ===========================================================================
+#  RIDE: Eggs  (idle frames are a different canvas size than the action poses,
+#  so use the trim + bottom-center alignment mode)
+# ===========================================================================
+build_ride_aligned("eggs", {
+    "ride":    "eggs_idle_01.png",
+    "wheelie": "eggs_wheelie_01.png",
+    "air":     "eggs_airborne_01.png",
+    "land":    "eggs_landing_01.png",
+    "crash":   "eggs_crash_01.png",
 })
 
 print("Done. Assets in", OUT)
