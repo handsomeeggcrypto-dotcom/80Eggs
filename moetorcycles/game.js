@@ -208,14 +208,23 @@ function pointerMenu(e, r) {
   else if (state === STATE.DEAD) startGame();
 }
 
-/* ---------- World / player ---------- */
+/* ---------- World / player ----------
+   Tuned for long, floaty, graceful arcs (Robot Unicorn Attack feel) rather than
+   short punchy hops. Low gravity + soft launch = ~1.5s of hang time and a wide
+   ~260px arc; a single jump carries the rider a long, relaxing distance. */
 const GROUND_MARGIN = 120;      // default surface distance from bottom
-const GRAVITY = 2600;           // px/s^2
-const JUMP_V = -1020;           // initial jump velocity
-const JUMP_CUT = 0.45;          // release-to-cut multiplier
-const MAX_FALL = 1900;
+const GRAVITY = 1000;           // px/s^2 (was 2600 — much floatier)
+const JUMP_V = -720;            // initial jump velocity (softer launch)
+const JUMP_CUT = 0.55;          // release-to-cut multiplier (gentle tap-hops)
+const MAX_FALL = 1150;          // gentle terminal descent
 const PLAYER_H = 150;           // drawn height
 const PLAYER_X = W * 0.26;      // fixed screen x of player center
+
+// Forward pace — calm, with a slow ramp and a modest cap so it stays relaxing.
+const SPEED_START = 480;
+const SPEED_RAMP = 5;           // px/s added per second
+const SPEED_MAX = 800;
+const DASH_MULT = 1.6;          // dash speed multiplier (was 1.9)
 
 let player, world, particles, stars, obstacles, score, speed, distance, animT, screenShake, deathTimer, trail;
 
@@ -238,7 +247,7 @@ function resetRun() {
   trail = [];
   score = 0;
   distance = 0;
-  speed = 560;
+  speed = SPEED_START;
   animT = 0;
   screenShake = 0;
   deathTimer = 0;
@@ -255,8 +264,11 @@ function resetRun() {
 let lastTop;
 function generateAhead() {
   while (world.nextX < distance + W * 2.2) {
-    // decide: platform or gap
-    const gap = Math.random() < 0.42 ? rand(120, 260) : 0;
+    // decide: platform or gap. Gaps are wide (the floaty jump carries ~690px)
+    // so clearing them feels like a long, deliberate arc, but stays forgiving.
+    const prevTop = lastTop;
+    const gap = Math.random() < 0.40 ? rand(200, 460) : 0;
+    const gapStart = world.nextX;
     world.nextX += gap;
 
     const w = rand(260, 620);
@@ -266,6 +278,19 @@ function generateAhead() {
     const seg = { x: world.nextX, w, top };
     world.segs.push(seg);
     lastTop = top;
+
+    // reward the jump: arc a line of stars over the gap
+    if (gap > 120) {
+      const n = randi(3, 5);
+      const base = Math.min(prevTop, top);
+      const peak = rand(90, 180);
+      for (let i = 0; i < n; i++) {
+        const tt = (i + 1) / (n + 1);
+        const sx = gapStart + tt * gap;
+        const sy = base - 40 - Math.sin(tt * Math.PI) * peak;
+        stars.push({ x: sx, y: sy, got: false, spin: Math.random() * 6 });
+      }
+    }
 
     // sprinkle collectible stars in an arc over this segment
     if (Math.random() < 0.8) {
@@ -322,8 +347,8 @@ function update(dt) {
   }
 
   animT += dt;
-  speed += dt * 9;                 // gradual ramp
-  const dx = speed * (player.dashT > 0 ? 1.9 : 1) * dt;
+  speed = Math.min(speed + dt * SPEED_RAMP, SPEED_MAX); // slow, capped ramp
+  const dx = speed * (player.dashT > 0 ? DASH_MULT : 1) * dt;
   distance += dx;
   score += dx * 0.02;
 
