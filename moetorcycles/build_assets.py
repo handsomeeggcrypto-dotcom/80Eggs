@@ -127,9 +127,11 @@ build_ride_aligned("eggs", {
 })
 
 # ===========================================================================
-#  RIDE: Bradley  (all source frames now transparent — no white-keying needed)
+#  RIDE: Bradley  (frames span TWO canvas sizes — wheelie_01 & crash_02 are
+#  1536x1024, the rest 1254x1254 — so use the trim+align mode, not shared-crop,
+#  or the wider frames get their bike front clipped)
 # ===========================================================================
-build_ride("bradley", {
+build_ride_aligned("bradley", {
     "ride":    "bradley_idle_01.png",
     "wheelie": "bradley_wheelie_01.png",
     "air":     "bradley_airborne_02.png",

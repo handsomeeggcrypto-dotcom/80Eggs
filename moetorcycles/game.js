@@ -63,8 +63,8 @@ const RIDES = [
     name: "Bradley",
     tagline: "Next-gen hyperbike. 中国心.",
     cost: 250,
-    scale: 1.5,
-    wheelFrac: 0.90,
+    scale: 1.62,
+    wheelFrac: 0.986,
     frames: {
       ride:    "assets/player_bradley_ride.png",
       wheelie: "assets/player_bradley_wheelie.png",
