@@ -156,6 +156,18 @@ const Sound = (() => {
       tone(mtof(base), t, 0.10, "triangle", 0.3);
       tone(mtof(base + 5), t + 0.06, 0.12, "triangle", 0.28);
     },
+    boost() { // big soaring whoosh when you fly through a ring
+      if (!guard()) return;
+      const t = ctx.currentTime;
+      const n = noise(t, 0.5, 0.5, "bandpass", 600, 1.0);
+      n.f.frequency.setValueAtTime(400, t);
+      n.f.frequency.exponentialRampToValueAtTime(6000, t + 0.45);
+      const o = tone(220, t, 0.5, "sawtooth", 0.22);
+      o.frequency.exponentialRampToValueAtTime(900, t + 0.4);
+      tone(mtof(84), t, 0.14, "triangle", 0.25);
+      tone(mtof(89), t + 0.08, 0.18, "triangle", 0.22);
+      tone(mtof(93), t + 0.16, 0.2, "triangle", 0.2);
+    },
     smash() {
       if (!guard()) return;
       const t = ctx.currentTime;

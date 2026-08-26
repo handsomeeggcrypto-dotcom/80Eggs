@@ -58,12 +58,30 @@ const RIDES = [
     },
     preview: "assets/player_eggs_ride.png",
   },
+  {
+    id: "bradley",
+    name: "Bradley",
+    tagline: "Next-gen hyperbike. 中国心.",
+    cost: 250,
+    scale: 1.5,
+    wheelFrac: 0.90,
+    frames: {
+      ride:    "assets/player_bradley_ride.png",
+      wheelie: "assets/player_bradley_wheelie.png",
+      air:     "assets/player_bradley_air.png",
+      land:    "assets/player_bradley_land.png",
+      crash:   "assets/player_bradley_crash.png",
+    },
+    preview: "assets/player_bradley_ride.png",
+  },
 ];
 
-/* ---------- Maps (selectable independently of the character) ---------- */
+/* ---------- Maps (selectable independently of the character) ----------
+   `road` picks the road styling (see drawRoad): "neon" | "dirt" | "china". */
 const MAPS = [
-  { id: "crayons", name: "Neon City",   cost: 0,   bg: bgSet("crayons") },
-  { id: "eggs",    name: "Countryside", cost: 100, bg: bgSet("eggs") },
+  { id: "crayons", name: "Neon City",   cost: 0,   bg: bgSet("crayons"), road: "neon" },
+  { id: "eggs",    name: "Countryside", cost: 100, bg: bgSet("eggs"),    road: "dirt" },
+  { id: "china",   name: "China City",  cost: 200, bg: bgSet("china"),   road: "china" },
 ];
 
 /* ---------- Asset loading (by URL, cached) ---------- */
@@ -109,6 +127,7 @@ const TRAIL_COLORS = [
   { name: "Green",  css: "#7dff9b", cost: 30 },
   { name: "Purple", css: "#c78bff", cost: 30 },
   { name: "White",  css: "#ffffff", cost: 30 },
+  { name: "China Red", css: "#ee1c25", cost: 40 }, // Chinese-flag red
 ];
 const TRAIL_DESIGNS = [
   { id: "line",    name: "Neon Line",  cost: 0 },
@@ -117,6 +136,7 @@ const TRAIL_DESIGNS = [
   { id: "dashed",  name: "Dashed",     cost: 40 },
   { id: "bubbles", name: "Bubbles",    cost: 40 },
   { id: "stars",   name: "Star Trail", cost: 60 },
+  { id: "curtain", name: "Curtain",    cost: 70 }, // full bike-height banner
 ];
 
 /* ---------- Currency + unlocks ----------
@@ -282,6 +302,10 @@ const SPEED_START = 480;
 const SPEED_RAMP = 5;           // px/s added per second
 const SPEED_MAX = 800;
 const DASH_MULT = 1.6;          // dash speed multiplier (was 1.9)
+// Flying through a giant ring = a soaring forward boost.
+const BOOST_MULT = 2.0;         // forward speed surge while boosting
+const BOOST_TIME = 0.85;        // seconds the surge lasts
+const BOOST_LIFT = 320;         // upward impulse on entry (soar forward)
 
 let player, world, particles, stars, obstacles, rings, score, speed, distance, animT, screenShake, deathTimer, trail;
 let combo, comboTimer, runStars;
@@ -296,6 +320,7 @@ function resetRun() {
     jumps: 0,
     dashT: 0,          // remaining dash time
     dashCd: 0,
+    boostT: 0,         // remaining ring-boost time
     landT: 0,          // landing animation timer
     alive: true,
     tilt: 0,
@@ -341,16 +366,16 @@ function generateAhead() {
     world.segs.push(seg);
     lastTop = top;
 
-    // reward the jump: arc a line of gold RINGS over the gap to fly through
+    // reward the jump: 1–2 GIANT gold rings over the gap — fly through for a boost
     if (gap > 120) {
-      const n = randi(3, 5);
+      const n = gap > 340 ? 2 : 1;
       const base = Math.min(prevTop, top);
-      const peak = rand(110, 200);
+      const peak = rand(120, 210);
       for (let i = 0; i < n; i++) {
         const tt = (i + 1) / (n + 1);
         const rx = gapStart + tt * gap;
-        const ry = base - 60 - Math.sin(tt * Math.PI) * peak;
-        rings.push({ x: rx, y: ry, r: 34, got: false, spin: Math.random() * 6 });
+        const ry = base - 80 - Math.sin(tt * Math.PI) * peak;
+        rings.push({ x: rx, y: ry, r: 58, got: false, spin: Math.random() * 6 });
       }
     }
 
@@ -431,13 +456,15 @@ function update(dt) {
 
   animT += dt;
   speed = Math.min(speed + dt * SPEED_RAMP, SPEED_MAX); // slow, capped ramp
-  const dx = speed * (player.dashT > 0 ? DASH_MULT : 1) * dt;
+  const spdMult = Math.max(player.dashT > 0 ? DASH_MULT : 1, player.boostT > 0 ? BOOST_MULT : 1);
+  const dx = speed * spdMult * dt;
   distance += dx;
   score += dx * 0.02;
 
   // timers
   if (player.dashT > 0) player.dashT -= dt;
   if (player.dashCd > 0) player.dashCd -= dt;
+  if (player.boostT > 0) player.boostT -= dt;
   if (player.landT > 0) player.landT -= dt;
   screenShake *= 0.88;
 
@@ -517,17 +544,22 @@ function update(dt) {
     }
   }
 
-  // rings — fly through them (bigger points), build combo faster
+  // rings — fly through a giant ring for a soaring forward BOOST
   for (const rg of rings) {
     if (rg.got) continue;
     rg.spin += dt * 3;
     const rx = rg.x - distance;
-    if (Math.hypot(rx - pcx, rg.y - pcy) < rg.r + 18) {
+    if (Math.hypot(rx - pcx, rg.y - pcy) < rg.r * 0.72) {
       rg.got = true;
       combo += 2; comboTimer = COMBO_WINDOW;
       score += 60 * comboMult();
-      Sound.star(combo + 6);
-      for (let i = 0; i < 14; i++) spawnSpark(rx, rg.y, ["#ffd23f","#fff3b0","#ffe066"][i % 3]);
+      // forward surge + upward lift so you soar out of the ring
+      player.boostT = BOOST_TIME;
+      player.vy = Math.min(player.vy, -BOOST_LIFT);
+      player.onGround = false; player.jumps = Math.min(player.jumps, 1);
+      screenShake = 6;
+      Sound.boost();
+      for (let i = 0; i < 22; i++) spawnSpark(rx, rg.y, ["#ffd23f","#fff3b0","#ffe066","#fff"][i % 4]);
     }
   }
 
@@ -541,7 +573,7 @@ function update(dt) {
     const overlapX = ox + o.w > pLeft && ox < pRight;
     const overlapY = pBot > oTop && pTop < o.top;
     if (overlapX && overlapY) {
-      if (player.dashT > 0) {
+      if (player.dashT > 0 || player.boostT > 0) {  // dashing or ring-boosting smashes through
         o.dead = true; score += 15; screenShake = 10;
         Sound.smash();
         for (let i = 0; i < 16; i++) spawnSpark(ox, oTop, ["#ff5bd0","#5bc8ff","#ffe066","#7dff9b"][i%4]);
@@ -553,6 +585,8 @@ function update(dt) {
 
   // ambient sparkle trail
   if (Math.random() < 0.6) spawnTrail();
+  // boost speed lines streaking back
+  if (player.boostT > 0) for (let i = 0; i < 2; i++) spawnSpeedLine();
 
   // particle update
   for (const p of particles) {
@@ -593,6 +627,14 @@ function spawnTrail() {
     r: rand(2, 5),
     color: ["#ff5bd0","#5bc8ff","#ffe066","#7dff9b","#c78bff"][randi(0,4)],
     kind: "trail",
+  });
+}
+// white streaks flying backward during a ring boost
+function spawnSpeedLine() {
+  particles.push({
+    x: PLAYER_X + rand(-40, 140), y: player.y + rand(0, PLAYER_H),
+    vx: -rand(900, 1500), vy: 0, g: 0, life: rand(0.18, 0.34),
+    r: rand(10, 26), color: "rgba(255,255,255,0.7)", kind: "streak",
   });
 }
 
@@ -695,15 +737,51 @@ function drawWorld() {
   }
 }
 
-// A bold dark road so the bright rider/props pop, with a neon curb and a
-// scrolling dashed center line. `worldX` keeps the dashes continuous.
+// Road styling is per-map (see MAPS[].road).
 function drawRoad(x, topY, w, worldX) {
+  const style = MAPS[selMap].road;
+  if (style === "dirt") drawRoadDirt(x, topY, w, worldX);
+  else if (style === "china") drawRoadChina(x, topY, w, worldX);
+  else drawRoadNeon(x, topY, w, worldX);
+}
+
+// China City: dark asphalt with a red+gold curb and gold dashes.
+function drawRoadChina(x, topY, w, worldX) {
   ctx.save();
-  // dark outline strip that separates the road from the busy background
+  ctx.fillStyle = "rgba(10,4,6,0.6)";
+  ctx.fillRect(x - 2, topY - 10, w + 4, 10);
+
+  const body = ctx.createLinearGradient(0, topY, 0, H);
+  body.addColorStop(0, "#2a1418");
+  body.addColorStop(0.15, "#1c0d10");
+  body.addColorStop(1, "#0b0506");
+  ctx.fillStyle = body;
+  ctx.fillRect(x, topY, w, H - topY);
+
+  // red curb with a gold top line
+  ctx.fillStyle = "#ee1c25";
+  ctx.fillRect(x, topY, w, 9);
+  ctx.fillStyle = "#ffcf33";
+  ctx.fillRect(x, topY, w, 3);
+
+  // scrolling gold dashes
+  const dashY = topY + 34, dashW = 46, gap = 42, period = dashW + gap;
+  ctx.fillStyle = "rgba(255,207,51,0.9)";
+  const start = worldX - ((worldX % period) + period) % period;
+  for (let d = start; d < worldX + w + period; d += period) {
+    const sx = d - worldX + x;
+    const clipL = Math.max(sx, x), clipR = Math.min(sx + dashW, x + w);
+    if (clipR > clipL) ctx.fillRect(clipL, dashY, clipR - clipL, 5);
+  }
+  ctx.restore();
+}
+
+// Neon City: dark asphalt, neon curb, scrolling dashed center line.
+function drawRoadNeon(x, topY, w, worldX) {
+  ctx.save();
   ctx.fillStyle = "rgba(8,3,20,0.55)";
   ctx.fillRect(x - 2, topY - 10, w + 4, 10);
 
-  // road body
   const body = ctx.createLinearGradient(0, topY, 0, H);
   body.addColorStop(0, "#241238");
   body.addColorStop(0.15, "#1a0e2b");
@@ -711,45 +789,88 @@ function drawRoad(x, topY, w, worldX) {
   ctx.fillStyle = body;
   ctx.fillRect(x, topY, w, H - topY);
 
-  // neon curb band along the driving surface
   const curb = ctx.createLinearGradient(x, 0, x + w, 0);
   curb.addColorStop(0.0, "#ff5bd0");
   curb.addColorStop(0.5, "#c78bff");
   curb.addColorStop(1.0, "#5bc8ff");
   ctx.fillStyle = curb;
   ctx.fillRect(x, topY, w, 9);
-  // white highlight line on top of the curb
   ctx.fillStyle = "rgba(255,255,255,0.95)";
   ctx.fillRect(x, topY, w, 3);
 
-  // scrolling dashed center line
   const dashY = topY + 34, dashW = 46, gap = 42, period = dashW + gap;
   ctx.fillStyle = "rgba(255,224,102,0.85)";
-  let start = worldX - ((worldX % period) + period) % period; // align to world grid
-  for (let dx = start; dx < worldX + w + period; dx += period) {
-    const sx = dx - worldX + x;
+  const start = worldX - ((worldX % period) + period) % period;
+  for (let d = start; d < worldX + w + period; d += period) {
+    const sx = d - worldX + x;
     const clipL = Math.max(sx, x), clipR = Math.min(sx + dashW, x + w);
     if (clipR > clipL) ctx.fillRect(clipL, dashY, clipR - clipL, 5);
   }
   ctx.restore();
 }
 
-// RUA-style gold ring you fly through (drawn as a shimmering torus)
+// Countryside: packed dirt / gravel — earthy body, grassy fringe, scattered
+// pebbles + wheel ruts (all positioned by world-x so they scroll, no flicker).
+function drawRoadDirt(x, topY, w, worldX) {
+  ctx.save();
+  // grassy fringe just above the surface
+  ctx.fillStyle = "#5c7d33";
+  ctx.fillRect(x - 2, topY - 8, w + 4, 8);
+  ctx.fillStyle = "rgba(30,45,16,0.5)";
+  ctx.fillRect(x - 2, topY - 2, w + 4, 3);
+
+  // dirt body
+  const body = ctx.createLinearGradient(0, topY, 0, H);
+  body.addColorStop(0, "#a5793f");
+  body.addColorStop(0.12, "#8a6234");
+  body.addColorStop(0.5, "#6a4a26");
+  body.addColorStop(1, "#4a331b");
+  ctx.fillStyle = body;
+  ctx.fillRect(x, topY, w, H - topY);
+
+  // lighter packed-dirt strip at the surface
+  ctx.fillStyle = "rgba(214,178,120,0.55)";
+  ctx.fillRect(x, topY, w, 6);
+
+  // two darker wheel ruts
+  ctx.fillStyle = "rgba(60,40,20,0.35)";
+  ctx.fillRect(x, topY + 26, w, 4);
+  ctx.fillRect(x, topY + 52, w, 4);
+
+  // gravel pebbles, deterministic per world cell so they scroll steadily
+  const cell = 26;
+  const c0 = Math.floor(worldX / cell), c1 = Math.ceil((worldX + w) / cell);
+  for (let c = c0; c <= c1; c++) {
+    const h1 = Math.sin(c * 12.9898) * 43758.5453; const rnd = h1 - Math.floor(h1);
+    const h2 = Math.sin(c * 78.233) * 12543.187;   const rnd2 = h2 - Math.floor(h2);
+    const px = c * cell + rnd * cell - worldX + x;
+    if (px < x || px > x + w) continue;
+    const py = topY + 12 + rnd2 * (Math.min(70, H - topY - 12));
+    const pr = 1.4 + rnd * 2.6;
+    ctx.fillStyle = rnd2 > 0.5 ? "rgba(225,205,170,0.6)" : "rgba(70,50,28,0.55)";
+    ctx.beginPath(); ctx.arc(px, py, pr, 0, Math.PI * 2); ctx.fill();
+  }
+  ctx.restore();
+}
+
+// Giant RUA-style boost ring you fly through (shimmering, pulsing gold torus)
 function drawRing(x, y, r, rot) {
   ctx.save();
   ctx.translate(x, y);
-  const wob = 0.72 + 0.28 * Math.abs(Math.sin(rot)); // fake 3-D spin (squash x)
-  ctx.scale(wob, 1);
+  const pulse = 1 + 0.04 * Math.sin(t * 6 + rot);
+  ctx.scale((0.7 + 0.3 * Math.abs(Math.sin(rot))) * pulse, pulse); // fake 3-D spin
   ctx.lineJoin = "round"; ctx.lineCap = "round";
-  ctx.shadowColor = "#ffd23f"; ctx.shadowBlur = 22;
-  // outer dark rim
+  // soft aura
+  ctx.shadowColor = "#ffd23f"; ctx.shadowBlur = 34;
   ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI * 2);
-  ctx.lineWidth = 12; ctx.strokeStyle = "#8a5a00"; ctx.stroke();
-  // gold band
-  ctx.lineWidth = 8; ctx.strokeStyle = "#ffcf33"; ctx.stroke();
-  // bright highlight
+  ctx.lineWidth = 20; ctx.strokeStyle = "#a86a00"; ctx.stroke(); // dark rim
+  ctx.lineWidth = 13; ctx.strokeStyle = "#ffcf33"; ctx.stroke(); // gold band
   ctx.shadowBlur = 0;
-  ctx.lineWidth = 3; ctx.strokeStyle = "rgba(255,255,255,0.85)"; ctx.stroke();
+  ctx.lineWidth = 5;  ctx.strokeStyle = "#fff2ad"; ctx.stroke(); // inner glow
+  // rotating highlight glint
+  ctx.beginPath();
+  ctx.arc(0, 0, r, rot, rot + 0.9);
+  ctx.lineWidth = 6; ctx.strokeStyle = "rgba(255,255,255,0.95)"; ctx.stroke();
   ctx.restore();
 }
 
@@ -850,6 +971,47 @@ function drawTrail(pts) {
   // near-constant thickness; fade/thin only over the oldest ~25% (the tail)
   const taper = (f) => Math.min(1, f * 4);
 
+  // Curtain: a full bike-height banner billowing OFF the bike — full height at
+  // the bike end, tapering + fluttering like fabric toward the free tail.
+  if (design === "curtain") {
+    const TALL = PLAYER_H * 1.42;
+    // per-point geometry: height (tall at head/bike, short at tail) + flutter
+    const topY = (i) => {
+      const f = i / (len - 1);                 // 0 tail … 1 head (at the bike)
+      const hgt = TALL * (0.28 + 0.72 * f);    // billows out to full height at the bike
+      const flutter = Math.sin(pts[i].x * 0.03 + t * 6) * 20 * (1 - f) +
+                      Math.sin(pts[i].x * 0.011 - t * 3) * 10 * (1 - f * 0.6);
+      return pts[i].y - hgt + flutter;
+    };
+    ctx.shadowColor = colCss; ctx.shadowBlur = 16;
+    for (let i = 1; i < len; i++) {
+      const tp = taper(i / len);
+      ctx.globalAlpha = tp * 0.52;
+      ctx.fillStyle = trailColorAt(i, len, colCss);
+      ctx.beginPath();
+      ctx.moveTo(pts[i - 1].x, topY(i - 1));
+      ctx.lineTo(pts[i].x, topY(i));
+      ctx.lineTo(pts[i].x, pts[i].y);
+      ctx.lineTo(pts[i - 1].x, pts[i - 1].y);
+      ctx.closePath(); ctx.fill();
+    }
+    // a brighter inner sweep (half height) for depth, and edges
+    ctx.shadowBlur = 0;
+    for (let i = 1; i < len; i++) {
+      const tp = taper(i / len);
+      // bright bottom edge = the wheel path (anchors it to the bike)
+      ctx.globalAlpha = tp * 0.95;
+      ctx.strokeStyle = trailColorAt(i, len, colCss); ctx.lineWidth = 6;
+      ctx.beginPath(); ctx.moveTo(pts[i - 1].x, pts[i - 1].y); ctx.lineTo(pts[i].x, pts[i].y); ctx.stroke();
+      // wavy top edge highlight
+      ctx.globalAlpha = tp * 0.55;
+      ctx.strokeStyle = "rgba(255,255,255,0.65)"; ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.moveTo(pts[i - 1].x, topY(i - 1)); ctx.lineTo(pts[i].x, topY(i)); ctx.stroke();
+    }
+    ctx.restore();
+    return;
+  }
+
   if (design === "bubbles" || design === "stars") {
     const step = design === "bubbles" ? 3 : 4;
     for (let i = 0; i < len; i += step) {
@@ -942,10 +1104,12 @@ function drawPlayer() {
   ctx.translate(PLAYER_X, player.y + PLAYER_H); // pivot on the road contact line
   ctx.rotate(player.tilt * 0.18);               // subtle; poses already convey motion
 
-  if (player.dashT > 0) {
-    ctx.shadowColor = "#5bc8ff"; ctx.shadowBlur = 40;
+  if (player.dashT > 0 || player.boostT > 0) {
+    const boosting = player.boostT > 0;
+    ctx.shadowColor = boosting ? "#ffd23f" : "#5bc8ff";
+    ctx.shadowBlur = boosting ? 55 : 40;
     ctx.globalAlpha = 0.6;
-    ctx.drawImage(sprite, dx - 30, dy, w, h);
+    ctx.drawImage(sprite, dx - (boosting ? 44 : 30), dy, w, h);
     ctx.globalAlpha = 1;
   }
   ctx.drawImage(sprite, dx, dy, w, h);
@@ -956,7 +1120,9 @@ function drawParticles() {
   for (const p of particles) {
     ctx.globalAlpha = clamp(p.life * 2, 0, 1);
     ctx.fillStyle = p.color;
-    if (p.kind === "trail") {
+    if (p.kind === "streak") {
+      ctx.fillRect(p.x, p.y, p.r * 3, 2);
+    } else if (p.kind === "trail") {
       ctx.fillRect(p.x, p.y, p.r * 2, p.r);
     } else {
       ctx.beginPath();

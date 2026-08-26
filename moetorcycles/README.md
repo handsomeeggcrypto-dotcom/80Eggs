@@ -50,7 +50,9 @@ Then open http://localhost:8777/ in your browser.
 
 ## Combo, rings & star currency
 
-- **Gold rings** arc over every gap — fly through them (RUA-style) for big points.
+- **Giant boost rings** arc over every gap — fly through one for a **soaring
+  forward boost** (upward lift + a ~0.85s speed surge, `BOOST_*`), with speed
+  lines, a gold glow, and a whoosh. The boost also smashes obstacles.
 - **Combo multiplier**: each star or ring builds a chain; the multiplier climbs
   ×1→×8 (`comboMult`) and drives all collectible score. It drains if you stop
   collecting (`COMBO_WINDOW`), shown by the timer bar under the ×N HUD.
@@ -63,7 +65,9 @@ Characters, maps, and trail colors/styles each carry a `cost` (0 = free). On the
 select screen, **tap a locked item to unlock it** (or `U` for the character);
 the 🌟 bank is top-right. Maps are chosen **independently of the character**, so
 any unlocked character can ride any unlocked map (the select screen previews the
-chosen map as its live background). Unlock state persists in
+chosen map as its live background). Each map also sets its **road style**
+(`MAPS[].road`, dispatched in `drawRoad`): Neon City = neon asphalt, Countryside
+= dirt/gravel. Unlock state persists in
 `moetorcycles_unlocks`; the bank in `moetorcycles_bank`.
 
 Select controls: `←/→` character, `[ ]` map (or tap a map card), `↑/↓` trail
@@ -104,6 +108,11 @@ Source art lives on the desktop in `~/Desktop/moetorcycle/`. Regenerate
 ```bash
 cd moetorcycles && python3 build_assets.py
 ```
+
+Some AI batches arrive on a **solid white background** (e.g. Bradley's action
+poses). `remove_white_bg` in the pipeline keys that out via a **border
+flood-fill** (so white *on* the bike is preserved) — pass it as `preprocess=` to
+`build_ride`. Frames that are already transparent pass through untouched.
 
 The pipeline has two alignment modes (AI art framing varies between batches):
 

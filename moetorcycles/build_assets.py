@@ -14,7 +14,7 @@ keeps the bike aligned across poses so it doesn't hop when the pose changes.
 Re-run any time the source art changes.
 """
 import os
-from PIL import Image
+from PIL import Image, ImageDraw
 
 SRC = os.path.expanduser("~/Desktop/moetorcycle")
 OUT = os.path.join(os.path.dirname(__file__), "assets")
@@ -30,15 +30,42 @@ def content_bbox(im, thresh=25):
     return alpha.getbbox()
 
 
+def remove_white_bg(im, thresh=34):
+    """Some AI frames come on a solid WHITE background. Flood-fill from the
+    border (not a global key) so white *on* the bike/rider is preserved, and
+    make the surrounding white transparent. Frames already transparent at the
+    border are left untouched (no near-white seeds fire)."""
+    im = im.convert("RGBA")
+    w, h = im.size
+    rgb = im.convert("RGB")
+    SENT = (255, 0, 255)  # sentinel colour not present in the art
+    px = rgb.load()
+    def whiteish(p): return p[0] > 225 and p[1] > 225 and p[2] > 225
+    seeds = []
+    for xx in range(0, w, 16): seeds += [(xx, 0), (xx, h - 1)]
+    for yy in range(0, h, 16): seeds += [(0, yy), (w - 1, yy)]
+    for s in seeds:
+        if px[s] != SENT and whiteish(px[s]):
+            ImageDraw.floodfill(rgb, s, SENT, thresh=thresh)
+    # keep each pixel's original alpha; only zero out the keyed (sentinel) bg
+    orig = list(im.split()[3].getdata())
+    rd = list(rgb.getdata())
+    alpha = Image.new("L", (w, h))
+    alpha.putdata([0 if rd[i] == SENT else orig[i] for i in range(len(rd))])
+    im.putalpha(alpha)
+    return im
+
+
 def save(im, name):
     im.save(os.path.join(OUT, name))
     print(f"  {name:26s} {im.size}")
 
 
-def build_ride(prefix, poses, pad=8):
+def build_ride(prefix, poses, pad=8, preprocess=None):
     """Shared-crop: when every pose shares one canvas at a consistent scale,
-    crop them all to the union bbox so the bike stays registered. (Crayons.)"""
-    imgs = {k: load(f) for k, f in poses.items()}
+    crop them all to the union bbox so the bike stays registered. (Crayons.)
+    `preprocess` (e.g. remove_white_bg) runs on each frame first."""
+    imgs = {k: (preprocess(load(f)) if preprocess else load(f)) for k, f in poses.items()}
     boxes = [content_bbox(im) for im in imgs.values()]
     l = min(b[0] for b in boxes) - pad
     t = min(b[1] for b in boxes) - pad
@@ -97,6 +124,17 @@ build_ride_aligned("eggs", {
     "air":     "eggs_airborne_01.png",
     "land":    "eggs_landing_01.png",
     "crash":   "eggs_crash_01.png",
+})
+
+# ===========================================================================
+#  RIDE: Bradley  (all source frames now transparent — no white-keying needed)
+# ===========================================================================
+build_ride("bradley", {
+    "ride":    "bradley_idle_01.png",
+    "wheelie": "bradley_wheelie_01.png",
+    "air":     "bradley_airborne_02.png",
+    "land":    "bradley_landing_01.png",
+    "crash":   "bradley_crash_02.png",
 })
 
 print("Done. Assets in", OUT)
