@@ -48,6 +48,27 @@ Then open http://localhost:8777/ in your browser.
 - Fall into a gap = crash. Collect ⭐ stars for bonus points.
 - Speed ramps up the longer you survive. Best score is saved locally.
 
+## Combo, rings & star currency
+
+- **Gold rings** arc over every gap — fly through them (RUA-style) for big points.
+- **Combo multiplier**: each star or ring builds a chain; the multiplier climbs
+  ×1→×8 (`comboMult`) and drives all collectible score. It drains if you stop
+  collecting (`COMBO_WINDOW`), shown by the timer bar under the ×N HUD.
+- **Stars are currency**: each collected star banks one 🌟 (persisted in
+  `localStorage`, survives death). Spend them to unlock content.
+
+## Unlocks & mix-and-match maps
+
+Characters, maps, and trail colors/styles each carry a `cost` (0 = free). On the
+select screen, **tap a locked item to unlock it** (or `U` for the character);
+the 🌟 bank is top-right. Maps are chosen **independently of the character**, so
+any unlocked character can ride any unlocked map (the select screen previews the
+chosen map as its live background). Unlock state persists in
+`moetorcycles_unlocks`; the bank in `moetorcycles_bank`.
+
+Select controls: `←/→` character, `[ ]` map (or tap a map card), `↑/↓` trail
+style, `C` trail color, `U` unlock, `Space`/tap the bottom prompt to ride.
+
 ## Sound
 
 All audio is **synthesized at runtime** with the Web Audio API — no audio files,
@@ -118,8 +139,9 @@ The select screen is a carousel — extra rides show up automatically with
 - [x] Real background art (4 parallax layers) — **done**
 - [x] Tron-style trails (6 colors × 6 styles, picker on select screen) — **done**
 - [x] Sound — synthesized SFX + looping soundtrack + mute — **done**
-- [ ] Combo multiplier + near-miss bonus
-- [ ] Star currency that unlocks trails / characters
+- [x] Combo multiplier + fly-through gold rings — **done**
+- [x] Star currency + unlockable characters / maps / trails, mix-and-match maps — **done**
+- [ ] Near-miss bonus
 - [ ] More rides (character-on-bike combos), each as single-frame art
 - [ ] More maps / background sets
 - [ ] Sound + music

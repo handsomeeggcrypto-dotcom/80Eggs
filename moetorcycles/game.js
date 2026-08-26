@@ -21,33 +21,32 @@ function bgSet(prefix) {
 // Optional dusk tint to unify a bright sky with the neon night layers (0 = off).
 let SKY_TINT = 0.0;
 
-/* ---------- Roster ----------
-   One RIDE = one character already on a bike (a fixed combo).
-   Each ride supplies single-frame sprites (character-on-bike) per pose, its own
-   parallax `bg` map, a `preview` image, and sprite draw tuning.
-   To add a ride: drop its frame + bg PNGs in assets/ and add an entry here. */
+/* ---------- Characters ----------
+   A character = one rider-on-bike (single frames per pose). Maps are chosen
+   separately (see MAPS) so any unlocked character can ride any unlocked map.
+   `cost` = stars to unlock (0 = free). `RIDES`/`selRide` name kept internally. */
 const RIDES = [
   {
     id: "crayons",
     name: "Crayons",
     tagline: "Ride your dreams. Color everything.",
-    // sprite draw tuning (per ride, since art framing differs between rides)
+    cost: 0,
     scale: 1.36,      // drawn height = PLAYER_H * scale
     wheelFrac: 0.935, // fraction of sprite height where the tyres touch ground
     frames: {
-      ride:    "assets/player_crayons_ride.png",     // single cruise frame (+ bob)
-      wheelie: "assets/player_crayons_wheelie.png",  // rising / takeoff
-      air:     "assets/player_crayons_air.png",      // falling
+      ride:    "assets/player_crayons_ride.png",
+      wheelie: "assets/player_crayons_wheelie.png",
+      air:     "assets/player_crayons_air.png",
       land:    "assets/player_crayons_land.png",
       crash:   "assets/player_crayons_crash.png",
     },
     preview: "assets/player_crayons_ride.png",
-    bg: bgSet("crayons"),
   },
   {
     id: "eggs",
     name: "Eggs",
     tagline: "Egg power. Bear it all.",
+    cost: 150,
     scale: 1.58,
     wheelFrac: 0.988,
     frames: {
@@ -58,8 +57,13 @@ const RIDES = [
       crash:   "assets/player_eggs_crash.png",
     },
     preview: "assets/player_eggs_ride.png",
-    bg: bgSet("eggs"),
   },
+];
+
+/* ---------- Maps (selectable independently of the character) ---------- */
+const MAPS = [
+  { id: "crayons", name: "Neon City",   cost: 0,   bg: bgSet("crayons") },
+  { id: "eggs",    name: "Countryside", cost: 100, bg: bgSet("eggs") },
 ];
 
 /* ---------- Asset loading (by URL, cached) ---------- */
@@ -84,8 +88,8 @@ function img(url) { return imgCache[url] || loadImg(url); }
   for (const r of RIDES) {
     urls.add(r.preview);
     for (const k in r.frames) urls.add(r.frames[k]);
-    for (const L of r.bg) urls.add(L.url);
   }
+  for (const m of MAPS) for (const L of m.bg) urls.add(L.url);
   assetTotal = urls.size;
   urls.forEach(loadImg);
 })();
@@ -94,34 +98,63 @@ function img(url) { return imgCache[url] || loadImg(url); }
 const STATE = { LOADING: "loading", TITLE: "title", SELECT: "select", PLAY: "play", DEAD: "dead" };
 let state = STATE.LOADING;
 
-let selRide = 0; // index into RIDES
+let selRide = 0; // index into RIDES (character)
+let selMap = 0;  // index into MAPS
 
-/* ---------- Tron-style trail options ---------- */
+/* ---------- Tron-style trail options (cost = stars to unlock) ---------- */
 const TRAIL_COLORS = [
-  { name: "Pink",   css: "#ff5bd0" },
-  { name: "Cyan",   css: "#5bc8ff" },
-  { name: "Yellow", css: "#ffe066" },
-  { name: "Green",  css: "#7dff9b" },
-  { name: "Purple", css: "#c78bff" },
-  { name: "White",  css: "#ffffff" },
+  { name: "Pink",   css: "#ff5bd0", cost: 0 },
+  { name: "Cyan",   css: "#5bc8ff", cost: 0 },
+  { name: "Yellow", css: "#ffe066", cost: 0 },
+  { name: "Green",  css: "#7dff9b", cost: 30 },
+  { name: "Purple", css: "#c78bff", cost: 30 },
+  { name: "White",  css: "#ffffff", cost: 30 },
 ];
 const TRAIL_DESIGNS = [
-  { id: "line",    name: "Neon Line" },
-  { id: "ribbon",  name: "Ribbon" },
-  { id: "rainbow", name: "Rainbow" },  // ignores color, cycles hue
-  { id: "dashed",  name: "Dashed" },
-  { id: "bubbles", name: "Bubbles" },
-  { id: "stars",   name: "Star Trail" },
+  { id: "line",    name: "Neon Line",  cost: 0 },
+  { id: "ribbon",  name: "Ribbon",     cost: 0 },
+  { id: "rainbow", name: "Rainbow",    cost: 50 }, // ignores color, cycles hue
+  { id: "dashed",  name: "Dashed",     cost: 40 },
+  { id: "bubbles", name: "Bubbles",    cost: 40 },
+  { id: "stars",   name: "Star Trail", cost: 60 },
 ];
+
+/* ---------- Currency + unlocks ----------
+   Collect stars (banked across runs) to unlock characters, maps, and trails.
+   Free items (cost 0) are always unlocked. Unlocked ids are stored as
+   "<kind>:<id>" e.g. "char:eggs", "map:eggs", "tc:3", "ts:2". */
+let bank = Number(localStorage.getItem("moetorcycles_bank") || 0);
+let unlocks = new Set();
+try { unlocks = new Set(JSON.parse(localStorage.getItem("moetorcycles_unlocks") || "[]")); } catch (e) {}
+let unlockFlash = 0;      // >0 = brief red "can't afford" flash
+let unlockPulse = 0;      // >0 = brief green "unlocked!" pulse
+
+function saveBank()    { localStorage.setItem("moetorcycles_bank", bank); }
+function saveUnlocks() { localStorage.setItem("moetorcycles_unlocks", JSON.stringify([...unlocks])); }
+function addStars(n)   { bank += n; saveBank(); }
+function isUnlocked(key, cost) { return !cost || unlocks.has(key); }
+function tryUnlock(key, cost) {
+  if (!cost || unlocks.has(key)) return true;
+  if (bank >= cost) {
+    bank -= cost; unlocks.add(key); saveBank(); saveUnlocks();
+    unlockPulse = 0.6; Sound.ui();
+    return true;
+  }
+  unlockFlash = 0.5; // not enough stars
+  return false;
+}
+function clampIdx(v, n) { return Number.isFinite(v) && v >= 0 && v < n ? v : 0; }
 let selTrailColor  = clampIdx(+localStorage.getItem("moetorcycles_trail_color"),  TRAIL_COLORS.length);
 let selTrailDesign = clampIdx(+localStorage.getItem("moetorcycles_trail_design"), TRAIL_DESIGNS.length);
-function clampIdx(v, n) { return Number.isFinite(v) && v >= 0 && v < n ? v : 0; }
+// a previously-saved trail choice may now be behind a paywall — fall back to free
+if (!isUnlocked("tc:" + selTrailColor, TRAIL_COLORS[selTrailColor].cost)) selTrailColor = 0;
+if (!isUnlocked("ts:" + selTrailDesign, TRAIL_DESIGNS[selTrailDesign].cost)) selTrailDesign = 0;
 function saveTrail() {
   localStorage.setItem("moetorcycles_trail_color", selTrailColor);
   localStorage.setItem("moetorcycles_trail_design", selTrailDesign);
 }
 // clickable regions on the select screen, refreshed each frame it's drawn
-const uiHits = { swatches: [], chips: [] };
+const uiHits = { swatches: [], chips: [], maps: [], charUnlock: null };
 
 let best = Number(localStorage.getItem("moetorcycles_best") || 0);
 let menuCd = 0; // debounce so one tap/press can't skip a whole screen
@@ -167,15 +200,20 @@ function handleMenuKey(code) {
   if (state === STATE.TITLE) {
     if ((code === "Space" || code === "Enter") && menuCd <= 0) { state = STATE.SELECT; menuCd = 0.3; }
   } else if (state === STATE.SELECT) {
-    // Left/Right switch character; Up/Down cycle trail style; C cycles color
+    // Left/Right = character, Up/Down = trail style, C = color, [ ] = map, U = unlock
     if (code === "ArrowLeft")  { selRide = (selRide - 1 + RIDES.length) % RIDES.length; Sound.ui(); }
     else if (code === "ArrowRight") { selRide = (selRide + 1) % RIDES.length; Sound.ui(); }
-    else if (code === "ArrowUp")   { selTrailDesign = (selTrailDesign - 1 + TRAIL_DESIGNS.length) % TRAIL_DESIGNS.length; saveTrail(); }
-    else if (code === "ArrowDown") { selTrailDesign = (selTrailDesign + 1) % TRAIL_DESIGNS.length; saveTrail(); }
-    else if (code === "KeyC") { selTrailColor = (selTrailColor + 1) % TRAIL_COLORS.length; saveTrail(); }
-    else if ((code === "Space" || code === "Enter") && menuCd <= 0) {
-      startGame();
+    else if (code === "ArrowUp")   cycleTrailStyle(-1);
+    else if (code === "ArrowDown") cycleTrailStyle(1);
+    else if (code === "KeyC")      cycleTrailColor(1);
+    else if (code === "BracketLeft")  { selMap = (selMap - 1 + MAPS.length) % MAPS.length; Sound.ui(); }
+    else if (code === "BracketRight") { selMap = (selMap + 1) % MAPS.length; Sound.ui(); }
+    else if (code === "KeyU") {
+      const c = RIDES[selRide], m = MAPS[selMap];
+      if (!isUnlocked("char:" + c.id, c.cost)) tryUnlock("char:" + c.id, c.cost);
+      else if (!isUnlocked("map:" + m.id, m.cost)) tryUnlock("map:" + m.id, m.cost);
     }
+    else if ((code === "Space" || code === "Enter") && menuCd <= 0) attemptStart();
   } else if (state === STATE.DEAD) {
     if ((code === "Space" || code === "Enter") && menuCd <= 0) startGame();
     if (code === "Escape") { state = STATE.SELECT; menuCd = 0.3; }
@@ -188,22 +226,41 @@ function pointerMenu(e, r) {
   else if (state === STATE.SELECT) {
     const mx = (e.clientX - r.left) / r.width * W;
     const my = (e.clientY - r.top) / r.height * H;
-    // swatches
+    const inRect = (b) => mx >= b.x && mx <= b.x + b.w && my >= b.y && my <= b.y + b.h;
+
+    // character unlock button
+    if (uiHits.charUnlock && inRect(uiHits.charUnlock)) {
+      tryUnlock(uiHits.charUnlock.key, uiHits.charUnlock.cost); menuCd = 0.15; return;
+    }
+    // trail color swatches (tap locked = unlock, then select)
     for (const s of uiHits.swatches) {
-      if (Math.hypot(mx - s.x, my - s.y) <= s.r) { selTrailColor = s.i; saveTrail(); menuCd = 0.15; return; }
+      if (Math.hypot(mx - s.x, my - s.y) <= s.r) {
+        if (tryUnlock(s.key, s.cost)) { selTrailColor = s.i; saveTrail(); }
+        menuCd = 0.15; return;
+      }
     }
-    // design chips
+    // trail style chips
     for (const c of uiHits.chips) {
-      if (mx >= c.x && mx <= c.x + c.w && my >= c.y && my <= c.y + c.h) { selTrailDesign = c.i; saveTrail(); menuCd = 0.15; return; }
+      if (inRect(c)) {
+        if (tryUnlock(c.key, c.cost)) { selTrailDesign = c.i; saveTrail(); }
+        menuCd = 0.15; return;
+      }
     }
-    // ride chevrons: anywhere left of the card = prev, right of the card = next
-    const cardL = W / 2 - 350, cardR = W / 2 + 350;
-    if (RIDES.length > 1 && mx < cardL) { selRide = (selRide - 1 + RIDES.length) % RIDES.length; Sound.ui(); menuCd = 0.2; return; }
-    if (RIDES.length > 1 && mx > cardR) { selRide = (selRide + 1) % RIDES.length; Sound.ui(); menuCd = 0.2; return; }
-    // only start when the ride card or the bottom "RIDE!" prompt is tapped,
-    // so a near-miss on the pickers doesn't launch a run
-    const inCard = my > H * 0.18 && my < H * 0.49 && mx > W * 0.22 && mx < W * 0.78;
-    if (inCard || my > H * 0.90) startGame();
+    // map cards
+    for (const m of uiHits.maps) {
+      if (inRect(m)) {
+        if (tryUnlock(m.key, m.cost)) { selMap = m.i; Sound.ui(); }
+        menuCd = 0.15; return;
+      }
+    }
+    // character chevrons: left/right of the card (within its vertical band)
+    const cardMidY = H * 0.28;
+    if (RIDES.length > 1 && Math.abs(my - cardMidY) < 130) {
+      if (mx < W / 2 - 288) { selRide = (selRide - 1 + RIDES.length) % RIDES.length; Sound.ui(); menuCd = 0.2; return; }
+      if (mx > W / 2 + 288) { selRide = (selRide + 1) % RIDES.length; Sound.ui(); menuCd = 0.2; return; }
+    }
+    // start only from the bottom prompt band
+    if (my > H * 0.90) attemptStart();
   }
   else if (state === STATE.DEAD) startGame();
 }
@@ -226,7 +283,10 @@ const SPEED_RAMP = 5;           // px/s added per second
 const SPEED_MAX = 800;
 const DASH_MULT = 1.6;          // dash speed multiplier (was 1.9)
 
-let player, world, particles, stars, obstacles, score, speed, distance, animT, screenShake, deathTimer, trail;
+let player, world, particles, stars, obstacles, rings, score, speed, distance, animT, screenShake, deathTimer, trail;
+let combo, comboTimer, runStars;
+const COMBO_WINDOW = 2.6;           // seconds to keep the chain alive
+const comboMult = () => Math.min(1 + Math.floor(combo / 5), 8); // x1..x8
 
 function resetRun() {
   player = {
@@ -245,6 +305,8 @@ function resetRun() {
   stars = [];
   obstacles = [];
   trail = [];
+  rings = [];
+  combo = 0; comboTimer = 0; runStars = 0;
   score = 0;
   distance = 0;
   speed = SPEED_START;
@@ -279,16 +341,16 @@ function generateAhead() {
     world.segs.push(seg);
     lastTop = top;
 
-    // reward the jump: arc a line of stars over the gap
+    // reward the jump: arc a line of gold RINGS over the gap to fly through
     if (gap > 120) {
       const n = randi(3, 5);
       const base = Math.min(prevTop, top);
-      const peak = rand(90, 180);
+      const peak = rand(110, 200);
       for (let i = 0; i < n; i++) {
         const tt = (i + 1) / (n + 1);
-        const sx = gapStart + tt * gap;
-        const sy = base - 40 - Math.sin(tt * Math.PI) * peak;
-        stars.push({ x: sx, y: sy, got: false, spin: Math.random() * 6 });
+        const rx = gapStart + tt * gap;
+        const ry = base - 60 - Math.sin(tt * Math.PI) * peak;
+        rings.push({ x: rx, y: ry, r: 34, got: false, spin: Math.random() * 6 });
       }
     }
 
@@ -314,6 +376,7 @@ function generateAhead() {
   // drop old segments/entities behind us
   world.segs = world.segs.filter((s) => s.x + s.w > distance - 200);
   stars = stars.filter((s) => s.x > distance - 200);
+  rings = rings.filter((r) => r.x > distance - 200);
   obstacles = obstacles.filter((o) => o.x > distance - 200);
 }
 
@@ -324,6 +387,26 @@ function startGame() {
   Sound.ui();
   jumpQueued = false;
   dashQueued = false;
+}
+
+// only ride when both the character and the map are unlocked
+function attemptStart() {
+  const c = RIDES[selRide], m = MAPS[selMap];
+  if (isUnlocked("char:" + c.id, c.cost) && isUnlocked("map:" + m.id, m.cost)) startGame();
+  else unlockFlash = 0.5;
+}
+// cycle to the next UNLOCKED trail color / style (skips locked ones)
+function cycleTrailColor(dir) {
+  for (let k = 0, i = selTrailColor; k < TRAIL_COLORS.length; k++) {
+    i = (i + dir + TRAIL_COLORS.length) % TRAIL_COLORS.length;
+    if (isUnlocked("tc:" + i, TRAIL_COLORS[i].cost)) { selTrailColor = i; saveTrail(); return; }
+  }
+}
+function cycleTrailStyle(dir) {
+  for (let k = 0, i = selTrailDesign; k < TRAIL_DESIGNS.length; k++) {
+    i = (i + dir + TRAIL_DESIGNS.length) % TRAIL_DESIGNS.length;
+    if (isUnlocked("ts:" + i, TRAIL_DESIGNS[i].cost)) { selTrailDesign = i; saveTrail(); return; }
+  }
 }
 
 /* ---------- Helpers ---------- */
@@ -414,16 +497,37 @@ function update(dt) {
   // world streaming
   generateAhead();
 
-  // stars
+  // combo decays if you stop collecting
+  if (combo > 0) { comboTimer -= dt; if (comboTimer <= 0) combo = 0; }
+
+  const pcx = PLAYER_X, pcy = player.y + PLAYER_H * 0.5;
+
+  // stars — currency (banked) + score, build combo
   for (const s of stars) {
     if (s.got) continue;
     s.spin += dt * 8;
     const sx = s.x - distance;
-    if (Math.abs(sx - PLAYER_X) < 55 && Math.abs(s.y - (player.y + PLAYER_H * 0.5)) < 70) {
+    if (Math.abs(sx - pcx) < 55 && Math.abs(s.y - pcy) < 70) {
       s.got = true;
-      score += 25;
-      Sound.star();
+      combo++; comboTimer = COMBO_WINDOW;
+      score += 25 * comboMult();
+      runStars++; addStars(1);
+      Sound.star(combo);
       for (let i = 0; i < 8; i++) spawnSpark(PLAYER_X, player.y + PLAYER_H * 0.4, "#ffe066");
+    }
+  }
+
+  // rings — fly through them (bigger points), build combo faster
+  for (const rg of rings) {
+    if (rg.got) continue;
+    rg.spin += dt * 3;
+    const rx = rg.x - distance;
+    if (Math.hypot(rx - pcx, rg.y - pcy) < rg.r + 18) {
+      rg.got = true;
+      combo += 2; comboTimer = COMBO_WINDOW;
+      score += 60 * comboMult();
+      Sound.star(combo + 6);
+      for (let i = 0; i < 14; i++) spawnSpark(rx, rg.y, ["#ffd23f","#fff3b0","#ffe066"][i % 3]);
     }
   }
 
@@ -544,7 +648,7 @@ function drawTiledLayer(url, speed) {
 }
 
 function drawScene() {
-  const layers = RIDES[selRide].bg; // current ride's map
+  const layers = MAPS[selMap].bg; // selected map
   // sky (opaque) — gradient fallback until the art loads
   if (!drawTiledLayer(layers[0].url, layers[0].speed)) {
     const g = ctx.createLinearGradient(0, 0, 0, H);
@@ -570,6 +674,12 @@ function drawWorld() {
     const x = s.x - distance;
     if (x > W || x + s.w < 0) continue;
     drawRoad(x, s.top, s.w, s.x);
+  }
+  for (const rg of rings) {
+    if (rg.got) continue;
+    const x = rg.x - distance;
+    if (x < -60 || x > W + 60) continue;
+    drawRing(x, rg.y, rg.r, rg.spin);
   }
   for (const s of stars) {
     if (s.got) continue;
@@ -621,6 +731,25 @@ function drawRoad(x, topY, w, worldX) {
     const clipL = Math.max(sx, x), clipR = Math.min(sx + dashW, x + w);
     if (clipR > clipL) ctx.fillRect(clipL, dashY, clipR - clipL, 5);
   }
+  ctx.restore();
+}
+
+// RUA-style gold ring you fly through (drawn as a shimmering torus)
+function drawRing(x, y, r, rot) {
+  ctx.save();
+  ctx.translate(x, y);
+  const wob = 0.72 + 0.28 * Math.abs(Math.sin(rot)); // fake 3-D spin (squash x)
+  ctx.scale(wob, 1);
+  ctx.lineJoin = "round"; ctx.lineCap = "round";
+  ctx.shadowColor = "#ffd23f"; ctx.shadowBlur = 22;
+  // outer dark rim
+  ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI * 2);
+  ctx.lineWidth = 12; ctx.strokeStyle = "#8a5a00"; ctx.stroke();
+  // gold band
+  ctx.lineWidth = 8; ctx.strokeStyle = "#ffcf33"; ctx.stroke();
+  // bright highlight
+  ctx.shadowBlur = 0;
+  ctx.lineWidth = 3; ctx.strokeStyle = "rgba(255,255,255,0.85)"; ctx.stroke();
   ctx.restore();
 }
 
@@ -850,12 +979,37 @@ function drawHUD() {
   ctx.shadowBlur = 0;
   ctx.fillStyle = "rgba(255,255,255,0.7)";
   ctx.fillText(`BEST ${best}`, 30, 62);
+  // stars collected this run (banked)
+  ctx.fillStyle = "#ffe066";
+  ctx.fillText(`🌟 ${runStars}`, 30, 86);
 
   // dash cooldown pip
   ctx.textAlign = "right";
   ctx.fillStyle = player.dashCd <= 0 ? "#5bff9b" : "rgba(255,255,255,0.35)";
   ctx.fillText(player.dashCd <= 0 ? "DASH READY" : "dash…", W - 28, 26);
   ctx.restore();
+
+  // combo multiplier (center-top) with a draining timer bar
+  if (combo > 0 && comboMult() > 1) {
+    ctx.save();
+    ctx.textAlign = "center"; ctx.textBaseline = "top";
+    const m = comboMult();
+    const pop = 1 + 0.12 * Math.max(0, comboTimer / COMBO_WINDOW - 0.7);
+    ctx.font = `bold ${Math.round(46 * pop)}px Trebuchet MS, sans-serif`;
+    ctx.fillStyle = "#ffe066";
+    ctx.shadowColor = "#ff8a00"; ctx.shadowBlur = 16;
+    ctx.fillText(`×${m}`, W / 2, 20);
+    ctx.font = "bold 15px Trebuchet MS, sans-serif";
+    ctx.shadowBlur = 0; ctx.fillStyle = "rgba(255,255,255,0.75)";
+    ctx.fillText(`COMBO ${combo}`, W / 2, 66);
+    // timer bar
+    const bw = 120, frac = clamp(comboTimer / COMBO_WINDOW, 0, 1);
+    ctx.fillStyle = "rgba(255,255,255,0.2)";
+    ctx.fillRect(W / 2 - bw / 2, 88, bw, 5);
+    ctx.fillStyle = "#ffe066";
+    ctx.fillRect(W / 2 - bw / 2, 88, bw * frac, 5);
+    ctx.restore();
+  }
 }
 
 /* ---- Screens ---- */
@@ -903,109 +1057,187 @@ function drawTitle() {
 
 function drawSelect() {
   menuScrim();
-  centerText("CHOOSE YOUR RIDE", H * 0.075, 36, "#fff");
+  centerText("CHOOSE YOUR RIDE", H * 0.055, 32, "#fff");
+  drawBankPill();
 
-  const ride = RIDES[selRide];
-  const cx = W / 2, cy = H * 0.33;
-  const w = 700, h = 300;
-  const x = cx - w/2, y = cy - h/2;
+  uiHits.swatches.length = 0;
+  uiHits.chips.length = 0;
+  uiHits.maps.length = 0;
+  uiHits.charUnlock = null;
 
-  // card
-  ctx.save();
-  ctx.fillStyle = "rgba(255,91,208,0.14)";
-  ctx.strokeStyle = "#ff5bd0";
-  ctx.lineWidth = 5;
-  roundRect(x, y, w, h, 26, true);
-  ctx.stroke();
-  ctx.restore();
-
-  // live trail preview: a wavy sample behind the bike using the current choice
-  const bikeBaseY = cy + h * 0.14;
-  const samp = [];
-  const nS = 30, headX = cx + 6, tailX = x + 48;
-  for (let i = 0; i < nS; i++) {
-    const f = i / (nS - 1);
-    samp.push({ x: tailX + (headX - tailX) * f, y: bikeBaseY + Math.sin(f * 6 + t * 3) * 10 });
-  }
-  drawTrail(samp);
-
-  // character-on-bike preview, contain-fit inside the card
-  const p = img(ride.preview);
-  if (p && p.width) {
-    const boxTop = y + 30, boxBot = y + h - 74;
-    const boxW = w - 140, boxH = boxBot - boxTop;
-    const scale = Math.min(boxW / p.width, boxH / p.height);
-    const iw = p.width * scale, ih = p.height * scale;
-    const bob = Math.sin(t * 2.5) * 6;
-    ctx.drawImage(p, cx - iw/2, boxTop + (boxH - ih)/2 + bob, iw, ih);
-  }
-  ctx.fillStyle = "#fff";
-  centerAt(ride.name, cx, y + h - 44, 30);
-
-  if (RIDES.length > 1) {
-    drawChevron(x - 40, cy, -1);
-    drawChevron(x + w + 40, cy, 1);
-  }
-
+  drawCharacterCard();
+  drawMapRow();
   drawTrailPickers();
 
+  const char = RIDES[selRide], map = MAPS[selMap];
+  const ready = isUnlocked("char:" + char.id, char.cost) && isUnlocked("map:" + map.id, map.cost);
   const pulse = 0.6 + 0.4 * Math.sin(t * 4);
-  ctx.globalAlpha = pulse;
-  centerText("Press SPACE / Tap to RIDE!", H * 0.95, 28, "#7dff9b");
+  ctx.globalAlpha = ready ? pulse : 0.9;
+  centerText(ready ? "Press SPACE / Tap to RIDE!" : "🔒  Unlock this character & map to ride",
+    H * 0.945, ready ? 26 : 21, ready ? "#7dff9b" : "rgba(255,255,255,0.7)");
   ctx.globalAlpha = 1;
 }
 
-// Trail color swatches + design chips, and records their hit-boxes for clicks.
-function drawTrailPickers() {
-  uiHits.swatches.length = 0;
-  uiHits.chips.length = 0;
+function drawBankPill() {
+  ctx.save();
+  ctx.textAlign = "right"; ctx.textBaseline = "top";
+  ctx.font = "bold 24px Trebuchet MS, sans-serif";
+  let col = "#ffe066";
+  if (unlockFlash > 0) col = Math.sin(t * 40) > 0 ? "#ff5b6e" : "#ffd7dc";
+  else if (unlockPulse > 0) col = "#7dff9b";
+  ctx.fillStyle = col; ctx.shadowColor = "rgba(0,0,0,0.6)"; ctx.shadowBlur = 6;
+  ctx.fillText(`🌟 ${bank}`, W - 26, 20);
+  ctx.font = "bold 12px Trebuchet MS, sans-serif";
+  ctx.fillStyle = "rgba(255,255,255,0.5)";
+  ctx.fillText("collect stars to unlock", W - 26, 48);
+  ctx.restore();
+}
 
+function drawCharacterCard() {
+  const char = RIDES[selRide];
+  const cx = W / 2, cy = H * 0.28, w = 560, h = 226;
+  const x = cx - w / 2, y = cy - h / 2;
+  const locked = !isUnlocked("char:" + char.id, char.cost);
+
+  ctx.save();
+  ctx.fillStyle = "rgba(255,91,208,0.14)";
+  ctx.strokeStyle = locked ? "rgba(255,255,255,0.35)" : "#ff5bd0";
+  ctx.lineWidth = 5;
+  roundRect(x, y, w, h, 24, true);
+  ctx.stroke();
+  ctx.restore();
+
+  // trail preview behind the bike (unlocked only)
+  if (!locked) {
+    const baseY = cy + h * 0.12, samp = [], nS = 26, headX = cx + 6, tailX = x + 44;
+    for (let i = 0; i < nS; i++) {
+      const f = i / (nS - 1);
+      samp.push({ x: tailX + (headX - tailX) * f, y: baseY + Math.sin(f * 6 + t * 3) * 9 });
+    }
+    drawTrail(samp);
+  }
+
+  const p = img(char.preview);
+  if (p && p.width) {
+    const boxTop = y + 24, boxBot = y + h - 50, boxW = w - 150, boxH = boxBot - boxTop;
+    const s = Math.min(boxW / p.width, boxH / p.height), iw = p.width * s, ih = p.height * s;
+    const bob = Math.sin(t * 2.5) * 5;
+    ctx.save();
+    if (locked) ctx.globalAlpha = 0.3;
+    ctx.drawImage(p, cx - iw / 2, boxTop + (boxH - ih) / 2 + bob, iw, ih);
+    ctx.restore();
+  }
+  if (!locked) { ctx.fillStyle = "#fff"; centerAt(char.name, cx, y + h - 30, 26); }
+
+  if (RIDES.length > 1) { drawChevron(x - 38, cy, -1); drawChevron(x + w + 38, cy, 1); }
+
+  if (locked) {
+    centerText("🔒", cy - 34, 46, "rgba(255,255,255,0.9)");
+    const afford = bank >= char.cost;
+    const bw = 240, bh = 44, bx = cx - bw / 2, by = cy + 12;
+    ctx.save();
+    ctx.fillStyle = afford ? "rgba(125,255,155,0.22)" : "rgba(255,90,110,0.16)";
+    ctx.strokeStyle = afford ? "#7dff9b" : "#ff5b6e";
+    ctx.lineWidth = 2.5;
+    roundRect(bx, by, bw, bh, bh / 2, true); ctx.stroke();
+    ctx.fillStyle = afford ? "#eafff0" : "#ffd7dc";
+    ctx.font = "bold 19px Trebuchet MS, sans-serif";
+    ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    ctx.fillText(`UNLOCK   ${char.cost} 🌟`, cx, by + bh / 2 + 1);
+    ctx.restore();
+    uiHits.charUnlock = { x: bx, y: by, w: bw, h: bh, key: "char:" + char.id, cost: char.cost };
+  }
+}
+
+function drawMapRow() {
+  centerText("MAP", H * 0.475, 16, "rgba(255,255,255,0.8)");
+  const cardW = 152, cardH = 62, gap = 20, y = H * 0.495;
+  const total = MAPS.length * cardW + (MAPS.length - 1) * gap;
+  const x0 = W / 2 - total / 2;
+  for (let i = 0; i < MAPS.length; i++) {
+    const m = MAPS[i], x = x0 + i * (cardW + gap);
+    const locked = !isUnlocked("map:" + m.id, m.cost);
+    const on = i === selMap;
+
+    ctx.save();
+    roundRect(x, y, cardW, cardH, 10, false); ctx.clip();
+    const thumb = img(m.bg[0].url); // sky = full opaque scene
+    if (thumb && thumb.width) {
+      const s = Math.max(cardW / thumb.width, cardH / thumb.height);
+      const iw = thumb.width * s, ih = thumb.height * s;
+      ctx.globalAlpha = locked ? 0.4 : 1;
+      ctx.drawImage(thumb, x + (cardW - iw) / 2, y + (cardH - ih) / 2, iw, ih);
+    } else {
+      ctx.fillStyle = "#223"; ctx.fillRect(x, y, cardW, cardH);
+    }
+    ctx.globalAlpha = 1;
+    ctx.fillStyle = "rgba(10,4,30,0.6)"; ctx.fillRect(x, y + cardH - 20, cardW, 20);
+    ctx.fillStyle = on ? "#ffe066" : "#fff";
+    ctx.font = "bold 13px Trebuchet MS, sans-serif";
+    ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    ctx.fillText(locked ? `${m.name}  🔒${m.cost}` : m.name, x + cardW / 2, y + cardH - 10);
+    ctx.restore();
+
+    ctx.lineWidth = on ? 4 : 2;
+    ctx.strokeStyle = on ? "#ffe066" : "rgba(255,255,255,0.35)";
+    roundRect(x, y, cardW, cardH, 10, false); ctx.stroke();
+
+    uiHits.maps.push({ x, y, w: cardW, h: cardH, i, locked, key: "map:" + m.id, cost: m.cost });
+  }
+}
+
+// Trail color swatches + style chips (with lock badges), records hit-boxes.
+function drawTrailPickers() {
   // ---- colors ----
-  centerText("TRAIL COLOR", H * 0.60, 18, "rgba(255,255,255,0.8)");
-  const sy = H * 0.655, sr = 17, sgap = 62;
-  const sStart = W/2 - (TRAIL_COLORS.length - 1) * sgap / 2;
+  centerText("TRAIL COLOR", H * 0.61, 16, "rgba(255,255,255,0.8)");
+  const sy = H * 0.65, sr = 16, sgap = 62;
+  const sStart = W / 2 - (TRAIL_COLORS.length - 1) * sgap / 2;
   for (let i = 0; i < TRAIL_COLORS.length; i++) {
     const cxs = sStart + i * sgap;
     const on = i === selTrailColor;
+    const locked = !isUnlocked("tc:" + i, TRAIL_COLORS[i].cost);
     ctx.save();
     ctx.beginPath(); ctx.arc(cxs, sy, sr + (on ? 5 : 0), 0, Math.PI * 2);
     ctx.fillStyle = TRAIL_COLORS[i].css;
+    ctx.globalAlpha = locked ? 0.4 : 1;
     ctx.shadowColor = TRAIL_COLORS[i].css; ctx.shadowBlur = on ? 18 : 8;
     ctx.fill();
-    ctx.shadowBlur = 0;
+    ctx.globalAlpha = 1; ctx.shadowBlur = 0;
     ctx.lineWidth = on ? 4 : 2;
     ctx.strokeStyle = on ? "#fff" : "rgba(255,255,255,0.4)";
     ctx.stroke();
+    if (locked) { ctx.font = "13px system-ui"; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText("🔒", cxs, sy); }
     ctx.restore();
-    uiHits.swatches.push({ x: cxs, y: sy, r: sr + 8, i });
+    uiHits.swatches.push({ x: cxs, y: sy, r: sr + 8, i, locked, key: "tc:" + i, cost: TRAIL_COLORS[i].cost });
   }
 
-  // ---- designs ----
-  centerText("TRAIL STYLE", H * 0.735, 18, "rgba(255,255,255,0.8)");
-  const chipY = H * 0.775, chipH = 40, pad = 18, gap = 12;
-  ctx.font = "bold 18px Trebuchet MS, sans-serif";
-  const widths = TRAIL_DESIGNS.map(d => ctx.measureText(d.name).width + pad * 2);
+  // ---- styles ----
+  centerText("TRAIL STYLE", H * 0.71, 16, "rgba(255,255,255,0.8)");
+  const chipY = H * 0.745, chipH = 38, pad = 16, gap = 11;
+  ctx.font = "bold 17px Trebuchet MS, sans-serif";
+  const widths = TRAIL_DESIGNS.map(d => ctx.measureText(d.name).width + pad * 2 + (isUnlocked("ts:" + TRAIL_DESIGNS.indexOf(d), d.cost) ? 0 : 22));
   const totalW = widths.reduce((a, b) => a + b, 0) + gap * (TRAIL_DESIGNS.length - 1);
-  let cxp = W/2 - totalW / 2;
+  let cxp = W / 2 - totalW / 2;
   for (let i = 0; i < TRAIL_DESIGNS.length; i++) {
     const cw = widths[i], on = i === selTrailDesign;
+    const locked = !isUnlocked("ts:" + i, TRAIL_DESIGNS[i].cost);
     ctx.save();
     ctx.fillStyle = on ? "rgba(125,255,155,0.22)" : "rgba(255,255,255,0.06)";
     ctx.strokeStyle = on ? "#7dff9b" : "rgba(255,255,255,0.25)";
     ctx.lineWidth = on ? 3 : 1.5;
-    roundRect(cxp, chipY, cw, chipH, chipH/2, true);
-    ctx.stroke();
-    ctx.fillStyle = on ? "#eafff0" : "rgba(255,255,255,0.75)";
-    ctx.font = "bold 18px Trebuchet MS, sans-serif";
+    roundRect(cxp, chipY, cw, chipH, chipH / 2, true); ctx.stroke();
+    ctx.fillStyle = locked ? "rgba(255,255,255,0.55)" : (on ? "#eafff0" : "rgba(255,255,255,0.8)");
+    ctx.font = "bold 17px Trebuchet MS, sans-serif";
     ctx.textAlign = "center"; ctx.textBaseline = "middle";
-    ctx.fillText(TRAIL_DESIGNS[i].name, cxp + cw/2, chipY + chipH/2 + 1);
+    const label = locked ? `${TRAIL_DESIGNS[i].name} 🔒${TRAIL_DESIGNS[i].cost}` : TRAIL_DESIGNS[i].name;
+    ctx.fillText(label, cxp + cw / 2, chipY + chipH / 2 + 1);
     ctx.restore();
-    uiHits.chips.push({ x: cxp, y: chipY, w: cw, h: chipH, i });
+    uiHits.chips.push({ x: cxp, y: chipY, w: cw, h: chipH, i, locked, key: "ts:" + i, cost: TRAIL_DESIGNS[i].cost });
     cxp += cw + gap;
   }
 
-  const hint = RIDES.length > 1 ? "←/→ character   ↑/↓ style   C / tap = color" : "↑/↓ style   C / tap = color";
-  centerText(hint, H * 0.855, 15, "rgba(255,255,255,0.5)");
+  const hint = "←/→ character   ↑/↓ style   C = color   ·  tap locked items to unlock";
+  centerText(hint, H * 0.83, 14, "rgba(255,255,255,0.5)");
 }
 
 function drawChevron(cx, cy, dir) {
@@ -1025,14 +1257,15 @@ function drawChevron(cx, cy, dir) {
 function drawDead() {
   ctx.fillStyle = "rgba(20,0,40,0.55)";
   ctx.fillRect(0, 0, W, H);
-  centerText("CRASH!", H * 0.32, 74, "#ff5bd0");
-  centerText(`Score  ${Math.floor(score)}`, H * 0.48, 44, "#fff");
-  centerText(`Best  ${best}`, H * 0.57, 26, "#ffe066");
+  centerText("CRASH!", H * 0.30, 74, "#ff5bd0");
+  centerText(`Score  ${Math.floor(score)}`, H * 0.45, 44, "#fff");
+  centerText(`Best  ${best}`, H * 0.535, 24, "#ffe066");
+  centerText(`🌟 ${runStars} collected   ·   bank ${bank}`, H * 0.60, 22, "#ffe066");
   const pulse = 0.6 + 0.4 * Math.sin(t * 4);
   ctx.globalAlpha = pulse;
-  centerText("Press SPACE / Tap to ride again", H * 0.72, 28, "#7dff9b");
+  centerText("Press SPACE / Tap to ride again", H * 0.73, 28, "#7dff9b");
   ctx.globalAlpha = 1;
-  centerText("Esc — change rider", H * 0.8, 18, "rgba(255,255,255,0.55)");
+  centerText("Esc — change character / map / unlocks", H * 0.81, 18, "rgba(255,255,255,0.55)");
 }
 
 /* ---- text helpers ---- */
@@ -1081,6 +1314,8 @@ function loop(now) {
   last = now;
   dt = Math.min(dt, 0.05); // clamp big frame gaps
   if (menuCd > 0) menuCd -= dt;
+  if (unlockFlash > 0) unlockFlash -= dt;
+  if (unlockPulse > 0) unlockPulse -= dt;
 
   if (state === STATE.LOADING && assetsLoaded >= assetTotal) {
     state = STATE.TITLE;
