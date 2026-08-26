@@ -450,8 +450,8 @@ window.NAP = window.NAP || {};
   function loop(ts) {
     const t = ts / 1000; let dt = last ? t - last : 0; last = t;
     dt = Math.min(dt, 0.05);
+    try { NAP.pollGamepad(dt); } catch (e) { /* input never blocks the frame */ }
     try {
-      NAP.pollGamepad(dt);
       // held attack (pad A / touch attack pad) — tryAttack guards its own rate
       if (input.fireAttack && NAP.scene === NAP.scenes.dream && !NAP.transition && NAP.scene.tryAttack) NAP.scene.tryAttack();
       if (NAP.scene) {
@@ -459,11 +459,11 @@ window.NAP = window.NAP || {};
         if (NAP.scene.draw) NAP.scene.draw(ctx);
       }
       NAP.drawInputOverlay(ctx);
-      updateTransition(dt);
-      drawTransition();
     } catch (e) {
-      if (!loop._warned) { console.error("Nap Time loop error:", e); loop._warned = true; }
+      if (!loop._warned) { console.error("Nap Time scene error:", e); loop._warned = true; }
     }
+    // transitions run in their own block so a scene error can never break them
+    try { updateTransition(dt); drawTransition(); } catch (e) { NAP.transition = null; }
     requestAnimationFrame(loop);   // always reschedule, even after an error
   }
 

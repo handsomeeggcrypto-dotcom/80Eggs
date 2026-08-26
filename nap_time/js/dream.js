@@ -1483,7 +1483,7 @@
         ctx.fillText(this.cfg.title.toUpperCase(), V.w / 2, V.h * 0.28 + 30);
       }
       ctx.fillStyle = "#fff"; ctx.font = "italic 26px 'Trebuchet MS',sans-serif";
-      ctx.fillText(def.banner, V.w / 2, V.h * 0.28 + 62);
+      ctx.fillText((this.cfg.objDef && this.cfg.objDef.banner) || "", V.w / 2, V.h * 0.28 + 62);
       ctx.globalAlpha = 1;
     }
 
