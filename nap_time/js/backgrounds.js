@@ -167,6 +167,15 @@
     ctx.fillStyle = "rgba(255,220,235,0.05)"; ctx.fillRect(0, 0, w, h);
   };
 
+  // IMQ's spaceship (uses the spaceship dream art as a scene backdrop)
+  BG.ship = function (ctx, w, h, t) {
+    const im = NAP.img(NAP.META.misc.bg_ship.file);
+    if (!im) { BG.dream_void(ctx, w, h, t); return; }
+    const s = Math.max(w / im.width, h / im.height), dw = im.width * s, dh = im.height * s;
+    ctx.drawImage(im, (w - dw) / 2, (h - dh) / 2 + Math.sin(t * 0.2) * 6, dw, dh);
+    ctx.fillStyle = "rgba(30,16,45,0.10)"; ctx.fillRect(0, 0, w, h);
+  };
+
   BG.paint = function (name, ctx, w, h, t) {
     (BG[name] || BG.bedroom_night)(ctx, w, h, t);
   };

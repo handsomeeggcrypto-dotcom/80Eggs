@@ -348,6 +348,7 @@ window.NAP = window.NAP || {};
     if (!s) s = { unlocked: ["egg"], cleared: [], choices: {} };
     if (!s.chars) s.chars = {};
     if (s.unlocked.indexOf("nap") < 0) s.unlocked.push("nap");   // Napling fully unlocked for now
+    if (s.unlocked.indexOf("imq") < 0) s.unlocked.push("imq");   // IMQ fully unlocked for now
     // migrate a legacy global level/xp onto egg
     if (s.level != null) { s.chars.egg = { level: s.level, xp: s.xp || 0, points: 0, nodes: {} };
       delete s.level; delete s.xp; }
@@ -478,10 +479,12 @@ window.NAP = window.NAP || {};
       "tile_library_corrupt_floor.png", "tile_library_corrupt_wall.png",
       "tile_pond_floor.png", "tile_pond_floor2.png", "tile_pond_water.png", "tile_pond_edge.png", "tile_pond_reeds.png", "tile_pond_bush.png",
       "tile_meadow_floor.png", "tile_meadow_floor2.png", "tile_meadow_picnic.png", "tile_meadow_wall.png", "tile_meadow_wall2.png",
+      "tile_ship_floor.png", "tile_ship_floor2.png", "tile_ship_wall.png", "tile_ship_wall2.png",
       M.misc.vn_kumori.file, M.misc.vn_shadow.file, M.misc.bg_galaxy.file,
       M.misc.bg_egg_room.file, M.misc.vn_egg.file, M.misc.bg_rooftop.file, M.misc.vn_neogaucha.file,
       M.misc.bg_library.file, M.misc.vn_lua.file, M.misc.vn_siren.file,
-      M.misc.bg_pond.file, M.misc.vn_beek.file, M.misc.bg_meadow.file, M.misc.vn_nap.file];
+      M.misc.bg_pond.file, M.misc.vn_beek.file, M.misc.bg_meadow.file, M.misc.vn_nap.file,
+      M.misc.bg_ship.file, M.misc.vn_imq.file, M.misc.vn_ims.file];
     for (const k in M.misc.foods) files.push(M.misc.foods[k].file);
     for (const id in M.chars) NAP.entityFiles(M.chars[id]).forEach(f => files.push(f));
     for (const id in M.foes) NAP.entityFiles(M.foes[id]).forEach(f => files.push(f));

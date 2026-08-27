@@ -24,7 +24,7 @@ transparent backgrounds, so no white-stripping is needed. The real work:
 Outputs individual PNGs + meta.json.  Run once:  python3 preprocess.py
 """
 import json, os
-from PIL import Image, ImageChops
+from PIL import Image, ImageChops, ImageDraw
 
 SRC = os.path.expanduser("~/Desktop/diablo yumemono")
 OUT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets", "processed")
@@ -38,6 +38,31 @@ BODY_WIDTH_FRAC = 0.22 # a row is "body" if its opaque width >= this * maxwidth
 
 def load(name):
     return Image.open(os.path.join(SRC, name)).convert("RGBA")
+
+
+def strip_bg(im, thresh=60):
+    """Some sheets bake a light checkerboard/white 'transparency' into the pixels.
+    Flood-fill the connected background in from the 4 corners and make it truly
+    transparent — interior light areas (e.g. a white apron) are preserved."""
+    im = im.convert("RGBA")
+    rgb = im.convert("RGB")
+    w, h = im.size
+    SENT = (255, 0, 255)
+    for c in [(0, 0), (w - 1, 0), (0, h - 1), (w - 1, h - 1)]:
+        try:
+            ImageDraw.floodfill(rgb, c, SENT, thresh=thresh)
+        except Exception:
+            pass
+    mask = rgb.point(lambda v: 0)  # placeholder; build alpha via band compare
+    r, g, b = rgb.split()
+    # a pixel is background iff it was replaced by the sentinel (255,0,255)
+    is_bg = ImageChops.multiply(
+        ImageChops.multiply(r.point(lambda v: 255 if v == 255 else 0),
+                            g.point(lambda v: 255 if v == 0 else 0)),
+        b.point(lambda v: 255 if v == 255 else 0))
+    keep = is_bg.point(lambda v: 0 if v else 255)      # 0 where bg, 255 elsewhere
+    im.putalpha(ImageChops.darker(im.split()[3], keep))
+    return im
 
 
 def alpha_mask(im):
@@ -185,6 +210,7 @@ def main():
     lua = player_set("lua", "lua")
     beek = player_set("beek", "beek")
     nap = player_set("nap", "nap")   # Napling, the daydreamer who made Yumemono
+    imq = player_set("imq", "imq")   # IMQ ("I may quit"), a glorp alien with a taser
 
     # ---- Nightmares (enemies) ----------------------------------------------
     shadow_egg = pack_entity("enemy", {
@@ -196,6 +222,13 @@ def main():
     oni = foe_set("oni", "enemy_oni")
     siren = foe_set("siren", "enemy_nightmarelua")            # Nightmare Lua
     nightmarebeek = foe_set("nbeek", "enemy_nightmarebeek")   # demon-bunny Beek
+    # IMS ("I may start") — sheets ship with a baked checkerboard bg; strip it.
+    ims = pack_entity("ims", {
+        "idle":   ([trim(strip_bg(load("enemy_ims_idle.png")))], 0),
+        "walk":   (slice_strip(strip_bg(load("enemy_ims_walk.png")), 4), "median"),
+        "attack": (slice_strip(strip_bg(load("enemy_ims_attack.png")), 4), "median"),
+        "death":  (slice_strip(strip_bg(load("enemy_ims_death.png")), 4), 0),
+    })
 
     # ---- Allies (summoned helpers) -----------------------------------------
     leech = pack_entity("leech", {   # Lua's Star Pal summon: a little axe guy
@@ -205,8 +238,8 @@ def main():
         "summon": ([trim(load("companion_leech_summon.png"))], 0),
     })
 
-    meta["chars"] = {"egg": egg, "neogaucha": neogaucha, "lua": lua, "beek": beek, "nap": nap}
-    meta["foes"] = {"shadow_egg": shadow_egg, "oni": oni, "siren": siren, "nightmarebeek": nightmarebeek}
+    meta["chars"] = {"egg": egg, "neogaucha": neogaucha, "lua": lua, "beek": beek, "nap": nap, "imq": imq}
+    meta["foes"] = {"shadow_egg": shadow_egg, "oni": oni, "siren": siren, "nightmarebeek": nightmarebeek, "ims": ims}
     meta["allies"] = {"leech": leech}
     meta["player"] = egg          # legacy aliases (kept for safety)
     meta["enemy"] = shadow_egg
@@ -240,6 +273,12 @@ def main():
     process_tile("tile_wall_blossomtree.png", "tile_meadow_wall.png")
     process_tile("tile_wall_cloudhedge.png", "tile_meadow_wall2.png")
 
+    # spaceship (IMQ's level): pink/purple starship panels + porthole windows
+    process_tile("tile_floor_starship.png", "tile_ship_floor.png")
+    process_tile("tile_floor_starship_var2.png", "tile_ship_floor2.png")
+    process_tile("tile_wall_spaceship_window.png", "tile_ship_wall.png")
+    process_tile("tile_floor_outerspace.png", "tile_ship_wall2.png")
+
     # ---- Potion (single centred icon) --------------------------------------
     potion = trim(load("item_potion_health.png"))
     ph = 128
@@ -248,8 +287,8 @@ def main():
     meta["misc"]["potion"] = {"file": "potion.png", "w": pw, "h": ph}
 
     # ---- VN speaker sprites (high-res trimmed full-body) --------------------
-    def vn_sprite(src, out, target_h=620):
-        im = trim(load(src))
+    def vn_sprite(src, out, target_h=620, strip=False):
+        im = trim(strip_bg(load(src)) if strip else load(src))
         w = round(im.width * target_h / im.height)
         im.resize((w, target_h), Image.LANCZOS).save(os.path.join(OUT, out))
         return {"file": out, "w": w, "h": target_h}
@@ -318,6 +357,14 @@ def main():
     mead.resize((mw, mh), Image.LANCZOS).save(os.path.join(OUT, "bg_meadow.png"))
     meta["misc"]["bg_meadow"] = {"file": "bg_meadow.png", "w": mw, "h": mh}
     meta["misc"]["vn_nap"] = vn_sprite("nap_idle_down.png", "vn_nap.png")
+
+    # ---- Spaceship background + IMQ / IMS VN sprites --------------------
+    ship = load("background_dream_spaceship.png").convert("RGB")
+    sw = 1280; sh = round(ship.height * sw / ship.width)
+    ship.resize((sw, sh), Image.LANCZOS).save(os.path.join(OUT, "bg_ship.png"))
+    meta["misc"]["bg_ship"] = {"file": "bg_ship.png", "w": sw, "h": sh}
+    meta["misc"]["vn_imq"] = vn_sprite("imq_idle_down.png", "vn_imq.png")
+    meta["misc"]["vn_ims"] = vn_sprite("enemy_ims_idle.png", "vn_ims.png", strip=True)
 
     with open(os.path.join(OUT, "meta.json"), "w") as f:
         json.dump(meta, f, indent=2)

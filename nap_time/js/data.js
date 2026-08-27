@@ -554,7 +554,119 @@
     },
   };
 
-  NAP.DATA = { characters: { egg, neogaucha, lua, beek, nap: napling }, order: ["egg", "neogaucha", "lua", "beek", "nap"] };
+  // ---- IMQ ("I may quit") — a glorp alien with a green taser -------------
+  const imq = {
+    id: "imq",
+    name: "IMQ",
+    title: "I May Quit",
+    accent: "#4dff9e",
+    vn: M.misc.vn_imq,
+    nightmareVN: M.misc.vn_ims,
+    tutorial: false,
+    buddy: "glorpcat",
+    element: "zappy",                                  // green taser-lightning
+    active: { id: "zapburst", name: "Zappy Panic!", cooldown: 13 },
+    lose: { title: "You Woke With a Gasp", text: "The console lights blinked out and the dream powered down. IMQ floated up, wide awake and jittery." },
+    win: { title: "Sweet Dream", text: "The pressure fizzled into harmless green sparks. The ship went quiet and warm, drifting among the stars." },
+    // standalone Spaceship level vs her nightmare IMS
+    ship: {
+      playerChar: "imq", enemyFoe: "ims", theme: "ship", bg: "bg_ship",
+      bossName: "IMS — I MAY START", cols: 20, rows: 15, objective: "defeat",
+      spawnEnemies: 2, boss: true, title: "Pink Purple Starship",
+    },
+    // placeholder story night (ready for the Yumemono writer)
+    chapter: {
+      segments: [
+
+        // ---- SEG 0: intro + snack choice (persists all night) ----
+        { type: "story", beats: [
+          { bg: "ship", side: null, speaker: "",
+            text: "Somewhere in the pink-purple dark, a little starship drifts with nowhere to be. Its pilot, IMQ, is very good at not starting things." },
+          { bg: "ship", side: "egg", speaker: "IMQ", mood: "sleepy",
+            text: "Blorp. Big to-do list today. Fix the engine, chart a course, save the galaxy... or, hear me out — a nap." },
+          { bg: "ship", side: "egg", speaker: "IMQ", mood: "sad",
+            text: "Every time I close my eyes, though, SHE shows up. Me, but sparkier. She keeps hissing one awful word: 'begin.'" },
+          { bg: "ship", side: "egg", speaker: "IMQ", mood: "neutral",
+            text: "Ugh, fine, fine. If I'm doing a scary dream, I'm doing it with a snack. What's it gonna be, kitty?",
+            choice: { prompt: "What does IMQ grab from the galley?", persist: true, options: [
+              { label: "Bogir", icon: "borgir", reply: "Bogir. Space burger. Anti-gravity grease, extra brave.", mods: { food: "borgir" } },
+              { label: "Apol", icon: "apol", reply: "Apol — keeps me zippy. Harder to catch when I'm running away.", mods: { food: "apol" } },
+              { label: "Tenddie", icon: "tendie", reply: "Tenddie. Little fried batteries of courage, basically.", mods: { food: "tendie" } },
+              { label: "Pizza", icon: "pizza", reply: "Pizza. Kitty gets the crust. Non-negotiable, it's ship law.", mods: { food: "pizza" } },
+            ] } },
+          { bg: "galaxy", side: "egg", speaker: "IMQ", mood: "sleepy",
+            text: "Okay. Powering down. If I don't come back, tell no one, it's embarrassing." },
+        ] },
+
+        // ---- SEG 1: Dream 1 — collect ----
+        { type: "dream", title: "Dream One", dream: {
+          playerChar: "imq", enemyFoe: "ims", theme: "ship", bg: "bg_ship",
+          objective: "collect", cols: 18, rows: 13, spawnEnemies: 2, boss: false,
+        } },
+
+        // ---- SEG 2: between dreams + difficulty ----
+        { type: "story", beats: [
+          { bg: "ship", side: null, speaker: "",
+            text: "IMQ jolts awake, floating an inch off the pilot seat. She actually finished something." },
+          { bg: "ship", side: "egg", speaker: "IMQ", mood: "surprised",
+            text: "I... started AND finished a thing? In a dream? Don't tell the awake version of me, she'll get ideas." },
+          { bg: "ship", side: "egg", speaker: "IMQ", mood: "neutral",
+            text: "It comes in waves next. How deep do I let the reactor spin?",
+            choice: { prompt: "How hard does IMQ push the engine?", options: [
+              { label: "Idle", reply: "Low power. Baby steps. Very on-brand.", mods: { difficulty: 0.8 } },
+              { label: "Cruising", reply: "Normal thrust. Let's see what she's got.", mods: { difficulty: 1.0 } },
+              { label: "Full throttle", reply: "Redline it. If I'm gonna panic, panic BIG.", mods: { difficulty: 1.4 } },
+            ] } },
+          { bg: "galaxy", side: "egg", speaker: "IMQ", mood: "sleepy",
+            text: "Back under. Kitty, guard the snacks." },
+        ] },
+
+        // ---- SEG 3: Dream 2 — survive ----
+        { type: "dream", title: "Dream Two", dream: {
+          playerChar: "imq", enemyFoe: "ims", theme: "ship", bg: "bg_ship",
+          objective: "survive", cols: 20, rows: 15, spawnEnemies: 3, boss: false, waves: 3,
+        } },
+
+        // ---- SEG 4: before the finale ----
+        { type: "story", beats: [
+          { bg: "ship", side: null, speaker: "",
+            text: "She wakes tangled in the seatbelt, heart racing at warp speed. But steadier than before." },
+          { bg: "ship", side: "egg", speaker: "IMQ", mood: "neutral",
+            text: "One left. The big spark. IMS — the part of me that wants to START everything, all at once, right now." },
+          { bg: "ship", side: "egg", speaker: "IMQ", mood: "neutral",
+            text: "How do I meet her?",
+            choice: { prompt: "How does IMQ face IMS?", options: [
+              { label: "Talk it out", reply: "Maybe she's not the enemy. Maybe we just... take turns. Start a little, quit a little.",
+                mods: { companion: true, extraPotion: true, mood: "kind" } },
+              { label: "Full send", reply: "You want me to start? Fine. I'm STARTING with this taser.",
+                mods: { difficulty: 1.25, mood: "fierce" } },
+            ] } },
+          { bg: "galaxy", side: "egg", speaker: "IMQ", mood: "sleepy",
+            text: "One more jump. All the way to the bridge." },
+        ] },
+
+        // ---- SEG 5: Dream 3 — defeat IMS (boss) ----
+        { type: "dream", title: "The Bridge", dream: {
+          playerChar: "imq", enemyFoe: "ims", theme: "ship", bg: "bg_ship",
+          bossName: "IMS — I MAY START", objective: "defeat", cols: 20, rows: 15, spawnEnemies: 2, boss: true,
+        } },
+
+        // ---- SEG 6: victory ----
+        { type: "story", end: true, beats: [
+          { bg: "dream_void", side: null, speaker: "",
+            text: "The last surge of pressure arcs, sputters, and settles into a soft green glow between them." },
+          { bg: "dream_void", side: "shadow", speaker: "???", mood: "sad",
+            text: "( ...I only ever wanted you to try. Just once. )" },
+          { bg: "ship", side: "egg", speaker: "IMQ", mood: "happy",
+            text: "Yeah, yeah. I know. We'll start tomorrow. TOGETHER. ...okay, maybe the day after. Baby steps, remember?" },
+          { bg: "ship", side: null, speaker: "",
+            text: "IMQ curls up with her green cat under a blanket of stars, and — having quit for the night — finally rests." },
+        ] },
+      ],
+    },
+  };
+
+  NAP.DATA = { characters: { egg, neogaucha, lua, beek, nap: napling, imq }, order: ["egg", "neogaucha", "lua", "beek", "nap", "imq"] };
 
   // Napling's dreams borrow the OTHER dreamers' nightmares. Each boss key maps to
   // its home arena (foe sprites + theme + backdrop + a coy boss name).

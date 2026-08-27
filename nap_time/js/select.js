@@ -12,6 +12,7 @@
         { label: "Lua", sub: "cloud library · her story", go: () => NAP.startChapter("lua") },
         { label: "Beek", sub: "pond meadow · his story", go: () => NAP.startChapter("beek") },
         { label: "Napling", sub: "dream-weaver · her story", go: () => NAP.startChapter("nap") },
+        { label: "IMQ", sub: "glorp alien · her story", go: () => NAP.startChapter("imq") },
       ];
       this.modes = [
         { label: "🗺 Adventure", sub: "free roam · bounties & treasure",

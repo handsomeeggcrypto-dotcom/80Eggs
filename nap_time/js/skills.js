@@ -55,6 +55,11 @@
         per: { cdr: 0.05, maxHp: 15 }, flag: "empower",
         desc: "Yumemono! calls TWO dream-fwiends at once, stronger and longer." },
     ]),
+    imq: passives().concat([
+      { id: "capstone", branch: "edge", tier: 3, name: "Overcharge", max: 1, reqLevel: 8, req: "crit",
+        per: { damage: 6, crit: 0.06 }, flag: "empower",
+        desc: "Zappy Panic! reaches farther, hits harder, and stuns longer." },
+    ]),
   };
 
   NAP.skillTree = charId => NAP.SKILLS[charId] || [];

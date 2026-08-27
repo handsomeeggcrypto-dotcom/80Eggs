@@ -310,6 +310,68 @@
         "canvasH": 247,
         "baselineY": 241
       }
+    },
+    "imq": {
+      "idle_down": {
+        "files": [
+          "imq_idle_down_0.png"
+        ],
+        "canvasW": 114,
+        "canvasH": 215,
+        "baselineY": 209
+      },
+      "idle_up": {
+        "files": [
+          "imq_idle_up_0.png"
+        ],
+        "canvasW": 115,
+        "canvasH": 215,
+        "baselineY": 209
+      },
+      "walk_down": {
+        "files": [
+          "imq_walk_down_0.png",
+          "imq_walk_down_1.png",
+          "imq_walk_down_2.png",
+          "imq_walk_down_3.png"
+        ],
+        "canvasW": 117,
+        "canvasH": 221,
+        "baselineY": 215
+      },
+      "walk_up": {
+        "files": [
+          "imq_walk_up_0.png",
+          "imq_walk_up_1.png",
+          "imq_walk_up_2.png",
+          "imq_walk_up_3.png"
+        ],
+        "canvasW": 119,
+        "canvasH": 220,
+        "baselineY": 214
+      },
+      "attack_down": {
+        "files": [
+          "imq_attack_down_0.png",
+          "imq_attack_down_1.png",
+          "imq_attack_down_2.png",
+          "imq_attack_down_3.png"
+        ],
+        "canvasW": 192,
+        "canvasH": 231,
+        "baselineY": 225
+      },
+      "attack_up": {
+        "files": [
+          "imq_attack_up_0.png",
+          "imq_attack_up_1.png",
+          "imq_attack_up_2.png",
+          "imq_attack_up_3.png"
+        ],
+        "canvasW": 191,
+        "canvasH": 230,
+        "baselineY": 224
+      }
     }
   },
   "foes": {
@@ -484,6 +546,49 @@
         "canvasH": 214,
         "baselineY": 208
       }
+    },
+    "ims": {
+      "idle": {
+        "files": [
+          "ims_idle_0.png"
+        ],
+        "canvasW": 144,
+        "canvasH": 227,
+        "baselineY": 221
+      },
+      "walk": {
+        "files": [
+          "ims_walk_0.png",
+          "ims_walk_1.png",
+          "ims_walk_2.png",
+          "ims_walk_3.png"
+        ],
+        "canvasW": 134,
+        "canvasH": 229,
+        "baselineY": 223
+      },
+      "attack": {
+        "files": [
+          "ims_attack_0.png",
+          "ims_attack_1.png",
+          "ims_attack_2.png",
+          "ims_attack_3.png"
+        ],
+        "canvasW": 137,
+        "canvasH": 212,
+        "baselineY": 206
+      },
+      "death": {
+        "files": [
+          "ims_death_0.png",
+          "ims_death_1.png",
+          "ims_death_2.png",
+          "ims_death_3.png"
+        ],
+        "canvasW": 190,
+        "canvasH": 223,
+        "baselineY": 217
+      }
     }
   },
   "misc": {
@@ -592,6 +697,21 @@
     "vn_nap": {
       "file": "vn_nap.png",
       "w": 430,
+      "h": 620
+    },
+    "bg_ship": {
+      "file": "bg_ship.png",
+      "w": 1280,
+      "h": 720
+    },
+    "vn_imq": {
+      "file": "vn_imq.png",
+      "w": 311,
+      "h": 620
+    },
+    "vn_ims": {
+      "file": "vn_ims.png",
+      "w": 380,
       "h": 620
     }
   },

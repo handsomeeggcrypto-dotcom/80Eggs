@@ -33,6 +33,7 @@
     lua:       { maxHp: 95, moveSpeed: 205, xpFind: 1.15 }, // nimble, dream-lucky star girl
     beek:      { maxHp: 120, damage: 24, moveSpeed: 175, dmgResist: 0.05 }, // sturdy orca-loving pond keeper
     nap:       { maxHp: 105, damage: 18, moveSpeed: 190, cdr: 0.12 },       // summoner — weaker poke, faster fwiends
+    imq:       { maxHp: 95, damage: 26, moveSpeed: 205, crit: 0.08 },        // twitchy alien — quick, zappy, glass-cannon-ish
   };
 
   // Small automatic growth per level (skill points add the rest on top).

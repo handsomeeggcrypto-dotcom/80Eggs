@@ -38,6 +38,7 @@
       water: "tile_pond_water.png", edge: "tile_pond_edge.png", overlayWalls: true },
     meadow: { floor: "tile_meadow_floor.png", floor2: "tile_meadow_floor2.png", wall: "tile_meadow_wall.png", wall2: "tile_meadow_wall2.png",
       picnic: "tile_meadow_picnic.png" },
+    ship: { floor: "tile_ship_floor.png", floor2: "tile_ship_floor2.png", wall: "tile_ship_wall.png", wall2: "tile_ship_wall2.png" },
   };
   // grid tile types: 0 floor, 1 floor2, 2 wall, 3 wall2(interior), 4 corrupt-floor(hazard),
   //                  5 corrupt-wall, 6 water(non-walkable), 7 pond-edge, 8 picnic(walkable variant)
@@ -482,6 +483,27 @@
     else if (this.active.id === "summon") this.castSummon();
     else if (this.active.id === "summonchar") this.castSummonChar();
     else if (this.active.id === "puddlesplash") this.castPuddleSplash();
+    else if (this.active.id === "zapburst") this.castZapBurst();
+  },
+  castZapBurst() {
+    const p = this.player, emp = this.empowered;
+    const R = emp ? TILE * 4.2 : TILE * 3.2;
+    const dmg = this.pBaseDmg * (emp ? 2.6 : 1.9);
+    // zap every enemy in range with green taser-lightning + a brief stun
+    let hits = 0;
+    for (const en of this.enemies) {
+      if (en.dead || en.dying) continue;
+      if (U.dist(en.x, en.y, p.x, p.y) >= R) continue;
+      this.hitEnemy(en, dmg * (en.isBoss ? 0.6 : 1));
+      en.lull = Math.max(en.lull || 0, en.isBoss ? 0.4 : (emp ? 1.1 : 0.8));
+      this.zaps.push({ x1: p.x, y1: p.y - 30, x2: en.x, y2: en.y - en.h * 0.4, t: 0, life: 0.22, c: "#d0ffe6", glow: "#4dff9e" });
+      this.spawnBurst(en.x, en.y - en.h * 0.4, "#4dff9e");
+      hits++;
+    }
+    this.particles.push({ ring: true, x: p.x, y: p.y - 20, t: 0, life: 0.4, r0: 10, r1: R, c: "#4dff9e" });
+    this.spawnPoof(p.x, p.y - 18, "#4dff9e");
+    this.popup(p.x, p.y - 58, hits ? "ZAP!" : "nnh—", "#4dff9e", true);
+    this.addShake(emp ? 9 : 6); this.freeze(0.05);
   },
   castSummonChar() {
     const p = this.player, emp = this.empowered;
@@ -969,7 +991,7 @@
         const dd = U.dist(o.x, o.y, en.x, en.y); if (dd < bd && dd < TILE * 3) { bd = dd; best = o; } }
       if (best) {
         this.hitEnemy(best, baseDmg * 0.5);
-        this.zaps.push({ x1: en.x, y1: en.y - en.h * 0.4, x2: best.x, y2: best.y - best.h * 0.4, t: 0, life: 0.18, c: el.spark });
+        this.zaps.push({ x1: en.x, y1: en.y - en.h * 0.4, x2: best.x, y2: best.y - best.h * 0.4, t: 0, life: 0.18, c: el.spark, glow: el.color });
       }
     }
     this.spawnBurst(en.x, en.y - en.h * 0.45, el.color);               // vibe-colored sparkle
@@ -1141,7 +1163,7 @@
       const a = U.clamp(1 - z.t / z.life, 0, 1);
       const x1 = z.x1 - cam.x, y1 = z.y1 - cam.y, x2 = z.x2 - cam.x, y2 = z.y2 - cam.y;
       ctx.save(); ctx.lineCap = "round";
-      ctx.globalAlpha = a * 0.4; ctx.strokeStyle = "#ff5bd0"; ctx.lineWidth = 6;
+      ctx.globalAlpha = a * 0.4; ctx.strokeStyle = z.glow || "#ff5bd0"; ctx.lineWidth = 6;
       ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
       ctx.globalAlpha = a; ctx.strokeStyle = z.c || "#ffd0f4"; ctx.lineWidth = 2.5;
       ctx.beginPath(); ctx.moveTo(x1, y1);
@@ -1295,6 +1317,7 @@
     D.shadow(sx, sy + 14, 16, 6);
     if (this.buddyType === "teddy") this.drawTeddy(ctx, sx, sy);
     else if (this.buddyType === "glorp") this.drawGlorp(ctx, sx, sy);
+    else if (this.buddyType === "glorpcat") this.drawGlorpCat(ctx, sx, sy);
     else if (this.buddyType === "orca") this.drawOrca(ctx, sx, sy);
     else if (this.buddyType === "leech" && M.allies && M.allies.leech) {
       const A = M.allies.leech; NAP.drawSprite(A.idle.files[0], A.idle, sx, sy + 14, 50 / M.storeBody, b.flip, 1);
@@ -1346,6 +1369,39 @@
     // little bow
     ctx.fillStyle = "#c0446a"; ctx.beginPath(); ctx.moveTo(sx, sy + 1); ctx.lineTo(sx - 6, sy - 2); ctx.lineTo(sx - 6, sy + 4); ctx.closePath(); ctx.moveTo(sx, sy + 1); ctx.lineTo(sx + 6, sy - 2); ctx.lineTo(sx + 6, sy + 4); ctx.closePath(); ctx.fill();
     ctx.beginPath(); ctx.arc(sx, sy + 1, 1.8, 0, 6.28); ctx.fill();
+  },
+  drawGlorpCat(ctx, sx, sy) {
+    // IMQ's green glorp cat: green alien kitty with antennae + big violet eyes
+    const green = "#5fd36a", drk = "#2e7a3a", eye = "#3a2a7c";
+    ctx.lineCap = "round";
+    // antennae with glowy tips
+    ctx.strokeStyle = green; ctx.lineWidth = 2.2;
+    ctx.beginPath(); ctx.moveTo(sx - 4, sy - 14); ctx.lineTo(sx - 6, sy - 22);
+    ctx.moveTo(sx + 4, sy - 14); ctx.lineTo(sx + 6, sy - 22); ctx.stroke();
+    ctx.fillStyle = "#c8ffd0"; ctx.beginPath(); ctx.arc(sx - 6, sy - 23, 2.4, 0, 6.28); ctx.arc(sx + 6, sy - 23, 2.4, 0, 6.28); ctx.fill();
+    // tail
+    ctx.strokeStyle = green; ctx.lineWidth = 4; ctx.beginPath(); ctx.moveTo(sx + 11, sy + 8); ctx.quadraticCurveTo(sx + 20, sy + 4, sx + 17, sy - 6); ctx.stroke();
+    // cat ears
+    ctx.fillStyle = green;
+    ctx.beginPath(); ctx.moveTo(sx - 11, sy - 12); ctx.lineTo(sx - 6, sy - 20); ctx.lineTo(sx - 3, sy - 12); ctx.closePath(); ctx.fill();
+    ctx.beginPath(); ctx.moveTo(sx + 11, sy - 12); ctx.lineTo(sx + 6, sy - 20); ctx.lineTo(sx + 3, sy - 12); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = drk; ctx.beginPath(); ctx.moveTo(sx - 8, sy - 13); ctx.lineTo(sx - 6, sy - 17); ctx.lineTo(sx - 4.5, sy - 13); ctx.closePath();
+    ctx.moveTo(sx + 8, sy - 13); ctx.lineTo(sx + 6, sy - 17); ctx.lineTo(sx + 4.5, sy - 13); ctx.closePath(); ctx.fill();
+    // paws + body + head
+    ctx.fillStyle = green;
+    ctx.beginPath(); ctx.arc(sx - 9, sy + 10, 3.5, 0, 6.28); ctx.arc(sx + 9, sy + 10, 3.5, 0, 6.28); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(sx, sy + 6, 11, 10, 0, 0, 6.28); ctx.fill();
+    ctx.beginPath(); ctx.arc(sx, sy - 6, 10, 0, 6.28); ctx.fill();
+    // big violet almond eyes + shine
+    ctx.fillStyle = eye;
+    for (const s of [-1, 1]) { ctx.save(); ctx.translate(sx + s * 4.2, sy - 6); ctx.rotate(s * 0.3); ctx.beginPath(); ctx.ellipse(0, 0, 3, 4.2, 0, 0, 6.28); ctx.fill(); ctx.restore(); }
+    ctx.fillStyle = "#dce6ff"; ctx.beginPath(); ctx.arc(sx - 5, sy - 8, 1, 0, 6.28); ctx.arc(sx + 3.4, sy - 8, 1, 0, 6.28); ctx.fill();
+    // pink nose + whiskers
+    ctx.fillStyle = "#ff9ecf"; ctx.beginPath(); ctx.arc(sx, sy - 2, 1.4, 0, 6.28); ctx.fill();
+    ctx.strokeStyle = "rgba(255,255,255,0.6)"; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(sx - 3, sy - 1); ctx.lineTo(sx - 10, sy - 2); ctx.moveTo(sx + 3, sy - 1); ctx.lineTo(sx + 10, sy - 2); ctx.stroke();
+    // belly spot
+    ctx.fillStyle = "#c8ffd0"; ctx.globalAlpha = 0.7; ctx.beginPath(); ctx.ellipse(sx, sy + 8, 5, 5, 0, 0, 6.28); ctx.fill(); ctx.globalAlpha = 1;
   },
   drawGlorp(ctx, sx, sy) {
     // pink alien-bear plush: antennae, big blue eyes, purple nose/feet

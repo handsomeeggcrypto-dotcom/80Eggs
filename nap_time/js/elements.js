@@ -18,8 +18,11 @@
     giggly: { id: "giggly", name: "Giggly", emoji: "🍃", effect: "nudge",
       color: "#7be88f", spark: "#e0ffe6",
       desc: "minty gusts that push dreams back" },
+    zappy: { id: "zappy", name: "Zappy", emoji: "🔌", effect: "chain",
+      color: "#4dff9e", spark: "#d0ffe6",
+      desc: "green taser-lightning that leaps to a nearby dream" },
   };
-  NAP.ELEMENT_ORDER = ["excited", "cozy", "sleepy", "giggly"];
+  NAP.ELEMENT_ORDER = ["excited", "cozy", "sleepy", "giggly", "zappy"];
 
   // the vibe a character is currently using (chosen, else innate default)
   NAP.charElement = function (charId) {
