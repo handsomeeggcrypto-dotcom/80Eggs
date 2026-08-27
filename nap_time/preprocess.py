@@ -292,6 +292,12 @@ def main():
         w = round(im.width * target_h / im.height)
         im.resize((w, target_h), Image.LANCZOS).save(os.path.join(OUT, out))
         return {"file": out, "w": w, "h": target_h}
+    # dedicated talking portraits (busts) for story scenes
+    def talk_sprite(src, out, th=620):
+        im = trim(load(src))
+        tw = round(im.width * th / im.height)
+        im.resize((tw, th), Image.LANCZOS).save(os.path.join(OUT, out))
+        return {"file": out, "w": tw, "h": th}
     meta["misc"]["vn_kumori"] = vn_sprite("egg_idle_down.png", "vn_kumori.png")
     meta["misc"]["vn_shadow"] = vn_sprite("enemy_zombie_egg_idle.png", "vn_shadow.png")
 
@@ -320,10 +326,7 @@ def main():
     meta["misc"]["bg_egg_room"] = {"file": "bg_egg_room.png", "w": rw, "h": rh}
 
     # ---- Egg talking portrait (bust) --------------------------------------
-    talk = trim(load("egg_talk.png"))
-    th = 620; tw = round(talk.width * th / talk.height)
-    talk.resize((tw, th), Image.LANCZOS).save(os.path.join(OUT, "vn_egg.png"))
-    meta["misc"]["vn_egg"] = {"file": "vn_egg.png", "w": tw, "h": th}
+    meta["misc"]["vn_egg"] = talk_sprite("egg_talk.png", "vn_egg.png")
 
     # ---- Rooftop dream background ------------------------------------------
     rd = load("background_rooftop_dream.png").convert("RGB")
@@ -332,7 +335,7 @@ def main():
     meta["misc"]["bg_rooftop"] = {"file": "bg_rooftop.png", "w": rw, "h": rh}
 
     # ---- Neogaucha VN speaker sprite (full-body idle) ---------------------
-    meta["misc"]["vn_neogaucha"] = vn_sprite("110_idle_down.png", "vn_neogaucha.png")
+    meta["misc"]["vn_neogaucha"] = talk_sprite("110_talk.jpg", "vn_neogaucha.png")
     meta["misc"]["vn_oni"] = vn_sprite("enemy_oni_idle.png", "vn_oni.png")
 
     # ---- Cloud Library background + Lua VN sprite -------------------------
@@ -340,7 +343,7 @@ def main():
     lw = 1280; lh = round(lib.height * lw / lib.width)
     lib.resize((lw, lh), Image.LANCZOS).save(os.path.join(OUT, "bg_library.png"))
     meta["misc"]["bg_library"] = {"file": "bg_library.png", "w": lw, "h": lh}
-    meta["misc"]["vn_lua"] = vn_sprite("lua_idle_down.png", "vn_lua.png")
+    meta["misc"]["vn_lua"] = talk_sprite("lua_talk.jpg", "vn_lua.png")
     meta["misc"]["vn_siren"] = vn_sprite("enemy_nightmarelua_idle.png", "vn_siren.png")
 
     # ---- Pond Meadow background + Beek/bunny VN sprites -------------------
@@ -348,7 +351,7 @@ def main():
     pw2 = 1280; ph2 = round(pond.height * pw2 / pond.width)
     pond.resize((pw2, ph2), Image.LANCZOS).save(os.path.join(OUT, "bg_pond.png"))
     meta["misc"]["bg_pond"] = {"file": "bg_pond.png", "w": pw2, "h": ph2}
-    meta["misc"]["vn_beek"] = vn_sprite("beek_idle_down.png", "vn_beek.png")
+    meta["misc"]["vn_beek"] = talk_sprite("beek_talk.png", "vn_beek.png")
     meta["misc"]["vn_nightmarebeek"] = vn_sprite("enemy_nightmarebeek_idle.png", "vn_nightmarebeek.png")
 
     # ---- Sunny Meadow background + Napling VN sprite ---------------------
@@ -356,14 +359,14 @@ def main():
     mw = 1280; mh = round(mead.height * mw / mead.width)
     mead.resize((mw, mh), Image.LANCZOS).save(os.path.join(OUT, "bg_meadow.png"))
     meta["misc"]["bg_meadow"] = {"file": "bg_meadow.png", "w": mw, "h": mh}
-    meta["misc"]["vn_nap"] = vn_sprite("nap_idle_down.png", "vn_nap.png")
+    meta["misc"]["vn_nap"] = talk_sprite("nap_talk.JPG", "vn_nap.png")
 
     # ---- Spaceship background + IMQ / IMS VN sprites --------------------
     ship = load("background_dream_spaceship.png").convert("RGB")
     sw = 1280; sh = round(ship.height * sw / ship.width)
     ship.resize((sw, sh), Image.LANCZOS).save(os.path.join(OUT, "bg_ship.png"))
     meta["misc"]["bg_ship"] = {"file": "bg_ship.png", "w": sw, "h": sh}
-    meta["misc"]["vn_imq"] = vn_sprite("imq_idle_down.png", "vn_imq.png")
+    meta["misc"]["vn_imq"] = talk_sprite("imq_talk.png", "vn_imq.png")
     meta["misc"]["vn_ims"] = vn_sprite("enemy_ims_idle.png", "vn_ims.png", strip=True)
 
     with open(os.path.join(OUT, "meta.json"), "w") as f:

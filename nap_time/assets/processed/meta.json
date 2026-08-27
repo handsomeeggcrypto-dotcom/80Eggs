@@ -651,7 +651,7 @@
     },
     "vn_neogaucha": {
       "file": "vn_neogaucha.png",
-      "w": 307,
+      "w": 620,
       "h": 620
     },
     "vn_oni": {
@@ -666,7 +666,7 @@
     },
     "vn_lua": {
       "file": "vn_lua.png",
-      "w": 405,
+      "w": 511,
       "h": 620
     },
     "vn_siren": {
@@ -681,7 +681,7 @@
     },
     "vn_beek": {
       "file": "vn_beek.png",
-      "w": 324,
+      "w": 449,
       "h": 620
     },
     "vn_nightmarebeek": {
@@ -696,7 +696,7 @@
     },
     "vn_nap": {
       "file": "vn_nap.png",
-      "w": 430,
+      "w": 436,
       "h": 620
     },
     "bg_ship": {
@@ -706,7 +706,7 @@
     },
     "vn_imq": {
       "file": "vn_imq.png",
-      "w": 311,
+      "w": 400,
       "h": 620
     },
     "vn_ims": {

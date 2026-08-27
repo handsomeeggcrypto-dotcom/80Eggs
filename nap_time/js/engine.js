@@ -9,6 +9,7 @@ window.NAP = window.NAP || {};
   // ---- constants / meta ----
   NAP.META = window.GAME_META;
   NAP.DIR = "assets/processed/";
+  NAP.ASSET_V = "16";   // bump when processed image contents change (busts browser cache)
 
   // ---- math / util ----
   const U = NAP.util = {
@@ -53,7 +54,7 @@ window.NAP = window.NAP || {};
     const im = new Image();
     im.onload = () => { images[f] = im; res(); };
     im.onerror = () => { console.warn("missing asset", f); res(); };
-    im.src = NAP.DIR + f;
+    im.src = NAP.DIR + f + "?v=" + NAP.ASSET_V;
   });
   NAP.loadImages = list => Promise.all([...new Set(list)].map(NAP.loadImage));
 
