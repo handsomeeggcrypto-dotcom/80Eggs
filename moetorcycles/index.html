@@ -2,7 +2,11 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<!-- run fullscreen when added to the iOS/Android home screen -->
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <title>MOEtorcycles</title>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -11,11 +15,14 @@
     background: #14002b;
     overflow: hidden;
     font-family: "Trebuchet MS", "Comic Sans MS", system-ui, sans-serif;
-    -webkit-user-select: none; user-select: none; touch-action: none;
+    -webkit-user-select: none; user-select: none;
+    touch-action: none; -ms-touch-action: none; overscroll-behavior: none;
+    -webkit-tap-highlight-color: transparent;
   }
   #wrap {
     position: absolute; inset: 0;
     display: flex; align-items: center; justify-content: center;
+    touch-action: none;
   }
   canvas {
     background: #1a0136;
@@ -23,7 +30,10 @@
     image-rendering: auto;
     box-shadow: 0 0 60px rgba(255,120,255,0.35);
     border-radius: 8px;
+    touch-action: none;
   }
+  /* fullscreen: let the canvas use the whole screen */
+  :fullscreen #wrap, :-webkit-full-screen #wrap { background: #14002b; }
 </style>
 </head>
 <body>

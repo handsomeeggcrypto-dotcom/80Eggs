@@ -260,9 +260,37 @@ let jumpQueued = false;
 let dashQueued = false;
 let anyPressQueued = false;
 
+let isTouch = ("ontouchstart" in window) || navigator.maxTouchPoints > 0;
+
+// Enter fullscreen on the first gesture (best-effort; iPhone Safari has no
+// Fullscreen API, so there it only fills the viewport / home-screen web app).
+let fsTried = false;
+function enterFullscreen() {
+  if (fsTried) return;
+  fsTried = true;
+  const el = document.documentElement;
+  const req = el.requestFullscreen || el.webkitRequestFullscreen || el.webkitRequestFullScreen;
+  if (req) { try { const p = req.call(el); if (p && p.catch) p.catch(() => {}); } catch (e) {} }
+  if (screen.orientation && screen.orientation.lock) {
+    try { screen.orientation.lock("landscape").catch(() => {}); } catch (e) {}
+  }
+}
+
+// Kill iOS double-tap-to-zoom and pinch-zoom.
+document.addEventListener("gesturestart", (e) => e.preventDefault(), { passive: false });
+document.addEventListener("gesturechange", (e) => e.preventDefault(), { passive: false });
+let lastTouchEnd = 0;
+document.addEventListener("touchend", (e) => {
+  const now = Date.now();
+  if (now - lastTouchEnd < 350) e.preventDefault(); // second tap of a double-tap
+  lastTouchEnd = now;
+}, { passive: false });
+document.addEventListener("touchmove", (e) => { if (e.scale && e.scale !== 1) e.preventDefault(); }, { passive: false });
+
 window.addEventListener("keydown", (e) => {
   if (["ArrowUp","ArrowDown","ArrowLeft","ArrowRight","Space"].includes(e.code)) e.preventDefault();
   Sound.unlock();
+  enterFullscreen();
   if (e.code === "KeyM") { Sound.toggleMute(); return; }
   if (keys[e.code]) return; // ignore auto-repeat
   keys[e.code] = true;
@@ -277,6 +305,7 @@ window.addEventListener("keyup", (e) => { keys[e.code] = false; });
 canvas.addEventListener("pointerdown", (e) => {
   const r = canvas.getBoundingClientRect();
   Sound.unlock();
+  enterFullscreen();
   // mute button (bottom-right) intercepts in every state
   const mx = (e.clientX - r.left) / r.width * W;
   const my = (e.clientY - r.top) / r.height * H;
@@ -284,7 +313,7 @@ canvas.addEventListener("pointerdown", (e) => {
   const x = (e.clientX - r.left) / r.width;
   anyPressQueued = true;
   if (state === STATE.PLAY) {
-    if (x > 0.62) dashQueued = true; else jumpQueued = true;
+    if (x >= 0.5) dashQueued = true; else jumpQueued = true; // left = jump, right = dash
   } else {
     pointerMenu(e, r);
   }
@@ -845,7 +874,37 @@ function render(dt) {
   else { drawWorld(); drawTrailInGame(); drawPlayer(); drawParticles(); drawHUD(); if (state === STATE.DEAD) drawDead(); }
 
   ctx.restore();
+  if (isTouch && (state === STATE.PLAY || state === STATE.RESCUE)) drawTouchPads();
   drawMuteButton(); // fixed overlay, unaffected by screen shake
+}
+
+// Translucent left/right control pads on touch devices (left = jump, right = dash).
+function drawTouchPads() {
+  ctx.save();
+  ctx.textAlign = "center"; ctx.textBaseline = "middle";
+  // faint tint over each half + centre divider
+  ctx.fillStyle = "rgba(120,200,255,0.06)";
+  ctx.fillRect(0, 0, W / 2, H);
+  ctx.fillStyle = "rgba(255,170,110,0.06)";
+  ctx.fillRect(W / 2, 0, W / 2, H);
+  ctx.strokeStyle = "rgba(255,255,255,0.12)"; ctx.lineWidth = 2;
+  ctx.setLineDash([10, 12]);
+  ctx.beginPath(); ctx.moveTo(W / 2, 30); ctx.lineTo(W / 2, H - 30); ctx.stroke();
+  ctx.setLineDash([]);
+
+  const pad = (cx, cy, glyph, label, col) => {
+    ctx.beginPath(); ctx.arc(cx, cy, 52, 0, Math.PI * 2);
+    ctx.fillStyle = "rgba(20,10,40,0.32)"; ctx.fill();
+    ctx.strokeStyle = col; ctx.lineWidth = 3; ctx.stroke();
+    ctx.fillStyle = col; ctx.font = "40px system-ui, sans-serif";
+    ctx.fillText(glyph, cx, cy - 4);
+    ctx.font = "bold 17px Trebuchet MS, sans-serif";
+    ctx.fillStyle = "#fff";
+    ctx.fillText(label, cx, cy + 34);
+  };
+  pad(W * 0.11, H * 0.80, "⤒", "JUMP", "rgba(150,215,255,0.95)");
+  pad(W * 0.89, H * 0.80, "»", "DASH", "rgba(255,195,140,0.98)");
+  ctx.restore();
 }
 
 function drawMuteButton() {
