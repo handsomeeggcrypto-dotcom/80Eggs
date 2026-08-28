@@ -262,6 +262,16 @@ let anyPressQueued = false;
 
 let isTouch = ("ontouchstart" in window) || navigator.maxTouchPoints > 0;
 
+// touch jump "hold": a finger on the jump pad counts as holding jump so the
+// variable-height cut doesn't chop mobile jumps into tiny hops.
+let touchJumpHeld = false;
+let jumpPointerId = null;
+function releaseJumpPointer(e) {
+  if (e.pointerId === jumpPointerId) { touchJumpHeld = false; jumpPointerId = null; }
+}
+window.addEventListener("pointerup", releaseJumpPointer);
+window.addEventListener("pointercancel", releaseJumpPointer);
+
 // Enter fullscreen on the first gesture (best-effort; iPhone Safari has no
 // Fullscreen API, so there it only fills the viewport / home-screen web app).
 let fsTried = false;
@@ -313,7 +323,8 @@ canvas.addEventListener("pointerdown", (e) => {
   const x = (e.clientX - r.left) / r.width;
   anyPressQueued = true;
   if (state === STATE.PLAY) {
-    if (x >= 0.5) dashQueued = true; else jumpQueued = true; // left = jump, right = dash
+    if (x >= 0.5) { dashQueued = true; }               // right = dash
+    else { jumpQueued = true; touchJumpHeld = true; jumpPointerId = e.pointerId; } // left = jump (held)
   } else {
     pointerMenu(e, r);
   }
@@ -442,6 +453,7 @@ function resetRun() {
     dashStock: up.dashMax, // available dash charges
     boostT: 0,           // remaining ring-boost time
     landT: 0,            // landing animation timer
+    jumpGrace: 0,        // min-rise window so quick taps still glide
     alive: true,
     tilt: 0,
     shieldsLeft: up.shields, // dustoff rescues remaining
@@ -589,6 +601,7 @@ function update(dt) {
   if (player.boostT > 0) player.boostT -= dt;
   if (player.landT > 0) player.landT -= dt;
   if (player.invT > 0) player.invT -= dt;
+  if (player.jumpGrace > 0) player.jumpGrace -= dt;
   screenShake *= 0.88;
   // dash charges recharge over time (up to the max from upgrades)
   if (player.dashStock < up.dashMax) {
@@ -609,13 +622,15 @@ function update(dt) {
       player.vy = JUMP_V;
       player.jumps++;
       player.onGround = false;
+      player.jumpGrace = 0.16; // guaranteed rise so even a quick tap glides
       Sound.jump();
       for (let i = 0; i < 8; i++) spawnSpark(PLAYER_X, player.y + PLAYER_H, "#fff");
     }
   }
-  // variable jump height: cut when jump released while rising
-  const jumpHeld = keys.Space || keys.ArrowUp || keys.KeyW;
-  if (!jumpHeld && player.vy < 0) player.vy *= Math.pow(JUMP_CUT, dt * 60);
+  // variable jump height: cut when jump is released while rising (after a short
+  // grace, and only if it isn't being held — keyboard OR the touch jump pad)
+  const jumpHeld = keys.Space || keys.ArrowUp || keys.KeyW || touchJumpHeld;
+  if (!jumpHeld && player.jumpGrace <= 0 && player.vy < 0) player.vy *= Math.pow(JUMP_CUT, dt * 60);
 
   // physics
   player.vy = Math.min(player.vy + GRAVITY * dt, MAX_FALL);
