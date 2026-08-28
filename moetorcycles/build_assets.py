@@ -143,8 +143,7 @@ build_ride_aligned("bradley", {
 })
 
 # ===========================================================================
-#  RIDE: ABBA  (mixed canvas sizes -> aligned; landing frames are white-bg ->
-#  key them out; other poses are already transparent so keying no-ops)
+#  RIDE: ABBA  (mixed canvas sizes -> aligned mode; all frames now transparent)
 # ===========================================================================
 build_ride_aligned("abba", {
     "ride":    "abba_idle_01.png",
@@ -152,7 +151,7 @@ build_ride_aligned("abba", {
     "air":     "abba_airborne_01.png",
     "land":    "abba_landing_01.png",
     "crash":   "abba_crash_01.png",
-}, preprocess=remove_white_bg)
+})
 
 # ---- MOE Zedong Dustoff (shield rescue helicopter) ----
 heli = load("skill_dustoff.png")
