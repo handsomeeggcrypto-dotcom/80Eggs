@@ -73,6 +73,21 @@ chosen map as its live background). Each map also sets its **road style**
 Select controls: `←/→` character, `[ ]` map (or tap a map card), `↑/↓` trail
 style, `C` trail color, `U` unlock, `Space`/tap the bottom prompt to ride.
 
+## Upgrade tree
+
+Permanent boosts bought with banked stars, on their own screen (⬆ UPGRADES on the
+select screen, or `T`; `Esc`/BACK to return). Four branches, each a chain you buy
+in order (`UPGRADES` array in `game.js`):
+
+- **Jump** — Triple Jump → Quad Jump
+- **Dash** — Long Dash → Quick Charge → Double Dash (two charges)
+- **Speed** — Cruiser (+base) → Overdrive (+top speed)
+- **Stars** — Star Magnet → Double Value
+
+Owned upgrades persist in `moetorcycles_upgrades` and are baked into `up` at the
+start of each run (`computeUpgrades`). Costs/effects are all in that array and
+`computeUpgrades` — easy to tune.
+
 ## Sound
 
 All audio is **synthesized at runtime** with the Web Audio API — no audio files,

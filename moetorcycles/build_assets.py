@@ -78,14 +78,17 @@ def build_ride(prefix, poses, pad=8, preprocess=None):
         save(im.crop(box), f"player_{prefix}_{key}.png")
 
 
-def build_ride_aligned(prefix, poses, pad=14, thresh=45):
+def build_ride_aligned(prefix, poses, pad=14, thresh=45, preprocess=None):
     """Trim + bottom-center align: when poses come on DIFFERENT canvas sizes
     (mismatched framing) but the bike is drawn at a consistent pixel scale,
     trim each to content and drop them onto one common canvas, bottom-aligned so
-    the tyres share a baseline and horizontally centred. (Eggs.)"""
+    the tyres share a baseline and horizontally centred. (Eggs, ABBA.)
+    `preprocess` (e.g. remove_white_bg) runs on each frame first."""
     trimmed = {}
     for k, f in poses.items():
         im = load(f)
+        if preprocess:
+            im = preprocess(im)
         bb = content_bbox(im, thresh)
         trimmed[k] = im.crop(bb)
     W = max(t.width for t in trimmed.values()) + pad * 2
@@ -138,5 +141,17 @@ build_ride_aligned("bradley", {
     "land":    "bradley_landing_01.png",
     "crash":   "bradley_crash_02.png",
 })
+
+# ===========================================================================
+#  RIDE: ABBA  (mixed canvas sizes -> aligned; landing frames are white-bg ->
+#  key them out; other poses are already transparent so keying no-ops)
+# ===========================================================================
+build_ride_aligned("abba", {
+    "ride":    "abba_idle_01.png",
+    "wheelie": "abba_wheelie_01.png",
+    "air":     "abba_airborne_01.png",
+    "land":    "abba_landing_01.png",
+    "crash":   "abba_crash_01.png",
+}, preprocess=remove_white_bg)
 
 print("Done. Assets in", OUT)

@@ -74,14 +74,31 @@ const RIDES = [
     },
     preview: "assets/player_bradley_ride.png",
   },
+  {
+    id: "abba",
+    name: "ABBA",
+    tagline: "Clouds, bunnies, and crystal dreams.",
+    cost: 300,
+    scale: 1.5,
+    wheelFrac: 0.989,
+    frames: {
+      ride:    "assets/player_abba_ride.png",
+      wheelie: "assets/player_abba_wheelie.png",
+      air:     "assets/player_abba_air.png",
+      land:    "assets/player_abba_land.png",
+      crash:   "assets/player_abba_crash.png",
+    },
+    preview: "assets/player_abba_ride.png",
+  },
 ];
 
 /* ---------- Maps (selectable independently of the character) ----------
-   `road` picks the road styling (see drawRoad): "neon" | "dirt" | "china". */
+   `road`: "neon" | "dirt" | "china" | "crystal" (see drawRoad). */
 const MAPS = [
-  { id: "crayons", name: "Neon City",   cost: 0,   bg: bgSet("crayons"), road: "neon" },
-  { id: "eggs",    name: "Countryside", cost: 100, bg: bgSet("eggs"),    road: "dirt" },
-  { id: "china",   name: "China City",  cost: 200, bg: bgSet("china"),   road: "china" },
+  { id: "crayons", name: "Neon City",    cost: 0,   bg: bgSet("crayons"), road: "neon" },
+  { id: "eggs",    name: "Countryside",  cost: 100, bg: bgSet("eggs"),    road: "dirt" },
+  { id: "china",   name: "China City",   cost: 200, bg: bgSet("china"),   road: "china" },
+  { id: "crystal", name: "Crystal City", cost: 250, bg: bgSet("crystal"), road: "crystal" },
 ];
 
 /* ---------- Asset loading (by URL, cached) ---------- */
@@ -113,7 +130,7 @@ function img(url) { return imgCache[url] || loadImg(url); }
 })();
 
 /* ---------- Game state machine ---------- */
-const STATE = { LOADING: "loading", TITLE: "title", SELECT: "select", PLAY: "play", DEAD: "dead" };
+const STATE = { LOADING: "loading", TITLE: "title", SELECT: "select", UPGRADES: "upgrades", PLAY: "play", DEAD: "dead" };
 let state = STATE.LOADING;
 
 let selRide = 0; // index into RIDES (character)
@@ -163,6 +180,56 @@ function tryUnlock(key, cost) {
   unlockFlash = 0.5; // not enough stars
   return false;
 }
+
+/* ---------- Upgrade tree ----------
+   Permanent, bought with banked stars. Each branch is a chain: a node needs the
+   one above it. Effects are baked into `up` at the start of each run. */
+const UPGRADES = [
+  { id: "jump", name: "Jump", icon: "🦘", nodes: [
+    { id: "jump_triple", name: "Triple Jump", desc: "A 3rd mid-air jump", cost: 140 },
+    { id: "jump_quad",   name: "Quad Jump",   desc: "A 4th mid-air jump", cost: 300 },
+  ]},
+  { id: "dash", name: "Dash", icon: "💨", nodes: [
+    { id: "dash_long",     name: "Long Dash",   desc: "Dash lasts 60% longer", cost: 130 },
+    { id: "dash_recharge", name: "Quick Charge", desc: "Dash recharges faster", cost: 170 },
+    { id: "dash_double",   name: "Double Dash",  desc: "Hold two dash charges", cost: 300 },
+  ]},
+  { id: "speed", name: "Speed", icon: "⚡", nodes: [
+    { id: "speed_base", name: "Cruiser",   desc: "Higher starting speed", cost: 110 },
+    { id: "speed_cap",  name: "Overdrive", desc: "Higher top speed",      cost: 240 },
+  ]},
+  { id: "stars", name: "Stars", icon: "⭐", nodes: [
+    { id: "star_magnet", name: "Star Magnet", desc: "Pull in nearby stars", cost: 160 },
+    { id: "star_value",  name: "Double Value", desc: "Stars worth 2×",      cost: 260 },
+  ]},
+];
+let upgrades = new Set();
+try { upgrades = new Set(JSON.parse(localStorage.getItem("moetorcycles_upgrades") || "[]")); } catch (e) {}
+function saveUpgrades() { localStorage.setItem("moetorcycles_upgrades", JSON.stringify([...upgrades])); }
+function hasUp(id) { return upgrades.has(id); }
+function buyUp(node, available) {
+  if (upgrades.has(node.id)) return;
+  if (!available) { unlockFlash = 0.5; return; }
+  if (bank >= node.cost) {
+    bank -= node.cost; upgrades.add(node.id); saveBank(); saveUpgrades();
+    unlockPulse = 0.6; Sound.ui();
+  } else unlockFlash = 0.5;
+}
+// effective per-run values baked from owned upgrades (recomputed at startGame)
+let up = {};
+function computeUpgrades() {
+  up = {
+    maxJumps:  2 + (hasUp("jump_triple") ? 1 : 0) + (hasUp("jump_quad") ? 1 : 0),
+    dashTime:  0.42 * (hasUp("dash_long") ? 1.6 : 1),
+    dashCd:    0.9  * (hasUp("dash_recharge") ? 0.55 : 1),
+    dashMax:   hasUp("dash_double") ? 2 : 1,
+    speedStart: SPEED_START + (hasUp("speed_base") ? 90 : 0),
+    speedMax:   SPEED_MAX + (hasUp("speed_cap") ? 220 : 0),
+    magnet:    hasUp("star_magnet"),
+    starValue: hasUp("star_value") ? 2 : 1,
+  };
+}
+
 function clampIdx(v, n) { return Number.isFinite(v) && v >= 0 && v < n ? v : 0; }
 let selTrailColor  = clampIdx(+localStorage.getItem("moetorcycles_trail_color"),  TRAIL_COLORS.length);
 let selTrailDesign = clampIdx(+localStorage.getItem("moetorcycles_trail_design"), TRAIL_DESIGNS.length);
@@ -174,7 +241,7 @@ function saveTrail() {
   localStorage.setItem("moetorcycles_trail_design", selTrailDesign);
 }
 // clickable regions on the select screen, refreshed each frame it's drawn
-const uiHits = { swatches: [], chips: [], maps: [], charUnlock: null };
+const uiHits = { swatches: [], chips: [], maps: [], charUnlock: null, upnodes: [], upBack: null, toUpgrades: null };
 
 let best = Number(localStorage.getItem("moetorcycles_best") || 0);
 let menuCd = 0; // debounce so one tap/press can't skip a whole screen
@@ -233,7 +300,10 @@ function handleMenuKey(code) {
       if (!isUnlocked("char:" + c.id, c.cost)) tryUnlock("char:" + c.id, c.cost);
       else if (!isUnlocked("map:" + m.id, m.cost)) tryUnlock("map:" + m.id, m.cost);
     }
+    else if (code === "KeyT") { state = STATE.UPGRADES; menuCd = 0.2; Sound.ui(); }
     else if ((code === "Space" || code === "Enter") && menuCd <= 0) attemptStart();
+  } else if (state === STATE.UPGRADES) {
+    if (code === "Escape" || code === "KeyT") { state = STATE.SELECT; menuCd = 0.2; }
   } else if (state === STATE.DEAD) {
     if ((code === "Space" || code === "Enter") && menuCd <= 0) startGame();
     if (code === "Escape") { state = STATE.SELECT; menuCd = 0.3; }
@@ -248,6 +318,8 @@ function pointerMenu(e, r) {
     const my = (e.clientY - r.top) / r.height * H;
     const inRect = (b) => mx >= b.x && mx <= b.x + b.w && my >= b.y && my <= b.y + b.h;
 
+    // UPGRADES button
+    if (uiHits.toUpgrades && inRect(uiHits.toUpgrades)) { state = STATE.UPGRADES; menuCd = 0.2; Sound.ui(); return; }
     // character unlock button
     if (uiHits.charUnlock && inRect(uiHits.charUnlock)) {
       tryUnlock(uiHits.charUnlock.key, uiHits.charUnlock.cost); menuCd = 0.15; return;
@@ -282,6 +354,15 @@ function pointerMenu(e, r) {
     // start only from the bottom prompt band
     if (my > H * 0.90) attemptStart();
   }
+  else if (state === STATE.UPGRADES) {
+    const mx = (e.clientX - r.left) / r.width * W;
+    const my = (e.clientY - r.top) / r.height * H;
+    const inRect = (b) => b && mx >= b.x && mx <= b.x + b.w && my >= b.y && my <= b.y + b.h;
+    if (inRect(uiHits.upBack)) { state = STATE.SELECT; menuCd = 0.2; Sound.ui(); return; }
+    for (const n of uiHits.upnodes) {
+      if (inRect(n)) { buyUp(n.node, n.available); menuCd = 0.15; return; }
+    }
+  }
   else if (state === STATE.DEAD) startGame();
 }
 
@@ -313,15 +394,17 @@ const COMBO_WINDOW = 2.6;           // seconds to keep the chain alive
 const comboMult = () => Math.min(1 + Math.floor(combo / 5), 8); // x1..x8
 
 function resetRun() {
+  computeUpgrades(); // bake owned upgrades into `up` for this run
   player = {
     y: H - GROUND_MARGIN - PLAYER_H,
     vy: 0,
     onGround: true,
     jumps: 0,
-    dashT: 0,          // remaining dash time
-    dashCd: 0,
-    boostT: 0,         // remaining ring-boost time
-    landT: 0,          // landing animation timer
+    dashT: 0,            // remaining dash time
+    dashCd: 0,           // recharge timer
+    dashStock: up.dashMax, // available dash charges
+    boostT: 0,           // remaining ring-boost time
+    landT: 0,            // landing animation timer
     alive: true,
     tilt: 0,
   };
@@ -334,7 +417,7 @@ function resetRun() {
   combo = 0; comboTimer = 0; runStars = 0;
   score = 0;
   distance = 0;
-  speed = SPEED_START;
+  speed = up.speedStart;
   animT = 0;
   screenShake = 0;
   deathTimer = 0;
@@ -455,7 +538,7 @@ function update(dt) {
   }
 
   animT += dt;
-  speed = Math.min(speed + dt * SPEED_RAMP, SPEED_MAX); // slow, capped ramp
+  speed = Math.min(speed + dt * SPEED_RAMP, up.speedMax); // slow, capped ramp
   const spdMult = Math.max(player.dashT > 0 ? DASH_MULT : 1, player.boostT > 0 ? BOOST_MULT : 1);
   const dx = speed * spdMult * dt;
   distance += dx;
@@ -463,20 +546,25 @@ function update(dt) {
 
   // timers
   if (player.dashT > 0) player.dashT -= dt;
-  if (player.dashCd > 0) player.dashCd -= dt;
   if (player.boostT > 0) player.boostT -= dt;
   if (player.landT > 0) player.landT -= dt;
   screenShake *= 0.88;
+  // dash charges recharge over time (up to the max from upgrades)
+  if (player.dashStock < up.dashMax) {
+    player.dashCd -= dt;
+    if (player.dashCd <= 0) { player.dashStock++; player.dashCd = up.dashCd; }
+  }
 
-  // dash input
-  if (dashQueued && player.dashCd <= 0) {
-    player.dashT = 0.42; player.dashCd = 0.9;
+  // dash input (spends a charge)
+  if (dashQueued && player.dashStock > 0 && player.dashT <= 0) {
+    player.dashStock--; player.dashT = up.dashTime;
+    if (player.dashCd <= 0) player.dashCd = up.dashCd; // start recharge if idle
     Sound.dash();
     for (let i = 0; i < 14; i++) spawnSpark(PLAYER_X - 30, player.y + PLAYER_H * 0.6);
   }
-  // jump input (double jump)
+  // jump input (up to maxJumps from upgrades)
   if (jumpQueued) {
-    if (player.onGround || player.jumps < 2) {
+    if (player.onGround || player.jumps < up.maxJumps) {
       player.vy = JUMP_V;
       player.jumps++;
       player.onGround = false;
@@ -533,12 +621,17 @@ function update(dt) {
   for (const s of stars) {
     if (s.got) continue;
     s.spin += dt * 8;
+    // Star Magnet upgrade: pull nearby stars toward the rider
+    if (up.magnet) {
+      const wdx = (distance + pcx) - s.x, wdy = pcy - s.y;
+      if (wdx * wdx + wdy * wdy < 210 * 210) { s.x += wdx * 7 * dt; s.y += wdy * 7 * dt; }
+    }
     const sx = s.x - distance;
     if (Math.abs(sx - pcx) < 55 && Math.abs(s.y - pcy) < 70) {
       s.got = true;
       combo++; comboTimer = COMBO_WINDOW;
       score += 25 * comboMult();
-      runStars++; addStars(1);
+      runStars += up.starValue; addStars(up.starValue);
       Sound.star(combo);
       for (let i = 0; i < 8; i++) spawnSpark(PLAYER_X, player.y + PLAYER_H * 0.4, "#ffe066");
     }
@@ -654,6 +747,7 @@ function render(dt) {
   if (state === STATE.LOADING) drawLoading();
   else if (state === STATE.TITLE) drawTitle();
   else if (state === STATE.SELECT) drawSelect();
+  else if (state === STATE.UPGRADES) drawUpgradeTree();
   else { drawWorld(); drawTrailInGame(); drawPlayer(); drawParticles(); drawHUD(); if (state === STATE.DEAD) drawDead(); }
 
   ctx.restore();
@@ -742,7 +836,63 @@ function drawRoad(x, topY, w, worldX) {
   const style = MAPS[selMap].road;
   if (style === "dirt") drawRoadDirt(x, topY, w, worldX);
   else if (style === "china") drawRoadChina(x, topY, w, worldX);
+  else if (style === "crystal") drawRoadCrystal(x, topY, w, worldX);
   else drawRoadNeon(x, topY, w, worldX);
+}
+
+// Crystal City: a glassy, faceted road — cool blue-purple body with scrolling
+// crystal facets, a prismatic curb, and scrolling gem diamonds down the middle.
+function drawRoadCrystal(x, topY, w, worldX) {
+  ctx.save();
+  ctx.fillStyle = "rgba(180,230,255,0.35)";
+  ctx.fillRect(x - 2, topY - 9, w + 4, 9);
+
+  const body = ctx.createLinearGradient(0, topY, 0, H);
+  body.addColorStop(0, "#5566b8");
+  body.addColorStop(0.14, "#3b3f86");
+  body.addColorStop(1, "#161436");
+  ctx.fillStyle = body;
+  ctx.fillRect(x, topY, w, H - topY);
+
+  // faceted diagonal shards (clipped to the road, scrolling with worldX)
+  ctx.save();
+  ctx.beginPath(); ctx.rect(x, topY, w, H - topY); ctx.clip();
+  const step = 64, depth = (H - topY) * 0.6;
+  const off = ((worldX * 0.6) % step + step) % step;
+  ctx.lineWidth = 20;
+  for (let sx = x - off - step; sx < x + w + depth; sx += step) {
+    ctx.strokeStyle = "rgba(200,240,255,0.10)";
+    ctx.beginPath(); ctx.moveTo(sx, topY); ctx.lineTo(sx - depth, H); ctx.stroke();
+    ctx.strokeStyle = "rgba(150,110,220,0.10)";
+    ctx.beginPath(); ctx.moveTo(sx + 32, topY); ctx.lineTo(sx + 32 - depth, H); ctx.stroke();
+  }
+  ctx.restore();
+
+  // prismatic curb
+  const curb = ctx.createLinearGradient(x, 0, x + w, 0);
+  curb.addColorStop(0.0, "#7dffff");
+  curb.addColorStop(0.4, "#c78bff");
+  curb.addColorStop(0.7, "#ff9ee0");
+  curb.addColorStop(1.0, "#7dd8ff");
+  ctx.fillStyle = curb;
+  ctx.fillRect(x, topY, w, 9);
+  ctx.fillStyle = "rgba(255,255,255,0.95)";
+  ctx.fillRect(x, topY, w, 3);
+
+  // scrolling crystal diamonds down the centre
+  const dY = topY + 36, per = 116;
+  const start = worldX - ((worldX % per) + per) % per;
+  for (let d = start; d < worldX + w + per; d += per) {
+    const cx = d - worldX + x;
+    if (cx < x + 8 || cx > x + w - 8) continue;
+    ctx.save();
+    ctx.translate(cx, dY); ctx.rotate(Math.PI / 4);
+    ctx.shadowColor = "#9fefff"; ctx.shadowBlur = 10;
+    ctx.fillStyle = "rgba(190,240,255,0.85)";
+    ctx.fillRect(-6, -6, 12, 12);
+    ctx.restore();
+  }
+  ctx.restore();
 }
 
 // China City: dark asphalt with a red+gold curb and gold dashes.
@@ -1149,10 +1299,12 @@ function drawHUD() {
   ctx.fillStyle = "#ffe066";
   ctx.fillText(`🌟 ${runStars}`, 30, 86);
 
-  // dash cooldown pip
+  // dash charges
   ctx.textAlign = "right";
-  ctx.fillStyle = player.dashCd <= 0 ? "#5bff9b" : "rgba(255,255,255,0.35)";
-  ctx.fillText(player.dashCd <= 0 ? "DASH READY" : "dash…", W - 28, 26);
+  const ready = player.dashStock > 0;
+  ctx.fillStyle = ready ? "#5bff9b" : "rgba(255,255,255,0.35)";
+  const label = up.dashMax > 1 ? `DASH ${player.dashStock}/${up.dashMax}` : (ready ? "DASH READY" : "dash…");
+  ctx.fillText(label, W - 28, 26);
   ctx.restore();
 
   // combo multiplier (center-top) with a draining timer bar
@@ -1231,6 +1383,17 @@ function drawSelect() {
   uiHits.maps.length = 0;
   uiHits.charUnlock = null;
 
+  // UPGRADES button (top-left)
+  const ub = { x: 24, y: 20, w: 172, h: 40 };
+  ctx.save();
+  ctx.fillStyle = "rgba(125,200,255,0.16)"; ctx.strokeStyle = "#5bc8ff"; ctx.lineWidth = 2.5;
+  roundRect(ub.x, ub.y, ub.w, ub.h, 20, true); ctx.stroke();
+  ctx.fillStyle = "#dff2ff"; ctx.font = "bold 18px Trebuchet MS, sans-serif";
+  ctx.textAlign = "center"; ctx.textBaseline = "middle";
+  ctx.fillText("⬆ UPGRADES", ub.x + ub.w / 2, ub.y + ub.h / 2 + 1);
+  ctx.restore();
+  uiHits.toUpgrades = ub;
+
   drawCharacterCard();
   drawMapRow();
   drawTrailPickers();
@@ -1257,6 +1420,75 @@ function drawBankPill() {
   ctx.fillStyle = "rgba(255,255,255,0.5)";
   ctx.fillText("collect stars to unlock", W - 26, 48);
   ctx.restore();
+}
+
+/* ---------- Upgrade tree screen ---------- */
+function drawUpgradeTree() {
+  menuScrim();
+  centerText("UPGRADES", H * 0.07, 34, "#fff");
+  centerText("spend banked stars on permanent boosts", H * 0.125, 15, "rgba(255,255,255,0.55)");
+  drawBankPill();
+  uiHits.upnodes.length = 0;
+
+  const nodeW = 220, nodeH = 104, spacing = 150, top = 214;
+  for (let c = 0; c < UPGRADES.length; c++) {
+    const cat = UPGRADES[c];
+    const cxs = W / 2 + (c - (UPGRADES.length - 1) / 2) * 300;
+    ctx.save();
+    ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    ctx.font = "30px system-ui, sans-serif"; ctx.fillText(cat.icon, cxs, 118);
+    ctx.font = "bold 20px Trebuchet MS, sans-serif"; ctx.fillStyle = "#fff";
+    ctx.fillText(cat.name.toUpperCase(), cxs, 148);
+    ctx.restore();
+
+    for (let n = 0; n < cat.nodes.length; n++) {
+      const node = cat.nodes[n];
+      const y = top + n * spacing;
+      const owned = upgrades.has(node.id);
+      const available = (n === 0 || upgrades.has(cat.nodes[n - 1].id)) && !owned;
+
+      if (n > 0) { // connector to the node above
+        ctx.strokeStyle = owned ? "#7dff9b" : "rgba(255,255,255,0.22)";
+        ctx.lineWidth = 4;
+        ctx.beginPath(); ctx.moveTo(cxs, y - spacing + nodeH / 2); ctx.lineTo(cxs, y - nodeH / 2); ctx.stroke();
+      }
+
+      const nx = cxs - nodeW / 2, ny = y - nodeH / 2;
+      ctx.save();
+      let border, fill;
+      if (owned) { border = "#7dff9b"; fill = "rgba(125,255,155,0.18)"; }
+      else if (available) { border = "#ffe066"; fill = "rgba(255,224,102,0.12)"; }
+      else { border = "rgba(255,255,255,0.2)"; fill = "rgba(255,255,255,0.05)"; }
+      ctx.fillStyle = fill; ctx.strokeStyle = border; ctx.lineWidth = available ? 3 : 2;
+      if (available) { ctx.shadowColor = "#ffe066"; ctx.shadowBlur = 10 + 6 * Math.sin(t * 4); }
+      roundRect(nx, ny, nodeW, nodeH, 14, true); ctx.shadowBlur = 0; ctx.stroke();
+
+      ctx.textAlign = "center"; ctx.textBaseline = "alphabetic";
+      ctx.fillStyle = owned ? "#eafff0" : available ? "#fff" : "rgba(255,255,255,0.5)";
+      ctx.font = "bold 18px Trebuchet MS, sans-serif";
+      ctx.fillText(node.name, cxs, ny + 30);
+      ctx.font = "13px Trebuchet MS, sans-serif";
+      ctx.fillStyle = owned ? "rgba(255,255,255,0.7)" : available ? "rgba(255,255,255,0.78)" : "rgba(255,255,255,0.4)";
+      ctx.fillText(node.desc, cxs, ny + 52);
+      ctx.font = "bold 15px Trebuchet MS, sans-serif";
+      if (owned) { ctx.fillStyle = "#7dff9b"; ctx.fillText("✓ OWNED", cxs, ny + 82); }
+      else if (available) { ctx.fillStyle = bank >= node.cost ? "#ffe066" : "#ff8a94"; ctx.fillText(`${node.cost} 🌟`, cxs, ny + 84); }
+      else { ctx.fillStyle = "rgba(255,255,255,0.4)"; ctx.fillText(`🔒 ${node.cost} 🌟`, cxs, ny + 84); }
+      ctx.restore();
+
+      uiHits.upnodes.push({ x: nx, y: ny, w: nodeW, h: nodeH, node, available });
+    }
+  }
+
+  const bw = 200, bh = 44, back = { x: W / 2 - bw / 2, y: H * 0.9, w: bw, h: bh };
+  ctx.save();
+  ctx.fillStyle = "rgba(255,91,208,0.16)"; ctx.strokeStyle = "#ff5bd0"; ctx.lineWidth = 2.5;
+  roundRect(back.x, back.y, back.w, back.h, 22, true); ctx.stroke();
+  ctx.fillStyle = "#fff"; ctx.font = "bold 20px Trebuchet MS, sans-serif";
+  ctx.textAlign = "center"; ctx.textBaseline = "middle";
+  ctx.fillText("← BACK", W / 2, back.y + bh / 2 + 1);
+  ctx.restore();
+  uiHits.upBack = back;
 }
 
 function drawCharacterCard() {
