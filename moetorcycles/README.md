@@ -83,6 +83,12 @@ in order (`UPGRADES` array in `game.js`):
 - **Dash** — Long Dash → Quick Charge → Double Dash (two charges)
 - **Speed** — Cruiser (+base) → Overdrive (+top speed)
 - **Stars** — Star Magnet → Double Value
+- **Rescue** — Dustoff (survive 1 crash) → Reinforced (survive 2)
+
+The **MOE Zedong Dustoff** shield: with a rescue charge, a crash triggers a
+helicopter (`assets/dustoff.png`) that swoops in, hooks the bike, carries it to
+solid ground, drops it, and flies off — then a brief invincibility. It's a
+`STATE.RESCUE` phase machine (startRescue/updateRescue/endRescue/drawRescue).
 
 Owned upgrades persist in `moetorcycles_upgrades` and are baked into `up` at the
 start of each run (`computeUpgrades`). Costs/effects are all in that array and
@@ -106,7 +112,8 @@ swatches/chips or use the arrow keys; the choice previews live behind the bike
 and is saved to localStorage.
 
 - Colors: `TRAIL_COLORS` in `game.js`. Styles: `TRAIL_DESIGNS` (`line`, `ribbon`,
-  `rainbow`, `dashed`, `bubbles`, `stars`); `rainbow` cycles hue and ignores color.
+  `rainbow`, `dashed`, `bubbles`, `stars`, `curtain`, `air`); `rainbow` cycles hue
+  and ignores color; `curtain` is a bike-height banner; `air` is thin wind streaks.
 - Add a color/style by appending to those arrays. New path styles slot into
   `drawTrail()`; the picker and preview pick them up automatically.
 

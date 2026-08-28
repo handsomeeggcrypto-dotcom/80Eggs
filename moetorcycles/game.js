@@ -20,6 +20,7 @@ function bgSet(prefix) {
 }
 // Optional dusk tint to unify a bright sky with the neon night layers (0 = off).
 let SKY_TINT = 0.0;
+const DUSTOFF = "assets/dustoff.png"; // MOE Zedong Dustoff rescue helicopter
 
 /* ---------- Characters ----------
    A character = one rider-on-bike (single frames per pose). Maps are chosen
@@ -125,12 +126,13 @@ function img(url) { return imgCache[url] || loadImg(url); }
     for (const k in r.frames) urls.add(r.frames[k]);
   }
   for (const m of MAPS) for (const L of m.bg) urls.add(L.url);
+  urls.add(DUSTOFF);
   assetTotal = urls.size;
   urls.forEach(loadImg);
 })();
 
 /* ---------- Game state machine ---------- */
-const STATE = { LOADING: "loading", TITLE: "title", SELECT: "select", UPGRADES: "upgrades", PLAY: "play", DEAD: "dead" };
+const STATE = { LOADING: "loading", TITLE: "title", SELECT: "select", UPGRADES: "upgrades", PLAY: "play", RESCUE: "rescue", DEAD: "dead" };
 let state = STATE.LOADING;
 
 let selRide = 0; // index into RIDES (character)
@@ -154,6 +156,7 @@ const TRAIL_DESIGNS = [
   { id: "bubbles", name: "Bubbles",    cost: 40 },
   { id: "stars",   name: "Star Trail", cost: 60 },
   { id: "curtain", name: "Curtain",    cost: 70 }, // full bike-height banner
+  { id: "air",     name: "Air Streams", cost: 50 }, // thin wind streaks
 ];
 
 /* ---------- Currency + unlocks ----------
@@ -202,6 +205,10 @@ const UPGRADES = [
     { id: "star_magnet", name: "Star Magnet", desc: "Pull in nearby stars", cost: 160 },
     { id: "star_value",  name: "Double Value", desc: "Stars worth 2×",      cost: 260 },
   ]},
+  { id: "rescue", name: "Rescue", icon: "🚁", nodes: [
+    { id: "shield_1", name: "Dustoff",  desc: "Survive 1 crash — airlift out", cost: 350 },
+    { id: "shield_2", name: "Reinforced", desc: "Survive 2 crashes per run",   cost: 600 },
+  ]},
 ];
 let upgrades = new Set();
 try { upgrades = new Set(JSON.parse(localStorage.getItem("moetorcycles_upgrades") || "[]")); } catch (e) {}
@@ -227,6 +234,7 @@ function computeUpgrades() {
     speedMax:   SPEED_MAX + (hasUp("speed_cap") ? 220 : 0),
     magnet:    hasUp("star_magnet"),
     starValue: hasUp("star_value") ? 2 : 1,
+    shields:   (hasUp("shield_1") ? 1 : 0) + (hasUp("shield_2") ? 1 : 0),
   };
 }
 
@@ -407,6 +415,8 @@ function resetRun() {
     landT: 0,            // landing animation timer
     alive: true,
     tilt: 0,
+    shieldsLeft: up.shields, // dustoff rescues remaining
+    invT: 0,             // brief invincibility after a rescue
   };
   world = { segs: [], nextX: 0 };
   particles = [];
@@ -532,6 +542,7 @@ function surfaceAt(wx) {
 
 /* ---------- Update ---------- */
 function update(dt) {
+  if (state === STATE.RESCUE) { updateRescue(dt); return; }
   if (state !== STATE.PLAY) {
     if (state === STATE.DEAD) { deathTimer += dt; screenShake *= 0.9; }
     return;
@@ -548,6 +559,7 @@ function update(dt) {
   if (player.dashT > 0) player.dashT -= dt;
   if (player.boostT > 0) player.boostT -= dt;
   if (player.landT > 0) player.landT -= dt;
+  if (player.invT > 0) player.invT -= dt;
   screenShake *= 0.88;
   // dash charges recharge over time (up to the max from upgrades)
   if (player.dashStock < up.dashMax) {
@@ -670,7 +682,7 @@ function update(dt) {
         o.dead = true; score += 15; screenShake = 10;
         Sound.smash();
         for (let i = 0; i < 16; i++) spawnSpark(ox, oTop, ["#ff5bd0","#5bc8ff","#ffe066","#7dff9b"][i%4]);
-      } else {
+      } else if (player.invT <= 0) {
         return kill();
       }
     }
@@ -691,8 +703,11 @@ function update(dt) {
   dashQueued = false;
 }
 
+let rescue = null;
+
 function kill() {
-  if (!player.alive) return;
+  if (!player.alive || state === STATE.RESCUE) return;
+  if (player.shieldsLeft > 0) { startRescue(); return; } // airlifted out
   player.alive = false;
   state = STATE.DEAD;
   deathTimer = 0;
@@ -705,6 +720,84 @@ function kill() {
     spawnSpark(PLAYER_X, player.y + PLAYER_H * 0.5,
       ["#ff5bd0","#5bc8ff","#ffe066","#7dff9b","#c78bff"][i % 5]);
   }
+}
+
+/* ---------- MOE Zedong Dustoff — shield rescue ---------- */
+const HELI_W = 380;                 // drawn helicopter width
+const HELI_HOVER_Y = 150;           // helicopter centre-y while carrying
+function heliH() { const im = img(DUSTOFF); return HELI_W * (im.width ? im.height / im.width : 0.61); }
+
+function startRescue() {
+  player.shieldsLeft--;
+  player.vy = 0; player.dashT = 0; player.boostT = 0; player.onGround = false;
+  screenShake = 4; // gentle nudge only
+  Sound.crash();
+  rescue = {
+    phase: "descend", t: 0,
+    heliX: PLAYER_X - 23,                       // hook sits over the bike
+    heliY: -heliH(),                            // starts above the screen
+    bikeY: clamp(player.y, 80, H - 300),
+    groundSurf: 0,
+  };
+  player.y = rescue.bikeY;
+  state = STATE.RESCUE;
+}
+
+function updateRescue(dt) {
+  const R = rescue;
+  R.t += dt;
+  screenShake *= 0.8; // settle the impact nudge fast, then hold steady
+  const ease = (v, tgt, k) => v + (tgt - v) * Math.min(1, k * dt);
+  const hangY = HELI_HOVER_Y + heliH() * 0.5 + 30; // bike centre while hanging
+
+  if (R.phase === "descend") {
+    R.heliY = ease(R.heliY, HELI_HOVER_Y, 5);
+    if (R.heliY > HELI_HOVER_Y - 6) { R.heliY = HELI_HOVER_Y; R.phase = "lift"; R.t = 0; }
+  } else if (R.phase === "lift") {
+    player.y = ease(player.y, hangY, 6);
+    spawnWindTrail();
+    if (R.t > 0.7) { R.phase = "carry"; R.t = 0; }
+  } else if (R.phase === "carry") {
+    distance += 360 * dt;                       // scroll forward under the bike
+    generateAhead();
+    player.y = ease(player.y, hangY, 6);
+    spawnWindTrail();
+    const surf = surfaceAt(distance + PLAYER_X);
+    if (R.t > 0.6 && surf !== null) { R.phase = "lower"; R.t = 0; R.groundSurf = surf; }
+  } else if (R.phase === "lower") {
+    const targetY = R.groundSurf - PLAYER_H;
+    R.heliY = ease(R.heliY, R.groundSurf - PLAYER_H - heliH() * 0.5 - 30, 4);
+    player.y = ease(player.y, targetY, 5);
+    spawnWindTrail();
+    if (player.y > targetY - 3) {
+      player.y = targetY; player.onGround = true; player.jumps = 0;
+      R.phase = "away"; R.t = 0;
+    }
+  } else if (R.phase === "away") {
+    R.heliX += 620 * dt; R.heliY -= 260 * dt;   // fly up and off to the right
+    spawnWindTrail();
+    if (R.t > 0.55) endRescue();
+  }
+  // ambient particle update so sparks/wind keep moving during the rescue
+  for (const p of particles) { p.x += p.vx * dt; p.y += p.vy * dt; p.vy += p.g * dt; p.life -= dt; }
+  particles = particles.filter((p) => p.life > 0);
+}
+
+function endRescue() {
+  rescue = null;
+  player.alive = true; player.vy = 0; player.onGround = true;
+  player.invT = 1.4; // brief grace period
+  state = STATE.PLAY;
+}
+
+function spawnWindTrail() {
+  if (!rescue) return;
+  const hx = rescue.heliX - HELI_W * 0.42, hy = rescue.heliY - heliH() * 0.1;
+  particles.push({
+    x: hx, y: hy + rand(-30, 40),
+    vx: -rand(500, 900), vy: rand(20, 90), g: 0, life: rand(0.2, 0.4),
+    r: rand(10, 24), color: "rgba(230,245,255,0.6)", kind: "streak",
+  });
 }
 
 function spawnSpark(x, y, color = "#fff") {
@@ -748,6 +841,7 @@ function render(dt) {
   else if (state === STATE.TITLE) drawTitle();
   else if (state === STATE.SELECT) drawSelect();
   else if (state === STATE.UPGRADES) drawUpgradeTree();
+  else if (state === STATE.RESCUE) drawRescue();
   else { drawWorld(); drawTrailInGame(); drawPlayer(); drawParticles(); drawHUD(); if (state === STATE.DEAD) drawDead(); }
 
   ctx.restore();
@@ -1162,6 +1256,27 @@ function drawTrail(pts) {
     return;
   }
 
+  // Air Streams: a few thin wavy wind streaks trailing behind the bike.
+  if (design === "air") {
+    const lanes = [-16, -6, 4, 14, 24];
+    ctx.lineCap = "round";
+    for (let L = 0; L < lanes.length; L++) {
+      const phase = L * 1.7, amp = 5 + L;
+      ctx.beginPath();
+      for (let i = 0; i < len; i++) {
+        const wy = pts[i].y + lanes[L] + Math.sin(pts[i].x * 0.045 + phase + t * 8) * amp;
+        if (i === 0) ctx.moveTo(pts[i].x, wy); else ctx.lineTo(pts[i].x, wy);
+      }
+      ctx.strokeStyle = trailColorAt(len - 1, len, colCss);
+      ctx.globalAlpha = 0.28 + 0.12 * (L % 2);
+      ctx.shadowColor = colCss; ctx.shadowBlur = 6;
+      ctx.lineWidth = 2.2;
+      ctx.stroke();
+    }
+    ctx.restore();
+    return;
+  }
+
   if (design === "bubbles" || design === "stars") {
     const step = design === "bubbles" ? 3 : 4;
     for (let i = 0; i < len; i += step) {
@@ -1266,6 +1381,35 @@ function drawPlayer() {
   ctx.restore();
 }
 
+function drawRescue() {
+  drawScene();
+  drawWorld();
+  drawParticles();               // wind streaks + crash sparks
+
+  const heli = img(DUSTOFF);
+  const hw = HELI_W, hh = heliH();
+  const hx = rescue.heliX, hy = rescue.heliY;
+  const bobX = Math.sin(t * 5) * 2;
+  // hook point in the sprite ≈ (0.56w, 0.98h) from top-left
+  const hookX = hx + (0.56 - 0.5) * hw + bobX;
+  const hookY = hy + (0.98 - 0.5) * hh;
+
+  if (heli && heli.width) ctx.drawImage(heli, hx - hw / 2 + bobX, hy - hh / 2, hw, hh);
+  if (rescue.phase !== "away") {  // cable from hook to the hanging bike
+    ctx.save();
+    ctx.strokeStyle = "#242424"; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.moveTo(hookX, hookY); ctx.lineTo(PLAYER_X - 4, player.y + 16); ctx.stroke();
+    ctx.restore();
+  }
+  drawPlayer();                   // the bike, drawn wherever player.y is
+  drawHUD();
+
+  const pulse = 0.6 + 0.4 * Math.sin(t * 6);
+  ctx.globalAlpha = pulse;
+  centerText("🚁 MOE ZEDONG DUSTOFF", H * 0.14, 30, "#ffe066");
+  ctx.globalAlpha = 1;
+}
+
 function drawParticles() {
   for (const p of particles) {
     ctx.globalAlpha = clamp(p.life * 2, 0, 1);
@@ -1298,6 +1442,11 @@ function drawHUD() {
   // stars collected this run (banked)
   ctx.fillStyle = "#ffe066";
   ctx.fillText(`🌟 ${runStars}`, 30, 86);
+  // shields (dustoff rescues) remaining
+  if (player.shieldsLeft > 0) {
+    ctx.fillStyle = "#5bc8ff";
+    ctx.fillText(`🛡 ${player.shieldsLeft}`, 30, 110);
+  }
 
   // dash charges
   ctx.textAlign = "right";
@@ -1430,10 +1579,12 @@ function drawUpgradeTree() {
   drawBankPill();
   uiHits.upnodes.length = 0;
 
-  const nodeW = 220, nodeH = 104, spacing = 150, top = 214;
-  for (let c = 0; c < UPGRADES.length; c++) {
+  const N = UPGRADES.length;
+  const nodeW = N > 4 ? 206 : 220, nodeH = 104, spacing = 150, top = 214;
+  const colGap = Math.min(300, (W - nodeW - 40) / (N - 1));
+  for (let c = 0; c < N; c++) {
     const cat = UPGRADES[c];
-    const cxs = W / 2 + (c - (UPGRADES.length - 1) / 2) * 300;
+    const cxs = W / 2 + (c - (N - 1) / 2) * colGap;
     ctx.save();
     ctx.textAlign = "center"; ctx.textBaseline = "middle";
     ctx.font = "30px system-ui, sans-serif"; ctx.fillText(cat.icon, cxs, 118);

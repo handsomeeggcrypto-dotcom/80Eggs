@@ -154,4 +154,8 @@ build_ride_aligned("abba", {
     "crash":   "abba_crash_01.png",
 }, preprocess=remove_white_bg)
 
+# ---- MOE Zedong Dustoff (shield rescue helicopter) ----
+heli = load("skill_dustoff.png")
+save(heli.crop(content_bbox(heli, 30)), "dustoff.png")
+
 print("Done. Assets in", OUT)
