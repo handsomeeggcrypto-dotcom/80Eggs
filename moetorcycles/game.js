@@ -451,6 +451,7 @@ function pointerMenu(e, r) {
    short punchy hops. Low gravity + soft launch = ~1.5s of hang time and a wide
    ~260px arc; a single jump carries the rider a long, relaxing distance. */
 const GROUND_MARGIN = 120;      // default surface distance from bottom
+const PLATFORM_H = 132;          // max road thickness before it floats as a platform
 const GRAVITY = 1000;           // px/s^2 (was 2600 — much floatier)
 const JUMP_V = -720;            // initial jump velocity (softer launch)
 const JUMP_CUT = 0.55;          // release-to-cut multiplier (gentle tap-hops)
@@ -1031,6 +1032,26 @@ function drawWorld() {
   }
 }
 
+// How far down a road segment should be painted. Short/low roads fill to the
+// bottom of the screen (grounded); tall roads stop at a slab of PLATFORM_H so
+// you can still see the city behind them — it's a game, roads can float.
+function roadBottom(topY) {
+  const b = topY + PLATFORM_H;
+  return b >= H - 80 ? H : b;   // near the floor: fill solid; else float as a slab
+}
+
+// Shaded underside + soft drop shadow so a floating road reads as a platform,
+// not a hard-edged rectangle. No-op when the segment reaches the ground.
+function drawPlatformUnderside(x, topY, w, botY) {
+  if (botY >= H) return;
+  ctx.fillStyle = "rgba(0,0,0,0.45)"; ctx.fillRect(x, botY - 5, w, 5);
+  ctx.fillStyle = "rgba(0,0,0,0.8)";  ctx.fillRect(x, botY, w, 4);
+  const sh = ctx.createLinearGradient(0, botY, 0, botY + 30);
+  sh.addColorStop(0, "rgba(0,0,0,0.35)");
+  sh.addColorStop(1, "rgba(0,0,0,0)");
+  ctx.fillStyle = sh; ctx.fillRect(x, botY + 4, w, 30);
+}
+
 // Road styling is per-map (see MAPS[].road).
 function drawRoad(x, topY, w, worldX) {
   const style = MAPS[selMap].road;
@@ -1043,30 +1064,31 @@ function drawRoad(x, topY, w, worldX) {
 
 // Tokyo Night: wet black asphalt with neon reflections and white lane dashes.
 function drawRoadTokyo(x, topY, w, worldX) {
+  const botY = roadBottom(topY);
   ctx.save();
   ctx.fillStyle = "rgba(255,90,200,0.30)"; // neon curb glow line
   ctx.fillRect(x - 2, topY - 8, w + 4, 8);
 
-  const body = ctx.createLinearGradient(0, topY, 0, H);
+  const body = ctx.createLinearGradient(0, topY, 0, botY);
   body.addColorStop(0, "#161320");
   body.addColorStop(0.12, "#0e0b16");
   body.addColorStop(1, "#05040a");
   ctx.fillStyle = body;
-  ctx.fillRect(x, topY, w, H - topY);
+  ctx.fillRect(x, topY, w, botY - topY);
 
   // wet neon reflections: soft vertical smears of colour scrolling past
   ctx.save();
-  ctx.beginPath(); ctx.rect(x, topY, w, H - topY); ctx.clip();
+  ctx.beginPath(); ctx.rect(x, topY, w, botY - topY); ctx.clip();
   const cols = ["rgba(255,60,180,0.10)", "rgba(90,200,255,0.09)", "rgba(200,120,255,0.09)"];
   const per = 150;
   const start = worldX - ((worldX % per) + per) % per;
   for (let d = start; d < worldX + w + per; d += per) {
     const sx = d - worldX + x;
-    const g = ctx.createLinearGradient(sx, topY, sx, H);
+    const g = ctx.createLinearGradient(sx, topY, sx, botY);
     const c = cols[Math.floor(Math.abs(d / per)) % cols.length];
     g.addColorStop(0, c); g.addColorStop(1, "rgba(0,0,0,0)");
     ctx.fillStyle = g;
-    ctx.fillRect(sx - 16, topY + 6, 32, H - topY);
+    ctx.fillRect(sx - 16, topY + 6, 32, botY - topY);
   }
   ctx.restore();
 
@@ -1083,34 +1105,36 @@ function drawRoadTokyo(x, topY, w, worldX) {
     const clipL = Math.max(sx, x), clipR = Math.min(sx + dashW, x + w);
     if (clipR > clipL) ctx.fillRect(clipL, dashY, clipR - clipL, 5);
   }
+  drawPlatformUnderside(x, topY, w, botY);
   ctx.restore();
 }
 
 // Crystal City: a glassy, faceted road — cool blue-purple body with scrolling
 // crystal facets, a prismatic curb, and scrolling gem diamonds down the middle.
 function drawRoadCrystal(x, topY, w, worldX) {
+  const botY = roadBottom(topY);
   ctx.save();
   ctx.fillStyle = "rgba(180,230,255,0.35)";
   ctx.fillRect(x - 2, topY - 9, w + 4, 9);
 
-  const body = ctx.createLinearGradient(0, topY, 0, H);
+  const body = ctx.createLinearGradient(0, topY, 0, botY);
   body.addColorStop(0, "#5566b8");
   body.addColorStop(0.14, "#3b3f86");
   body.addColorStop(1, "#161436");
   ctx.fillStyle = body;
-  ctx.fillRect(x, topY, w, H - topY);
+  ctx.fillRect(x, topY, w, botY - topY);
 
   // faceted diagonal shards (clipped to the road, scrolling with worldX)
   ctx.save();
-  ctx.beginPath(); ctx.rect(x, topY, w, H - topY); ctx.clip();
-  const step = 64, depth = (H - topY) * 0.6;
+  ctx.beginPath(); ctx.rect(x, topY, w, botY - topY); ctx.clip();
+  const step = 64, depth = (botY - topY) * 0.6;
   const off = ((worldX * 0.6) % step + step) % step;
   ctx.lineWidth = 20;
   for (let sx = x - off - step; sx < x + w + depth; sx += step) {
     ctx.strokeStyle = "rgba(200,240,255,0.10)";
-    ctx.beginPath(); ctx.moveTo(sx, topY); ctx.lineTo(sx - depth, H); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(sx, topY); ctx.lineTo(sx - depth, botY); ctx.stroke();
     ctx.strokeStyle = "rgba(150,110,220,0.10)";
-    ctx.beginPath(); ctx.moveTo(sx + 32, topY); ctx.lineTo(sx + 32 - depth, H); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(sx + 32, topY); ctx.lineTo(sx + 32 - depth, botY); ctx.stroke();
   }
   ctx.restore();
 
@@ -1138,21 +1162,23 @@ function drawRoadCrystal(x, topY, w, worldX) {
     ctx.fillRect(-6, -6, 12, 12);
     ctx.restore();
   }
+  drawPlatformUnderside(x, topY, w, botY);
   ctx.restore();
 }
 
 // China City: dark asphalt with a red+gold curb and gold dashes.
 function drawRoadChina(x, topY, w, worldX) {
+  const botY = roadBottom(topY);
   ctx.save();
   ctx.fillStyle = "rgba(10,4,6,0.6)";
   ctx.fillRect(x - 2, topY - 10, w + 4, 10);
 
-  const body = ctx.createLinearGradient(0, topY, 0, H);
+  const body = ctx.createLinearGradient(0, topY, 0, botY);
   body.addColorStop(0, "#2a1418");
   body.addColorStop(0.15, "#1c0d10");
   body.addColorStop(1, "#0b0506");
   ctx.fillStyle = body;
-  ctx.fillRect(x, topY, w, H - topY);
+  ctx.fillRect(x, topY, w, botY - topY);
 
   // red curb with a gold top line
   ctx.fillStyle = "#ee1c25";
@@ -1169,21 +1195,23 @@ function drawRoadChina(x, topY, w, worldX) {
     const clipL = Math.max(sx, x), clipR = Math.min(sx + dashW, x + w);
     if (clipR > clipL) ctx.fillRect(clipL, dashY, clipR - clipL, 5);
   }
+  drawPlatformUnderside(x, topY, w, botY);
   ctx.restore();
 }
 
 // Neon City: dark asphalt, neon curb, scrolling dashed center line.
 function drawRoadNeon(x, topY, w, worldX) {
+  const botY = roadBottom(topY);
   ctx.save();
   ctx.fillStyle = "rgba(8,3,20,0.55)";
   ctx.fillRect(x - 2, topY - 10, w + 4, 10);
 
-  const body = ctx.createLinearGradient(0, topY, 0, H);
+  const body = ctx.createLinearGradient(0, topY, 0, botY);
   body.addColorStop(0, "#241238");
   body.addColorStop(0.15, "#1a0e2b");
   body.addColorStop(1, "#0c0618");
   ctx.fillStyle = body;
-  ctx.fillRect(x, topY, w, H - topY);
+  ctx.fillRect(x, topY, w, botY - topY);
 
   const curb = ctx.createLinearGradient(x, 0, x + w, 0);
   curb.addColorStop(0.0, "#ff5bd0");
@@ -1202,12 +1230,14 @@ function drawRoadNeon(x, topY, w, worldX) {
     const clipL = Math.max(sx, x), clipR = Math.min(sx + dashW, x + w);
     if (clipR > clipL) ctx.fillRect(clipL, dashY, clipR - clipL, 5);
   }
+  drawPlatformUnderside(x, topY, w, botY);
   ctx.restore();
 }
 
 // Countryside: packed dirt / gravel — earthy body, grassy fringe, scattered
 // pebbles + wheel ruts (all positioned by world-x so they scroll, no flicker).
 function drawRoadDirt(x, topY, w, worldX) {
+  const botY = roadBottom(topY);
   ctx.save();
   // grassy fringe just above the surface
   ctx.fillStyle = "#5c7d33";
@@ -1216,13 +1246,13 @@ function drawRoadDirt(x, topY, w, worldX) {
   ctx.fillRect(x - 2, topY - 2, w + 4, 3);
 
   // dirt body
-  const body = ctx.createLinearGradient(0, topY, 0, H);
+  const body = ctx.createLinearGradient(0, topY, 0, botY);
   body.addColorStop(0, "#a5793f");
   body.addColorStop(0.12, "#8a6234");
   body.addColorStop(0.5, "#6a4a26");
   body.addColorStop(1, "#4a331b");
   ctx.fillStyle = body;
-  ctx.fillRect(x, topY, w, H - topY);
+  ctx.fillRect(x, topY, w, botY - topY);
 
   // lighter packed-dirt strip at the surface
   ctx.fillStyle = "rgba(214,178,120,0.55)";
@@ -1241,11 +1271,12 @@ function drawRoadDirt(x, topY, w, worldX) {
     const h2 = Math.sin(c * 78.233) * 12543.187;   const rnd2 = h2 - Math.floor(h2);
     const px = c * cell + rnd * cell - worldX + x;
     if (px < x || px > x + w) continue;
-    const py = topY + 12 + rnd2 * (Math.min(70, H - topY - 12));
+    const py = topY + 12 + rnd2 * (Math.min(70, botY - topY - 12));
     const pr = 1.4 + rnd * 2.6;
     ctx.fillStyle = rnd2 > 0.5 ? "rgba(225,205,170,0.6)" : "rgba(70,50,28,0.55)";
     ctx.beginPath(); ctx.arc(px, py, pr, 0, Math.PI * 2); ctx.fill();
   }
+  drawPlatformUnderside(x, topY, w, botY);
   ctx.restore();
 }
 
