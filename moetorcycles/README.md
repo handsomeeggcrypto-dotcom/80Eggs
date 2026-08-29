@@ -68,7 +68,17 @@ Each map has its own ground hazard — jump over it, or dash / ring-boost to sma
 through. They share one collision box (`HAZARDS` size bands in `game.js`); only
 the art differs (`o.kind`, drawn by `drawHazard*`): Neon City = crayon pillar,
 Countryside = hay bale, China City = red lantern stack, Crystal City = crystal
-spike, Tokyo Night = neon construction barricade.
+spike, Tokyo Night = neon construction barricade, MoeMoe Land = red-ringed
+heart-eyes emoji.
+
+## Condition-unlocked maps
+
+Most content unlocks by spending stars, but a map can instead unlock on a
+**condition** via a `req` function on its `MAPS` entry (with a `reqText` badge).
+**MoeMoe Land** — the secret meme level — has `cost: 0` and
+`req: () => unlockedCharCount() >= 4`, so it unlocks automatically once you own
+4 characters (no stars). `mapUnlocked(m)` is the single gate used everywhere
+(select ready-check, map card lock, tap handling).
 
 ## Unlocks & mix-and-match maps
 

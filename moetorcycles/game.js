@@ -122,6 +122,9 @@ const MAPS = [
       { url: "assets/bg/tokyo_mid.png",  speed: 0.42 },
       { url: "assets/bg/tokyo_near.png", speed: 0.80 },
   ]},
+  // Secret meme level: unlocks once you own 4 characters (no star cost).
+  { id: "moemoe",  name: "MoeMoe Land",  cost: 0, bg: bgSet("moemoe"), road: "moemoe", hazard: "emoji",
+    req: () => unlockedCharCount() >= 4, reqText: "🔒 4 CHARS" },
 ];
 
 // Per-map hazard footprints (all ground-mounted; jump over or dash/boost to smash).
@@ -132,6 +135,7 @@ const HAZARDS = {
   lantern:   { w: 42,  hMin: 92,  hMax: 140 },
   crystal:   { w: 58,  hMin: 78,  hMax: 128 },
   barricade: { w: 84,  hMin: 60,  hMax: 84  },
+  emoji:     { w: 58,  hMin: 58,  hMax: 96  },
 };
 
 /* ---------- Asset loading (by URL, cached) ---------- */
@@ -216,6 +220,16 @@ function tryUnlock(key, cost) {
   }
   unlockFlash = 0.5; // not enough stars
   return false;
+}
+// how many playable characters the player has unlocked (free ones included)
+function unlockedCharCount() {
+  return RIDES.reduce((n, r) => n + (isUnlocked("char:" + r.id, r.cost) ? 1 : 0), 0);
+}
+// A map is available if its condition (req, e.g. "own 4 characters") is met and
+// it's free or purchased. `req` maps ignore stars — they unlock on the condition.
+function mapUnlocked(m) {
+  if (m.req && !m.req()) return false;
+  return isUnlocked("map:" + m.id, m.cost);
 }
 
 /* ---------- Upgrade tree ----------
@@ -423,7 +437,10 @@ function pointerMenu(e, r) {
     // map cards
     for (const m of uiHits.maps) {
       if (inRect(m)) {
-        if (tryUnlock(m.key, m.cost)) { selMap = m.i; Sound.ui(); }
+        const mm = MAPS[m.i];
+        if (mapUnlocked(mm)) { selMap = m.i; Sound.ui(); }         // available -> select
+        else if (mm.req) { unlockFlash = 0.5; Sound.ui(); }        // condition-locked -> can't buy
+        else if (tryUnlock(m.key, m.cost)) { selMap = m.i; Sound.ui(); } // star-locked -> buy
         menuCd = 0.15; return;
       }
     }
@@ -601,7 +618,7 @@ function startGame() {
 // only ride when both the character and the map are unlocked
 function attemptStart() {
   const c = RIDES[selRide], m = MAPS[selMap];
-  if (isUnlocked("char:" + c.id, c.cost) && isUnlocked("map:" + m.id, m.cost)) startGame();
+  if (isUnlocked("char:" + c.id, c.cost) && mapUnlocked(m)) startGame();
   else unlockFlash = 0.5;
 }
 // cycle to the next UNLOCKED trail color / style (skips locked ones)
@@ -1099,6 +1116,7 @@ function drawRoad(x, topY, w, worldX) {
   else if (style === "china") drawRoadChina(x, topY, w, worldX);
   else if (style === "crystal") drawRoadCrystal(x, topY, w, worldX);
   else if (style === "tokyo") drawRoadTokyo(x, topY, w, worldX);
+  else if (style === "moemoe") drawRoadMoe(x, topY, w, worldX);
   else drawRoadNeon(x, topY, w, worldX);
 }
 
@@ -1274,6 +1292,63 @@ function drawRoadNeon(x, topY, w, worldX) {
   ctx.restore();
 }
 
+// MoeMoe Land: glossy gold road with a black body, blue+gold curb, black dashes
+// and little scrolling sparkles — to match the weird blue/gold/black meme scene.
+function drawRoadMoe(x, topY, w, worldX) {
+  const botY = roadBottom(topY);
+  ctx.save();
+  ctx.fillStyle = "rgba(0,0,0,0.6)";
+  ctx.fillRect(x - 2, topY - 10, w + 4, 10);
+
+  const body = ctx.createLinearGradient(0, topY, 0, botY);
+  body.addColorStop(0, "#3a2f08");
+  body.addColorStop(0.12, "#1a1503");
+  body.addColorStop(1, "#050400");
+  ctx.fillStyle = body;
+  ctx.fillRect(x, topY, w, botY - topY);
+
+  // glossy gold surface strip
+  const gloss = ctx.createLinearGradient(0, topY, 0, topY + 18);
+  gloss.addColorStop(0, "#ffe14d");
+  gloss.addColorStop(1, "rgba(255,200,40,0)");
+  ctx.fillStyle = gloss;
+  ctx.fillRect(x, topY + 3, w, 18);
+
+  // blue curb with a bright gold top line (the scene's blue + gold)
+  ctx.fillStyle = "#2a6bff";
+  ctx.fillRect(x, topY, w, 9);
+  ctx.fillStyle = "#ffd23f";
+  ctx.fillRect(x, topY, w, 3);
+
+  // scrolling black centre dashes
+  const dashY = topY + 34, dashW = 46, gap = 42, period = dashW + gap;
+  ctx.fillStyle = "rgba(0,0,0,0.85)";
+  const start = worldX - ((worldX % period) + period) % period;
+  for (let d = start; d < worldX + w + period; d += period) {
+    const sx = d - worldX + x;
+    const clipL = Math.max(sx, x), clipR = Math.min(sx + dashW, x + w);
+    if (clipR > clipL) ctx.fillRect(clipL, dashY, clipR - clipL, 5);
+  }
+
+  // little scrolling gold sparkles on the tar
+  ctx.save();
+  ctx.beginPath(); ctx.rect(x, topY, w, botY - topY); ctx.clip();
+  const cell = 70;
+  const c0 = Math.floor(worldX / cell), c1 = Math.ceil((worldX + w) / cell);
+  for (let c = c0; c <= c1; c++) {
+    const h1 = Math.sin(c * 91.7) * 4137.1; const r1 = h1 - Math.floor(h1);
+    const h2 = Math.sin(c * 33.3) * 7219.7; const r2 = h2 - Math.floor(h2);
+    const px = c * cell + r1 * cell - worldX + x;
+    const py = topY + 22 + r2 * Math.min(48, botY - topY - 22);
+    ctx.fillStyle = "rgba(255,220,80,0.7)";
+    ctx.beginPath(); ctx.arc(px, py, 1.6 + r1 * 1.6, 0, Math.PI * 2); ctx.fill();
+  }
+  ctx.restore();
+
+  drawPlatformUnderside(x, topY, w, botY);
+  ctx.restore();
+}
+
 // Countryside: packed dirt / gravel — earthy body, grassy fringe, scattered
 // pebbles + wheel ruts (all positioned by world-x so they scroll, no flicker).
 function drawRoadDirt(x, topY, w, worldX) {
@@ -1381,7 +1456,49 @@ function drawObstacle(x, o) {
     case "lantern":   return drawHazardLantern(x, o);
     case "crystal":   return drawHazardCrystal(x, o);
     case "barricade": return drawHazardBarricade(x, o);
+    case "emoji":     return drawHazardEmoji(x, o);
     default:          return drawHazardCrayon(x, o);
+  }
+}
+
+// MoeMoe Land: a stack of kawaii heart-eyes emoji faces (the scene's mascots).
+function drawHazardEmoji(x, o) {
+  const oTop = o.top - o.h, cx = x + o.w / 2;
+  const n = Math.max(1, Math.round(o.h / 70));
+  const fh = o.h / n;
+  // pulsing red danger aura so the hazard reads apart from the emoji-filled scene
+  const pulse = 0.5 + 0.5 * Math.sin(t * 8);
+  for (let i = 0; i < n; i++) {
+    const cy = oTop + i * fh + fh * 0.5;
+    const R = Math.min(o.w, fh) * 0.46;
+    ctx.save();
+    ctx.shadowColor = `rgba(255,40,70,${0.75 + 0.25 * pulse})`; ctx.shadowBlur = 24;
+    ctx.fillStyle = "#ff2a46"; // red danger ring behind the face
+    ctx.beginPath(); ctx.arc(cx, cy, R + 9 + 2 * pulse, 0, Math.PI * 2); ctx.fill();
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = "#fff"; // white halo for legibility
+    ctx.beginPath(); ctx.arc(cx, cy, R + 3, 0, Math.PI * 2); ctx.fill();
+    const g = ctx.createRadialGradient(cx - R * 0.3, cy - R * 0.35, R * 0.2, cx, cy, R);
+    g.addColorStop(0, "#ffe680"); g.addColorStop(1, "#f5b60c");
+    ctx.fillStyle = g;
+    ctx.beginPath(); ctx.arc(cx, cy, R, 0, Math.PI * 2); ctx.fill();
+    ctx.lineWidth = 2.5; ctx.strokeStyle = "#5a3d00";
+    ctx.beginPath(); ctx.arc(cx, cy, R, 0, Math.PI * 2); ctx.stroke();
+    // big shiny black eyes
+    for (const s of [-1, 1]) {
+      const ex = cx + s * R * 0.4, ey = cy - R * 0.08;
+      ctx.fillStyle = "#150c00";
+      ctx.beginPath(); ctx.ellipse(ex, ey, R * 0.26, R * 0.36, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = "#fff";
+      ctx.beginPath(); ctx.arc(ex - R * 0.09, ey - R * 0.12, R * 0.1, 0, Math.PI * 2); ctx.fill();
+      // pink blush
+      ctx.fillStyle = "rgba(255,120,150,0.7)";
+      ctx.beginPath(); ctx.ellipse(ex, cy + R * 0.34, R * 0.16, R * 0.1, 0, 0, Math.PI * 2); ctx.fill();
+    }
+    // little smile
+    ctx.lineWidth = 2.5; ctx.strokeStyle = "#5a3d00"; ctx.lineCap = "round";
+    ctx.beginPath(); ctx.arc(cx, cy + R * 0.18, R * 0.28, 0.2 * Math.PI, 0.8 * Math.PI); ctx.stroke();
+    ctx.restore();
   }
 }
 
@@ -1946,7 +2063,7 @@ function drawSelect() {
   drawTrailPickers();
 
   const char = RIDES[selRide], map = MAPS[selMap];
-  const ready = isUnlocked("char:" + char.id, char.cost) && isUnlocked("map:" + map.id, map.cost);
+  const ready = isUnlocked("char:" + char.id, char.cost) && mapUnlocked(map);
   const pulse = 0.6 + 0.4 * Math.sin(t * 4);
   ctx.globalAlpha = ready ? pulse : 0.9;
   centerText(ready ? "Press SPACE / Tap to RIDE!" : "🔒  Unlock this character & map to ride",
@@ -2103,7 +2220,7 @@ function drawMapRow() {
   const x0 = W / 2 - total / 2;
   for (let i = 0; i < MAPS.length; i++) {
     const m = MAPS[i], x = x0 + i * (cardW + gap);
-    const locked = !isUnlocked("map:" + m.id, m.cost);
+    const locked = !mapUnlocked(m);
     const on = i === selMap;
 
     ctx.save();
@@ -2122,7 +2239,8 @@ function drawMapRow() {
     ctx.fillStyle = on ? "#ffe066" : "#fff";
     ctx.font = "bold 13px Trebuchet MS, sans-serif";
     ctx.textAlign = "center"; ctx.textBaseline = "middle";
-    ctx.fillText(locked ? `${m.name}  🔒${m.cost}` : m.name, x + cardW / 2, y + cardH - 10);
+    const lockLabel = m.req ? `${m.name}  ${m.reqText}` : `${m.name}  🔒${m.cost}`;
+    ctx.fillText(locked ? lockLabel : m.name, x + cardW / 2, y + cardH - 10);
     ctx.restore();
 
     ctx.lineWidth = on ? 4 : 2;
