@@ -91,15 +91,37 @@ const RIDES = [
     },
     preview: "assets/player_abba_ride.png",
   },
+  {
+    id: "designer",
+    name: "Designer",
+    tagline: "Dream fuel. Itasha dreams.",
+    cost: 300,
+    scale: 1.5,
+    wheelFrac: 0.987,
+    frames: {
+      ride:    "assets/player_designer_ride.png",
+      wheelie: "assets/player_designer_wheelie.png",
+      air:     "assets/player_designer_air.png",
+      land:    "assets/player_designer_land.png",
+      crash:   "assets/player_designer_crash.png",
+    },
+    preview: "assets/player_designer_ride.png",
+  },
 ];
 
 /* ---------- Maps (selectable independently of the character) ----------
-   `road`: "neon" | "dirt" | "china" | "crystal" (see drawRoad). */
+   `road`: "neon" | "dirt" | "china" | "crystal" | "tokyo" (see drawRoad). */
 const MAPS = [
   { id: "crayons", name: "Neon City",    cost: 0,   bg: bgSet("crayons"), road: "neon" },
   { id: "eggs",    name: "Countryside",  cost: 100, bg: bgSet("eggs"),    road: "dirt" },
   { id: "china",   name: "China City",   cost: 200, bg: bgSet("china"),   road: "china" },
   { id: "crystal", name: "Crystal City", cost: 250, bg: bgSet("crystal"), road: "crystal" },
+  // Tokyo art has only sky/mid/near (no far layer)
+  { id: "tokyo",   name: "Tokyo Night",  cost: 250, road: "tokyo", bg: [
+      { url: "assets/bg/tokyo_sky.png",  speed: 0.06 },
+      { url: "assets/bg/tokyo_mid.png",  speed: 0.42 },
+      { url: "assets/bg/tokyo_near.png", speed: 0.80 },
+  ]},
 ];
 
 /* ---------- Asset loading (by URL, cached) ---------- */
@@ -147,6 +169,7 @@ const TRAIL_COLORS = [
   { name: "Purple", css: "#c78bff", cost: 30 },
   { name: "White",  css: "#ffffff", cost: 30 },
   { name: "China Red", css: "#ee1c25", cost: 40 }, // Chinese-flag red
+  { name: "Black",  css: "#0d0d0d", cost: 40 },
 ];
 const TRAIL_DESIGNS = [
   { id: "line",    name: "Neon Line",  cost: 0 },
@@ -157,6 +180,7 @@ const TRAIL_DESIGNS = [
   { id: "stars",   name: "Star Trail", cost: 60 },
   { id: "curtain", name: "Curtain",    cost: 70 }, // full bike-height banner
   { id: "air",     name: "Air Streams", cost: 50 }, // thin wind streaks
+  { id: "soapbubbles", name: "Soap Bubbles", cost: 60 }, // hollow, glassy bubbles
 ];
 
 /* ---------- Currency + unlocks ----------
@@ -1005,7 +1029,53 @@ function drawRoad(x, topY, w, worldX) {
   if (style === "dirt") drawRoadDirt(x, topY, w, worldX);
   else if (style === "china") drawRoadChina(x, topY, w, worldX);
   else if (style === "crystal") drawRoadCrystal(x, topY, w, worldX);
+  else if (style === "tokyo") drawRoadTokyo(x, topY, w, worldX);
   else drawRoadNeon(x, topY, w, worldX);
+}
+
+// Tokyo Night: wet black asphalt with neon reflections and white lane dashes.
+function drawRoadTokyo(x, topY, w, worldX) {
+  ctx.save();
+  ctx.fillStyle = "rgba(255,90,200,0.30)"; // neon curb glow line
+  ctx.fillRect(x - 2, topY - 8, w + 4, 8);
+
+  const body = ctx.createLinearGradient(0, topY, 0, H);
+  body.addColorStop(0, "#161320");
+  body.addColorStop(0.12, "#0e0b16");
+  body.addColorStop(1, "#05040a");
+  ctx.fillStyle = body;
+  ctx.fillRect(x, topY, w, H - topY);
+
+  // wet neon reflections: soft vertical smears of colour scrolling past
+  ctx.save();
+  ctx.beginPath(); ctx.rect(x, topY, w, H - topY); ctx.clip();
+  const cols = ["rgba(255,60,180,0.10)", "rgba(90,200,255,0.09)", "rgba(200,120,255,0.09)"];
+  const per = 150;
+  const start = worldX - ((worldX % per) + per) % per;
+  for (let d = start; d < worldX + w + per; d += per) {
+    const sx = d - worldX + x;
+    const g = ctx.createLinearGradient(sx, topY, sx, H);
+    const c = cols[Math.floor(Math.abs(d / per)) % cols.length];
+    g.addColorStop(0, c); g.addColorStop(1, "rgba(0,0,0,0)");
+    ctx.fillStyle = g;
+    ctx.fillRect(sx - 16, topY + 6, 32, H - topY);
+  }
+  ctx.restore();
+
+  // magenta curb + white top line
+  ctx.fillStyle = "#ff3cae"; ctx.fillRect(x, topY, w, 7);
+  ctx.fillStyle = "rgba(255,255,255,0.9)"; ctx.fillRect(x, topY, w, 2);
+
+  // scrolling white lane dashes
+  const dashY = topY + 34, dashW = 46, gap = 44, period = dashW + gap;
+  ctx.fillStyle = "rgba(240,240,255,0.8)";
+  const s2 = worldX - ((worldX % period) + period) % period;
+  for (let d = s2; d < worldX + w + period; d += period) {
+    const sx = d - worldX + x;
+    const clipL = Math.max(sx, x), clipR = Math.min(sx + dashW, x + w);
+    if (clipR > clipL) ctx.fillRect(clipL, dashY, clipR - clipL, 5);
+  }
+  ctx.restore();
 }
 
 // Crystal City: a glassy, faceted road — cool blue-purple body with scrolling
@@ -1288,6 +1358,41 @@ function drawTrail(pts) {
 
   // near-constant thickness; fade/thin only over the oldest ~25% (the tail)
   const taper = (f) => Math.min(1, f * 4);
+
+  // Soap Bubbles: hollow, translucent glassy bubbles that drift and pop, with a
+  // bright rim, a shine highlight, and a hint of iridescent film.
+  if (design === "soapbubbles") {
+    for (let i = 0; i < len; i += 3) {
+      const f = i / len, tp = taper(f);
+      const hx = Math.sin(i * 12.9898) * 43758.5453; const r1 = hx - Math.floor(hx);
+      const rad = (8 + r1 * 15) * (0.6 + 0.4 * tp);
+      const bx = pts[i].x + Math.cos(t * 1.5 + i * 0.7) * 4;
+      const by = pts[i].y - 8 + Math.sin(t * 2 + i) * 7;   // gentle bob/rise
+      // translucent glass fill (see-through)
+      ctx.globalAlpha = 0.14 + 0.08 * tp;
+      ctx.fillStyle = colCss;
+      ctx.beginPath(); ctx.arc(bx, by, rad, 0, Math.PI * 2); ctx.fill();
+      // dark outer rim so the bubble reads on bright backgrounds
+      ctx.globalAlpha = 0.4 + 0.35 * tp;
+      ctx.lineWidth = 3.5; ctx.strokeStyle = "rgba(20,20,40,0.6)";
+      ctx.beginPath(); ctx.arc(bx, by, rad, 0, Math.PI * 2); ctx.stroke();
+      // bright glassy rim
+      ctx.globalAlpha = 0.55 + 0.35 * tp;
+      ctx.lineWidth = 2; ctx.strokeStyle = colCss;
+      ctx.beginPath(); ctx.arc(bx, by, rad, 0, Math.PI * 2); ctx.stroke();
+      // iridescent film arc (lower-right)
+      ctx.globalAlpha = 0.5 * tp;
+      ctx.strokeStyle = `hsl(${(i * 40 + t * 120) % 360} 95% 72%)`;
+      ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(bx, by, rad - 1.5, 0.4, 1.9); ctx.stroke();
+      // white shine highlight (upper-left)
+      ctx.globalAlpha = 0.7 + 0.3 * tp;
+      ctx.fillStyle = "#ffffff";
+      ctx.beginPath(); ctx.arc(bx - rad * 0.32, by - rad * 0.34, Math.max(1.5, rad * 0.24), 0, Math.PI * 2); ctx.fill();
+    }
+    ctx.restore();
+    return;
+  }
 
   // Curtain: a full bike-height banner billowing OFF the bike — full height at
   // the bike end, tapering + fluttering like fabric toward the free tail.

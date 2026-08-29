@@ -153,6 +153,17 @@ build_ride_aligned("abba", {
     "crash":   "abba_crash_01.png",
 })
 
+# ===========================================================================
+#  RIDE: Designer  (mixed canvas sizes -> aligned mode; all frames transparent)
+# ===========================================================================
+build_ride_aligned("designer", {
+    "ride":    "designer_idle_01.png",
+    "wheelie": "designer_wheelie_01.png",
+    "air":     "designer_airborne_01.png",
+    "land":    "designer_landing_01.png",
+    "crash":   "designer_crash_01.png",
+})
+
 # ---- MOE Zedong Dustoff (shield rescue helicopter) ----
 heli = load("skill_dustoff.png")
 save(heli.crop(content_bbox(heli, 30)), "dustoff.png")
