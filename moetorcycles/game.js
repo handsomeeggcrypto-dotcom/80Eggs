@@ -273,7 +273,7 @@ function saveTrail() {
   localStorage.setItem("moetorcycles_trail_design", selTrailDesign);
 }
 // clickable regions on the select screen, refreshed each frame it's drawn
-const uiHits = { swatches: [], chips: [], maps: [], charUnlock: null, upnodes: [], upBack: null, toUpgrades: null };
+const uiHits = { swatches: [], chips: [], maps: [], charUnlock: null, upnodes: [], upBack: null, toUpgrades: null, deadBack: null };
 
 let best = Number(localStorage.getItem("moetorcycles_best") || 0);
 let menuCd = 0; // debounce so one tap/press can't skip a whole screen
@@ -435,7 +435,15 @@ function pointerMenu(e, r) {
       if (inRect(n)) { buyUp(n.node, n.available); menuCd = 0.15; return; }
     }
   }
-  else if (state === STATE.DEAD) startGame();
+  else if (state === STATE.DEAD) {
+    const mx = (e.clientX - r.left) / r.width * W;
+    const my = (e.clientY - r.top) / r.height * H;
+    const b = uiHits.deadBack;
+    if (b && mx >= b.x && mx <= b.x + b.w && my >= b.y && my <= b.y + b.h) {
+      state = STATE.SELECT; menuCd = 0.3; Sound.ui(); return;   // back to character/map select
+    }
+    startGame(); // tap elsewhere = ride again
+  }
 }
 
 /* ---------- World / player ----------
@@ -1991,9 +1999,19 @@ function drawDead() {
   centerText(`🌟 ${runStars} collected   ·   bank ${bank}`, H * 0.60, 22, "#ffe066");
   const pulse = 0.6 + 0.4 * Math.sin(t * 4);
   ctx.globalAlpha = pulse;
-  centerText("Press SPACE / Tap to ride again", H * 0.73, 28, "#7dff9b");
+  centerText("Press SPACE / Tap to ride again", H * 0.70, 28, "#7dff9b");
   ctx.globalAlpha = 1;
-  centerText("Esc — change character / map / unlocks", H * 0.81, 18, "rgba(255,255,255,0.55)");
+
+  // tappable back button (mobile has no Esc)
+  const bw = 320, bh = 50, back = { x: W / 2 - bw / 2, y: H * 0.80, w: bw, h: bh };
+  ctx.save();
+  ctx.fillStyle = "rgba(255,91,208,0.18)"; ctx.strokeStyle = "#ff5bd0"; ctx.lineWidth = 2.5;
+  roundRect(back.x, back.y, back.w, back.h, 25, true); ctx.stroke();
+  ctx.fillStyle = "#fff"; ctx.font = "bold 20px Trebuchet MS, sans-serif";
+  ctx.textAlign = "center"; ctx.textBaseline = "middle";
+  ctx.fillText("‹ CHANGE CHARACTER / MAP", W / 2, back.y + bh / 2 + 1);
+  ctx.restore();
+  uiHits.deadBack = back;
 }
 
 /* ---- text helpers ---- */
