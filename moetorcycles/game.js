@@ -112,17 +112,27 @@ const RIDES = [
 /* ---------- Maps (selectable independently of the character) ----------
    `road`: "neon" | "dirt" | "china" | "crystal" | "tokyo" (see drawRoad). */
 const MAPS = [
-  { id: "crayons", name: "Neon City",    cost: 0,   bg: bgSet("crayons"), road: "neon" },
-  { id: "eggs",    name: "Countryside",  cost: 100, bg: bgSet("eggs"),    road: "dirt" },
-  { id: "china",   name: "China City",   cost: 200, bg: bgSet("china"),   road: "china" },
-  { id: "crystal", name: "Crystal City", cost: 250, bg: bgSet("crystal"), road: "crystal" },
+  { id: "crayons", name: "Neon City",    cost: 0,   bg: bgSet("crayons"), road: "neon",    hazard: "crayon" },
+  { id: "eggs",    name: "Countryside",  cost: 100, bg: bgSet("eggs"),    road: "dirt",    hazard: "hay" },
+  { id: "china",   name: "China City",   cost: 200, bg: bgSet("china"),   road: "china",   hazard: "lantern" },
+  { id: "crystal", name: "Crystal City", cost: 250, bg: bgSet("crystal"), road: "crystal", hazard: "crystal" },
   // Tokyo art has only sky/mid/near (no far layer)
-  { id: "tokyo",   name: "Tokyo Night",  cost: 250, road: "tokyo", bg: [
+  { id: "tokyo",   name: "Tokyo Night",  cost: 250, road: "tokyo", hazard: "barricade", bg: [
       { url: "assets/bg/tokyo_sky.png",  speed: 0.06 },
       { url: "assets/bg/tokyo_mid.png",  speed: 0.42 },
       { url: "assets/bg/tokyo_near.png", speed: 0.80 },
   ]},
 ];
+
+// Per-map hazard footprints (all ground-mounted; jump over or dash/boost to smash).
+// Collision is the same rect model for all; only the art + size band differ.
+const HAZARDS = {
+  crayon:    { w: 46,  hMin: 80,  hMax: 130 },
+  hay:       { w: 78,  hMin: 66,  hMax: 92  },
+  lantern:   { w: 42,  hMin: 92,  hMax: 140 },
+  crystal:   { w: 58,  hMin: 78,  hMax: 128 },
+  barricade: { w: 84,  hMin: 60,  hMax: 84  },
+};
 
 /* ---------- Asset loading (by URL, cached) ---------- */
 const imgCache = {};
@@ -470,8 +480,10 @@ const BOOST_TIME = 0.85;        // seconds the surge lasts
 const BOOST_LIFT = 320;         // upward impulse on entry (soar forward)
 
 let player, world, particles, stars, obstacles, rings, score, speed, distance, animT, screenShake, deathTimer, trail;
+let popups;                          // floating score/near-miss text
 let combo, comboTimer, runStars;
 const COMBO_WINDOW = 2.6;           // seconds to keep the chain alive
+const NEAR_MISS_DIST = 52;          // clearing a hazard by <this many px = near miss
 const comboMult = () => Math.min(1 + Math.floor(combo / 5), 8); // x1..x8
 
 function resetRun() {
@@ -498,6 +510,7 @@ function resetRun() {
   obstacles = [];
   trail = [];
   rings = [];
+  popups = [];
   combo = 0; comboTimer = 0; runStars = 0;
   score = 0;
   distance = 0;
@@ -557,10 +570,14 @@ function generateAhead() {
         stars.push({ x: sx, y: sy, got: false, spin: Math.random() * 6 });
       }
     }
-    // obstacle pillar (dash to smash, or jump over)
+    // hazard (jump over, or dash/boost to smash) — themed per map
     if (gap === 0 && w > 340 && Math.random() < 0.5) {
       const ox = seg.x + rand(w * 0.35, w * 0.7);
-      obstacles.push({ x: ox, top: seg.top, h: rand(80, 130), w: 46, dead: false });
+      const hz = HAZARDS[MAPS[selMap].hazard] || HAZARDS.crayon;
+      obstacles.push({
+        x: ox, top: seg.top, h: rand(hz.hMin, hz.hMax), w: hz.w,
+        kind: MAPS[selMap].hazard, dead: false, minClear: Infinity, scored: false,
+      });
     }
 
     world.nextX = seg.x + w;
@@ -759,8 +776,23 @@ function update(dt) {
         o.dead = true; score += 15; screenShake = 10;
         Sound.smash();
         for (let i = 0; i < 16; i++) spawnSpark(ox, oTop, ["#ff5bd0","#5bc8ff","#ffe066","#7dff9b"][i%4]);
+        continue;
       } else if (player.invT <= 0) {
         return kill();
+      }
+    }
+    // near-miss: while airborne over the hazard, remember the tightest clearance
+    if (overlapX && pBot <= oTop) o.minClear = Math.min(o.minClear, oTop - pBot);
+    // award it once the hazard has slipped fully behind the rider
+    if (!o.scored && ox + o.w < pLeft) {
+      o.scored = true;
+      if (o.minClear < NEAR_MISS_DIST) {
+        combo++; comboTimer = COMBO_WINDOW;
+        const bonus = 40 * comboMult();
+        score += bonus;
+        Sound.star(combo);
+        spawnPopup(PLAYER_X, player.y + PLAYER_H * 0.25, "NEAR MISS +" + bonus, "#7dff9b");
+        for (let i = 0; i < 10; i++) spawnSpark(PLAYER_X, player.y + PLAYER_H * 0.5, "#7dff9b");
       }
     }
   }
@@ -775,6 +807,10 @@ function update(dt) {
     p.x += p.vx * dt; p.y += p.vy * dt; p.vy += p.g * dt; p.life -= dt;
   }
   particles = particles.filter((p) => p.life > 0);
+
+  // floating popups rise, drift back, and fade
+  for (const p of popups) { p.x -= 150 * dt; p.y += p.vy * dt; p.life -= dt * 1.3; }
+  popups = popups.filter((p) => p.life > 0);
 
   jumpQueued = false;
   dashQueued = false;
@@ -892,6 +928,10 @@ function spawnTrail() {
     kind: "trail",
   });
 }
+// floating score / near-miss text that rises and fades (screen-space x, world y)
+function spawnPopup(x, y, text, color = "#fff") {
+  popups.push({ x, y, text, color, life: 1.0, vy: -46 });
+}
 // white streaks flying backward during a ring boost
 function spawnSpeedLine() {
   particles.push({
@@ -919,7 +959,7 @@ function render(dt) {
   else if (state === STATE.SELECT) drawSelect();
   else if (state === STATE.UPGRADES) drawUpgradeTree();
   else if (state === STATE.RESCUE) drawRescue();
-  else { drawWorld(); drawTrailInGame(); drawPlayer(); drawParticles(); drawHUD(); if (state === STATE.DEAD) drawDead(); }
+  else { drawWorld(); drawTrailInGame(); drawPlayer(); drawParticles(); drawPopups(); drawHUD(); if (state === STATE.DEAD) drawDead(); }
 
   ctx.restore();
   if (isTouch && (state === STATE.PLAY || state === STATE.RESCUE)) drawTouchPads();
@@ -1332,15 +1372,26 @@ function drawStar(x, y, r, rot) {
 
 // A hazard that stays legible on any background: white halo + black outline +
 // hazard stripes, topped with a crayon tip. Dash smashes it; otherwise it kills.
+// Hazards are themed per map but share one collision box. Each draw fills the
+// footprint [x..x+o.w] x [o.top-o.h .. o.top] and keeps a dark outline / halo so
+// it stays legible on any background.
 function drawObstacle(x, o) {
+  switch (o.kind) {
+    case "hay":       return drawHazardHay(x, o);
+    case "lantern":   return drawHazardLantern(x, o);
+    case "crystal":   return drawHazardCrystal(x, o);
+    case "barricade": return drawHazardBarricade(x, o);
+    default:          return drawHazardCrayon(x, o);
+  }
+}
+
+// Neon City: a hazard-striped crayon pillar with a pointed tip.
+function drawHazardCrayon(x, o) {
   const oTop = o.top - o.h;
   ctx.save();
-  // pulsing warning glow
   const pulse = 0.5 + 0.5 * Math.sin(t * 8);
   ctx.shadowColor = `rgba(255,60,90,${0.6 + 0.4 * pulse})`;
   ctx.shadowBlur = 22;
-
-  // body with thick black outline
   ctx.fillStyle = "#12030a";
   roundRect(x - 3, oTop - 3, o.w + 6, o.h + 6, 8, true);
   ctx.shadowBlur = 0;
@@ -1348,8 +1399,6 @@ function drawObstacle(x, o) {
   roundRect(x - 3, oTop - 3, o.w + 6, o.h + 6, 8, true); // white halo ring
   ctx.fillStyle = "#160208";
   roundRect(x, oTop, o.w, o.h, 6, true);
-
-  // diagonal hazard stripes clipped to the body
   ctx.save();
   ctx.beginPath();
   roundRect(x + 3, oTop + 3, o.w - 6, o.h - 6, 4, false);
@@ -1366,8 +1415,6 @@ function drawObstacle(x, o) {
     ctx.fill();
   }
   ctx.restore();
-
-  // pointed crayon tip
   ctx.fillStyle = "#ff4d6d";
   ctx.beginPath();
   ctx.moveTo(x - 3, oTop);
@@ -1376,6 +1423,121 @@ function drawObstacle(x, o) {
   ctx.closePath();
   ctx.fill();
   ctx.lineWidth = 2.5; ctx.strokeStyle = "#12030a"; ctx.stroke();
+  ctx.restore();
+}
+
+// Countryside: a round straw hay bale with binding straps.
+function drawHazardHay(x, o) {
+  const oTop = o.top - o.h, cx = x + o.w / 2, cy = o.top - o.h / 2;
+  const r = Math.min(o.w, o.h) / 2;
+  ctx.save();
+  ctx.shadowColor = "rgba(0,0,0,0.45)"; ctx.shadowBlur = 12;
+  ctx.fillStyle = "#3a2a12"; roundRect(x - 3, oTop - 3, o.w + 6, o.h + 6, r + 3, true);
+  ctx.shadowBlur = 0;
+  ctx.fillStyle = "rgba(255,255,255,0.9)"; roundRect(x - 3, oTop - 3, o.w + 6, o.h + 6, r + 3, true);
+  const g = ctx.createLinearGradient(0, oTop, 0, o.top);
+  g.addColorStop(0, "#f2ce62"); g.addColorStop(1, "#b9832e");
+  ctx.fillStyle = g; roundRect(x, oTop, o.w, o.h, r, true);
+  ctx.save();
+  ctx.beginPath(); roundRect(x, oTop, o.w, o.h, r, false); ctx.clip();
+  // spiral roll rings + straw texture
+  ctx.strokeStyle = "rgba(120,80,20,0.45)"; ctx.lineWidth = 2;
+  for (let rr = 8; rr < o.w; rr += 12) { ctx.beginPath(); ctx.arc(cx, cy, rr, 0, Math.PI * 2); ctx.stroke(); }
+  ctx.strokeStyle = "rgba(90,60,15,0.22)"; ctx.lineWidth = 1;
+  for (let yy = oTop + 6; yy < o.top; yy += 7) { ctx.beginPath(); ctx.moveTo(x, yy); ctx.lineTo(x + o.w, yy); ctx.stroke(); }
+  ctx.restore();
+  ctx.fillStyle = "rgba(60,40,12,0.55)";
+  ctx.fillRect(x + o.w * 0.32 - 2, oTop, 5, o.h);
+  ctx.fillRect(x + o.w * 0.68 - 2, oTop, 5, o.h);
+  ctx.restore();
+}
+
+// China City: a post stacked with glowing red paper lanterns.
+function drawHazardLantern(x, o) {
+  const oTop = o.top - o.h, cx = x + o.w / 2;
+  ctx.save();
+  ctx.fillStyle = "#241012"; ctx.fillRect(cx - 4, oTop, 8, o.h); // post
+  const n = Math.max(2, Math.round(o.h / 48));
+  const lh = o.h / n;
+  for (let i = 0; i < n; i++) {
+    const ly = oTop + i * lh + lh * 0.5;
+    const lw = o.w * 0.98, lhh = lh * 0.72;
+    ctx.shadowColor = "rgba(255,60,60,0.8)"; ctx.shadowBlur = 15;
+    ctx.fillStyle = "#ffcf33"; // gold caps
+    ctx.fillRect(cx - lw * 0.26, ly - lhh * 0.5 - 4, lw * 0.52, 4);
+    ctx.fillRect(cx - lw * 0.26, ly + lhh * 0.5, lw * 0.52, 4);
+    const g = ctx.createLinearGradient(cx - lw / 2, 0, cx + lw / 2, 0);
+    g.addColorStop(0, "#a5111a"); g.addColorStop(0.5, "#ee1c25"); g.addColorStop(1, "#a5111a");
+    ctx.fillStyle = g;
+    ctx.beginPath(); ctx.ellipse(cx, ly, lw / 2, lhh / 2, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.shadowBlur = 0;
+    ctx.lineWidth = 2.5; ctx.strokeStyle = "#5a0708"; ctx.stroke();
+    ctx.strokeStyle = "rgba(255,207,51,0.7)"; ctx.lineWidth = 1.5;
+    for (const fx of [-0.26, 0, 0.26]) {
+      ctx.beginPath(); ctx.moveTo(cx + lw * fx, ly - lhh * 0.42); ctx.lineTo(cx + lw * fx, ly + lhh * 0.42); ctx.stroke();
+    }
+  }
+  ctx.strokeStyle = "#ffcf33"; ctx.lineWidth = 3; // bottom tassel
+  ctx.beginPath(); ctx.moveTo(cx, o.top - 2); ctx.lineTo(cx, o.top + 9); ctx.stroke();
+  ctx.restore();
+}
+
+// Crystal City: a faceted cluster of glowing crystal spikes.
+function drawHazardCrystal(x, o) {
+  const oTop = o.top - o.h, cx = x + o.w / 2;
+  ctx.save();
+  const shard = (bx, bw, ty, c1, c2) => {
+    const g = ctx.createLinearGradient(bx, ty, bx, o.top);
+    g.addColorStop(0, c1); g.addColorStop(1, c2);
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.moveTo(bx, ty);                 // pointed tip
+    ctx.lineTo(bx + bw / 2, o.top - 10);
+    ctx.lineTo(bx + bw * 0.3, o.top);
+    ctx.lineTo(bx - bw * 0.3, o.top);
+    ctx.lineTo(bx - bw / 2, o.top - 10);
+    ctx.closePath(); ctx.fill();
+    ctx.lineWidth = 2.5; ctx.strokeStyle = "#1a1440"; ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(bx, ty); ctx.lineTo(bx, o.top - 6);
+    ctx.lineWidth = 1.5; ctx.strokeStyle = "rgba(255,255,255,0.6)"; ctx.stroke();
+  };
+  ctx.shadowColor = "rgba(150,230,255,0.8)"; ctx.shadowBlur = 18;
+  shard(cx - o.w * 0.28, o.w * 0.42, oTop + o.h * 0.34, "#8fd8ff", "#4a76c8");
+  shard(cx + o.w * 0.30, o.w * 0.44, oTop + o.h * 0.22, "#c79bff", "#6a3fb0");
+  ctx.shadowBlur = 24;
+  shard(cx, o.w * 0.52, oTop, "#d6f7ff", "#5b8de0"); // tallest central spike
+  ctx.restore();
+}
+
+// Tokyo Night: a striped neon construction barricade with a blinking light.
+function drawHazardBarricade(x, o) {
+  const oTop = o.top - o.h, cx = x + o.w / 2;
+  ctx.save();
+  ctx.shadowColor = "rgba(255,190,40,0.55)"; ctx.shadowBlur = 16;
+  ctx.fillStyle = "#111"; roundRect(x - 3, oTop - 3, o.w + 6, o.h + 6, 6, true);
+  ctx.shadowBlur = 0;
+  ctx.fillStyle = "#fff"; roundRect(x - 3, oTop - 3, o.w + 6, o.h + 6, 6, true);
+  ctx.fillStyle = "#141418"; roundRect(x, oTop, o.w, o.h, 5, true);
+  ctx.save();
+  ctx.beginPath(); roundRect(x + 3, oTop + 3, o.w - 6, o.h - 6, 3, false); ctx.clip();
+  const sw = 14;
+  for (let i = -o.h; i < o.w + o.h; i += sw * 2) {
+    ctx.fillStyle = "#ffbe28";
+    ctx.beginPath();
+    ctx.moveTo(x + i, oTop);
+    ctx.lineTo(x + i + sw, oTop);
+    ctx.lineTo(x + i + sw - o.h, oTop + o.h);
+    ctx.lineTo(x + i - o.h, oTop + o.h);
+    ctx.closePath();
+    ctx.fill();
+  }
+  // cyan reflective band
+  ctx.fillStyle = "rgba(90,200,255,0.4)"; ctx.fillRect(x, oTop + o.h * 0.42, o.w, o.h * 0.16);
+  ctx.restore();
+  const blink = 0.5 + 0.5 * Math.sin(t * 10); // blinking hazard light
+  ctx.shadowColor = `rgba(255,60,120,${0.4 + 0.6 * blink})`; ctx.shadowBlur = 18;
+  ctx.fillStyle = `rgba(255,${Math.round(50 + 120 * blink)},170,1)`;
+  ctx.beginPath(); ctx.arc(cx, oTop - 6, 5, 0, Math.PI * 2); ctx.fill();
   ctx.restore();
 }
 
@@ -1643,6 +1805,24 @@ function drawParticles() {
     }
   }
   ctx.globalAlpha = 1;
+}
+
+function drawPopups() {
+  ctx.save();
+  ctx.textAlign = "center"; ctx.textBaseline = "middle";
+  ctx.font = "900 24px Trebuchet MS, sans-serif";
+  ctx.lineWidth = 4; ctx.strokeStyle = "rgba(0,0,0,0.85)"; ctx.lineJoin = "round";
+  for (const p of popups) {
+    ctx.globalAlpha = clamp(p.life * 1.4, 0, 1);
+    const pop = 1 + Math.max(0, (p.life - 0.7)) * 1.2; // quick pop-in on spawn
+    ctx.save();
+    ctx.translate(p.x, p.y); ctx.scale(pop, pop);
+    ctx.strokeText(p.text, 0, 0);
+    ctx.fillStyle = p.color; ctx.fillText(p.text, 0, 0);
+    ctx.restore();
+  }
+  ctx.globalAlpha = 1;
+  ctx.restore();
 }
 
 /* ---- HUD ---- */

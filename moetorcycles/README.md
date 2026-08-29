@@ -58,6 +58,17 @@ Then open http://localhost:8777/ in your browser.
   collecting (`COMBO_WINDOW`), shown by the timer bar under the ×N HUD.
 - **Stars are currency**: each collected star banks one 🌟 (persisted in
   `localStorage`, survives death). Spend them to unlock content.
+- **Near-miss bonus**: clear a hazard by jumping *just* over it (within
+  `NEAR_MISS_DIST` px) for a "NEAR MISS" bonus that also feeds the combo. It's
+  scored once the hazard slips behind you un-smashed.
+
+## Hazards (per map)
+
+Each map has its own ground hazard — jump over it, or dash / ring-boost to smash
+through. They share one collision box (`HAZARDS` size bands in `game.js`); only
+the art differs (`o.kind`, drawn by `drawHazard*`): Neon City = crayon pillar,
+Countryside = hay bale, China City = red lantern stack, Crystal City = crystal
+spike, Tokyo Night = neon construction barricade.
 
 ## Unlocks & mix-and-match maps
 
@@ -172,7 +183,8 @@ The select screen is a carousel — extra rides show up automatically with
 - [x] Sound — synthesized SFX + looping soundtrack + mute — **done**
 - [x] Combo multiplier + fly-through gold rings — **done**
 - [x] Star currency + unlockable characters / maps / trails, mix-and-match maps — **done**
-- [ ] Near-miss bonus
+- [x] Near-miss bonus (tight jump over a hazard) — **done**
+- [x] Per-map hazards (crayon / hay bale / lantern stack / crystal spike / neon barricade) — **done**
 - [ ] More rides (character-on-bike combos), each as single-frame art
 - [ ] More maps / background sets
 - [ ] Sound + music
