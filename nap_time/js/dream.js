@@ -68,8 +68,13 @@
     this.pMaxHp = this.stats.maxHp;
     this.pBaseDmg = this.stats.damage;
     this.levelFlash = 0;
-    // difficulty scales enemy damage a little (0.8->0.88, 1.5->1.30)
-    this.enemyDmgScale = 1 + (this.diff - 1) * 0.6;
+    // enemies get tougher + meaner the higher your character's level (plus the chosen difficulty)
+    const clvl = this.charProg.level;
+    this.enemyHpScale = this.diff * (1 + Math.min(2.4, (clvl - 1) * 0.06));   // HP grows ~6%/level (cap ~3.4x)
+    this.enemyDmgScale = (1 + (this.diff - 1) * 0.6) * (1 + Math.min(1.5, (clvl - 1) * 0.04));
+    this.aggro = 1 + Math.min(1.0, (clvl - 1) * 0.035);   // faster, keener senses, attacks sooner (cap 2x)
+    this.rangedUnlocked = clvl >= 3;                       // ranged attack unlocks at level 3
+    this.playerShots = [];
     this.player = { x: 2.5 * TILE, y: 2.5 * TILE, radius: 16, hp: this.pMaxHp, maxhp: this.pMaxHp,
       dir: "down", moving: false, animT: 0, attacking: false, atkT: 0, atkHit: false, hurtT: 0,
       buff: { kind: null, t: 0 }, form: 0 };   // buff = food; form = Oni Mode timer
@@ -394,6 +399,11 @@
       this.player.maxhp = this.stats.maxHp;
       this.player.hp = this.player.maxhp;
       this.spawnHearts(this.player.x, this.player.y - 28);
+      // unlock the ranged attack at level 3
+      if (!this.rangedUnlocked && r.level >= 3) {
+        this.rangedUnlocked = true;
+        this.popup(this.player.x, this.player.y - 66, "✦ Ranged Attack!", (this.element && this.element.color) || "#ffe08a", true);
+      }
     }
   },
   spawnBuddy(isEscort) {
@@ -403,13 +413,13 @@
 
   // ---------- entity factories ----------
   makeEnemy(pos, foeKey) {
-    return { x: pos.x, y: pos.y, radius: 16, hp: Math.round(ENEMY_MAX_HP * this.diff), maxhp: Math.round(ENEMY_MAX_HP * this.diff),
+    return { x: pos.x, y: pos.y, radius: 16, hp: Math.round(ENEMY_MAX_HP * this.enemyHpScale), maxhp: Math.round(ENEMY_MAX_HP * this.enemyHpScale),
       state: "idle", animT: 0, faceLeft: false, attacking: false, atkT: 0, atkCd: 0, atkDealt: false,
       hurtT: 0, dying: false, deathT: 0, dead: false, isBoss: false, h: ENEMY_H,
       foe: foeKey || this.cfg.enemyFoe || "shadow_egg" };
   },
   makeBoss(pos, foeKey) {
-    return { x: pos.x, y: pos.y, radius: 24, hp: Math.round(BOSS_MAX_HP * this.diff), maxhp: Math.round(BOSS_MAX_HP * this.diff),
+    return { x: pos.x, y: pos.y, radius: 24, hp: Math.round(BOSS_MAX_HP * this.enemyHpScale), maxhp: Math.round(BOSS_MAX_HP * this.enemyHpScale),
       state: "idle", animT: 0, faceLeft: false, attacking: false, atkT: 0, atkCd: 1, atkDealt: false,
       hurtT: 0, dying: false, deathT: 0, dead: false, isBoss: true, h: BOSS_H, blastCd: BOSS_BLAST_CD,
       phase: 1, novaCd: 2.0, novaCharge: 0,
@@ -672,6 +682,7 @@
     this.updatePickups(dt);
     this.updateBuddy(dt);
     this.updateMinions(dt);
+    this.updatePlayerShots(dt);
     this.updateZaps(dt);
     this.updateParticles(dt);
     this.checkObjective(dt);
@@ -721,6 +732,12 @@
             if (dist < TILE * 0.5 || dx * v.x + dy * v.y > 0) { this.hitEnemy(en, pdmg); this.applyElement(en, pdmg); }
           }
         }
+        // ranged attack (unlocked at level 3): fire an element-themed bolt forward
+        if (this.rangedUnlocked && this.element) {
+          const sp = 470, dmg = this.pBaseDmg * (p.buff.kind === "dmg" && p.buff.t > 0 ? 1.6 : 1) * (p.form > 0 ? 1.6 : 1);
+          this.playerShots.push({ x: p.x + v.x * 14, y: p.y - 20 + v.y * 14, vx: v.x * sp, vy: v.y * sp, t: 0, life: 1.05, r: 8, dmg, el: this.element });
+          this.spawnBurst(p.x + v.x * 22, p.y - 20 + v.y * 22, this.element.spark);
+        }
       }
       if (p.atkT >= ATTACK_TIME) p.attacking = false;
     }
@@ -758,9 +775,9 @@
       if (en.atkCd > 0) en.atkCd -= dt;
       const p2 = en.isBoss && en.phase === 2;
       const reach = en.isBoss ? ENEMY_REACH + 24 : ENEMY_REACH;
-      const speed = (en.isBoss ? BOSS_SPEED : ENEMY_SPEED) * (p2 ? BOSS_P2_SPEED : 1) * (en.wet > 0 ? 0.5 : 1);
+      const speed = (en.isBoss ? BOSS_SPEED : ENEMY_SPEED) * (p2 ? BOSS_P2_SPEED : 1) * (en.wet > 0 ? 0.5 : 1) * this.aggro;
       const atkTime = (en.isBoss ? BOSS_ATK_TIME : ENEMY_ATK_TIME) * (p2 ? BOSS_P2_ATK : 1);
-      const atkCd = (en.isBoss ? BOSS_ATK_CD : ENEMY_ATK_CD) * (p2 ? BOSS_P2_ATK : 1);
+      const atkCd = (en.isBoss ? BOSS_ATK_CD : ENEMY_ATK_CD) * (p2 ? BOSS_P2_ATK : 1) / this.aggro;
       const dmg = en.isBoss ? BOSS_DMG : ENEMY_DMG;
 
       if (en.isBoss) {
@@ -795,7 +812,7 @@
       }
       if (dist < reach) { en.state = "idle"; en.animT += dt;
         if (en.atkCd <= 0) { en.attacking = true; en.atkT = 0; en.atkDealt = false; } }
-      else if (dist < ENEMY_DETECT || en.isBoss) { en.state = "walk"; en.animT += dt;
+      else if (dist < ENEMY_DETECT * this.aggro || en.isBoss) { en.state = "walk"; en.animT += dt;
         const len = dist || 1; this.move(en, (dx / len) * speed * dt, (dy / len) * speed * dt); }
       else { en.state = "idle"; en.animT += dt * 0.5; }
     }
@@ -997,6 +1014,22 @@
     this.spawnBurst(en.x, en.y - en.h * 0.45, el.color);               // vibe-colored sparkle
   },
   updateZaps(dt) { for (const z of this.zaps) z.t += dt; this.zaps = this.zaps.filter(z => z.t < z.life); },
+  // level-3 ranged bolts: fly forward, hit the first enemy (with the element effect) or a wall
+  updatePlayerShots(dt) {
+    for (const s of this.playerShots) {
+      s.t += dt; s.x += s.vx * dt; s.y += s.vy * dt;
+      const tx = Math.floor(s.x / TILE), ty = Math.floor(s.y / TILE);
+      if (this.isWall(tx, ty)) { s.t = s.life; this.spawnBurst(s.x, s.y, s.el.color); continue; }
+      for (const en of this.enemies) {
+        if (en.dead || en.dying) continue;
+        if (U.dist(s.x, s.y, en.x, en.y - en.h * 0.4) < en.radius + 10) {
+          this.hitEnemy(en, s.dmg); this.applyElement(en, s.dmg);
+          this.spawnBurst(s.x, s.y, s.el.color); s.t = s.life; break;
+        }
+      }
+    }
+    this.playerShots = this.playerShots.filter(s => s.t < s.life);
+  },
 
   // ---------- anim pickers ----------
   frameOf(a, t, fps) { return a.files[Math.floor(t * fps) % a.files.length]; },
@@ -1157,6 +1190,18 @@
       else this.drawBuddy(ctx, cam);
     }
     for (const m of this.minions) this.drawMinion(ctx, cam, m);
+
+    // level-3 ranged bolts (element-coloured)
+    for (const s of this.playerShots) {
+      const sx = s.x - cam.x, sy = s.y - cam.y, el = s.el;
+      ctx.save(); ctx.globalCompositeOperation = "lighter";
+      const g = ctx.createRadialGradient(sx, sy, 1, sx, sy, 15);
+      g.addColorStop(0, el.spark); g.addColorStop(1, "rgba(0,0,0,0)");
+      ctx.fillStyle = g; ctx.beginPath(); ctx.arc(sx, sy, 15, 0, 6.28); ctx.fill();
+      ctx.restore();
+      ctx.fillStyle = el.color; ctx.beginPath(); ctx.arc(sx, sy, 5, 0, 6.28); ctx.fill();
+      ctx.fillStyle = "#fff"; ctx.beginPath(); ctx.arc(sx - s.vx * 0.002, sy - s.vy * 0.002, 2.2, 0, 6.28); ctx.fill();
+    }
 
     // Excited! chain-lightning arcs
     for (const z of this.zaps) {
