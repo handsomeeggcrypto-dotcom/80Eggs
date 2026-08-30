@@ -402,7 +402,9 @@
       // unlock the ranged attack at level 3
       if (!this.rangedUnlocked && r.level >= 3) {
         this.rangedUnlocked = true;
-        this.popup(this.player.x, this.player.y - 66, "✦ Ranged Attack!", (this.element && this.element.color) || "#ffe08a", true);
+        const c = (this.element && this.element.color) || "#ffe08a";
+        this.popup(this.player.x, this.player.y - 76, "✦ Ranged Attack!", c, true);
+        this.popup(this.player.x, this.player.y - 52, "right-click / Q", c);
       }
     }
   },
@@ -446,16 +448,22 @@
     if (this.outcome) { if (this.outcome === "riftlose") this.riftFinish(); return; }
     if (this.adventure && (k === "e" || k === "escape")) { this.win(); return; }   // wake from Adventure
     if (k === " ") this.tryAttack();
+    else if (k === "q") this.tryRanged();   // ranged on its own key (right-click too)
     else if (k === "shift") this.tryActive();
   },
-  onDown(x, y) {
+  onDown(x, y, button) {
     if (this.outcome === "riftclear") { for (const b of this.riftButtons) if (x >= b.x && x <= b.x + b.w && y >= b.y && y <= b.y + b.h) { b.act(); return; } return; }
     if (this.outcome === "riftlose") { this.riftFinish(); return; }
-    if (!this.outcome) this.tryAttack();
+    if (!this.outcome) { if (button === 2) this.tryRanged(); else this.tryAttack(); }   // right-click = ranged
   },
   tryAttack() {
     const p = this.player; if (p.attacking) return;
-    p.attacking = true; p.atkT = 0; p.atkHit = false;
+    p.attacking = true; p.atkT = 0; p.atkHit = false; p.rangedShot = false;
+  },
+  tryRanged() {
+    if (!this.rangedUnlocked || !this.element) return;
+    const p = this.player; if (p.attacking) return;
+    p.attacking = true; p.atkT = 0; p.atkHit = false; p.rangedShot = true;
   },
   // ---------- deep-sleep rift ----------
   updateRift(dt) {
@@ -724,19 +732,21 @@
       if (!p.atkHit && p.atkT / ATTACK_TIME >= ATTACK_HIT_AT) {
         p.atkHit = true;
         const v = this.faceVec(p.dir);
-        for (const en of this.enemies) {
-          if (en.dead || en.dying) continue;
-          const dx = en.x - p.x, dy = (en.y - 20) - (p.y - 20), dist = Math.hypot(dx, dy);
-          if (dist <= PLAYER_REACH + (en.isBoss ? 14 : 0)) {
-            const pdmg = this.pBaseDmg * (p.buff.kind === "dmg" && p.buff.t > 0 ? 1.6 : 1) * (p.form > 0 ? 1.6 : 1);
-            if (dist < TILE * 0.5 || dx * v.x + dy * v.y > 0) { this.hitEnemy(en, pdmg); this.applyElement(en, pdmg); }
-          }
-        }
-        // ranged attack (unlocked at level 3): fire an element-themed bolt forward
-        if (this.rangedUnlocked && this.element) {
-          const sp = 470, dmg = this.pBaseDmg * (p.buff.kind === "dmg" && p.buff.t > 0 ? 1.6 : 1) * (p.form > 0 ? 1.6 : 1);
-          this.playerShots.push({ x: p.x + v.x * 14, y: p.y - 20 + v.y * 14, vx: v.x * sp, vy: v.y * sp, t: 0, life: 1.05, r: 8, dmg, el: this.element });
+        const pdmg = this.pBaseDmg * (p.buff.kind === "dmg" && p.buff.t > 0 ? 1.6 : 1) * (p.form > 0 ? 1.6 : 1);
+        if (p.rangedShot) {
+          // ranged swing (own button, level 3+): fire an element-themed bolt forward
+          const sp = 470;
+          this.playerShots.push({ x: p.x + v.x * 14, y: p.y - 20 + v.y * 14, vx: v.x * sp, vy: v.y * sp, t: 0, life: 1.05, r: 8, dmg: pdmg, el: this.element });
           this.spawnBurst(p.x + v.x * 22, p.y - 20 + v.y * 22, this.element.spark);
+        } else {
+          // melee swing
+          for (const en of this.enemies) {
+            if (en.dead || en.dying) continue;
+            const dx = en.x - p.x, dy = (en.y - 20) - (p.y - 20), dist = Math.hypot(dx, dy);
+            if (dist <= PLAYER_REACH + (en.isBoss ? 14 : 0)) {
+              if (dist < TILE * 0.5 || dx * v.x + dy * v.y > 0) { this.hitEnemy(en, pdmg); this.applyElement(en, pdmg); }
+            }
+          }
         }
       }
       if (p.atkT >= ATTACK_TIME) p.attacking = false;
@@ -1506,6 +1516,14 @@
       D.bar(bx + 44, by + 24, bw - 58, 8, ready ? 1 : 1 - this.activeCd / this.activeMax, ready ? "#8dffb0" : "#c98be0");
       if (!ready) { ctx.fillStyle = "rgba(255,255,255,0.8)"; ctx.font = "11px sans-serif"; ctx.textAlign = "right"; ctx.fillText(Math.ceil(this.activeCd) + "s", bx + bw - 8, by + 17); }
       ctx.textAlign = "left";
+    }
+    // ranged-attack hint (once unlocked)
+    if (this.rangedUnlocked && this.element) {
+      const hy = this.active ? 148 : 100;
+      ctx.fillStyle = "rgba(25,15,45,0.55)"; D.rr(14, hy, 210, 24, 8); ctx.fill();
+      ctx.fillStyle = this.element.color; ctx.beginPath(); ctx.arc(30, hy + 12, 5, 0, 6.28); ctx.fill();
+      ctx.fillStyle = "rgba(255,255,255,0.85)"; ctx.font = "12px 'Trebuchet MS',sans-serif"; ctx.textAlign = "left";
+      ctx.fillText("Ranged: right-click / Q", 44, hy + 16);
     }
 
     // active food buff indicator (icon + shrinking timer)

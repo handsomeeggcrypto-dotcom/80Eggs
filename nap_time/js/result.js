@@ -64,7 +64,11 @@
       NAP.backgrounds.bedroom_night(ctx, w, h, t);
       ctx.fillStyle = "rgba(16,10,32,0.72)"; ctx.fillRect(0, 0, w, h);
 
-      const info = this.won ? this.char.win : this.char.lose;
+      // fall back to generic wake text (some characters only define `lose`, but
+      // Adventure / Deep Sleep let any character reach the win card)
+      const FALLBACK_WIN = { title: "Sweet Dream", text: "You drift back up out of the dream, warm and rested." };
+      const FALLBACK_LOSE = { title: "You Woke With a Gasp", text: "The dream slipped away. Steady... and back down you go." };
+      const info = this.won ? (this.char.win || FALLBACK_WIN) : (this.char.lose || FALLBACK_LOSE);
       ctx.textAlign = "center";
 
       // deterministic vertical stack (holds at any viewport height)
