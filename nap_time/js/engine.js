@@ -164,7 +164,8 @@ window.NAP = window.NAP || {};
   };
   function rangedReady() { return NAP.scene === NAP.scenes.dream && NAP.scene.rangedUnlocked; }
   function inCircle(x, y, c) { return Math.hypot(x - c.x, y - c.y) <= c.r; }
-  function inDreamPlay() { return NAP.scene === NAP.scenes.dream && !NAP.scene.outcome && !NAP.transition; }
+  function inDreamPlay() { return NAP.scene === NAP.scenes.dream && !NAP.scene.outcome && !NAP.scene.paused && !NAP.transition; }
+  function pauseBtnZone() { const V = NAP.view; return { x: V.w / 2, y: 26, r: 20 }; }
   function touchXY(t) { const r = canvas.getBoundingClientRect(); return { x: t.clientX - r.left, y: t.clientY - r.top }; }
   const activeTouches = {};   // identifier -> role: "joy" | "atk" | "act" | "tap"
 
@@ -173,7 +174,9 @@ window.NAP = window.NAP || {};
       const p = touchXY(t);
       if (inDreamPlay()) {
         const z = NAP.touchZones();
-        if (inCircle(p.x, p.y, z.act)) {                                     // active button (check first)
+        if (inCircle(p.x, p.y, pauseBtnZone())) {                            // pause button (top-center)
+          activeTouches[t.identifier] = "pause"; if (NAP.scene.togglePause) NAP.scene.togglePause();
+        } else if (inCircle(p.x, p.y, z.act)) {                              // active button
           activeTouches[t.identifier] = "act"; if (NAP.scene.tryActive) NAP.scene.tryActive();
         } else if (rangedReady() && inCircle(p.x, p.y, z.rng)) {             // ranged button
           activeTouches[t.identifier] = "rng"; input.fireRanged = true;
@@ -242,23 +245,25 @@ window.NAP = window.NAP || {};
     const prev = input.padPrev;
     let sx = dz(gp.axes[0] || 0), sy = dz(gp.axes[1] || 0);
     if (b(14)) sx = -1; if (b(15)) sx = 1; if (b(12)) sy = -1; if (b(13)) sy = 1;
-    const inDream = NAP.scene === NAP.scenes.dream && !NAP.transition;
+    const isDreamScene = NAP.scene === NAP.scenes.dream && !NAP.transition;
+    const inDream = isDreamScene && !NAP.scene.paused;   // active gameplay (not paused)
     const justActive = (b(2) && !prev[2]) || (b(5) && !prev[5]);
     const justBack = b(1) && !prev[1];
     const justStart = b(9) && !prev[9];
     const justA = b(0) && !prev[0];
+    // Start = pause toggle inside a dream (playing or paused)
+    if (justStart && isDreamScene && NAP.scene.togglePause) NAP.scene.togglePause();
     if (inDream) {
       input.axis.x += sx; input.axis.y += sy;
       input.fireAttack = touchAttackHeld() || b(0);       // A held = melee
       input.fireRanged = touchRangedHeld() || b(1) || b(7); // B or right-trigger held = ranged
       if (justActive && NAP.scene.tryActive) NAP.scene.tryActive();
-      if (justStart && NAP.scene.onKey) NAP.scene.onKey("escape");
     } else {
-      input.fireRanged = false;
+      input.fireRanged = false; input.fireAttack = false;
       const spd = 640 * dt;
       input.mouse.x = Math.max(0, Math.min(NAP.view.w, input.mouse.x + sx * spd));
       input.mouse.y = Math.max(0, Math.min(NAP.view.h, input.mouse.y + sy * spd));
-      if ((justA || justStart) && NAP.scene.onDown && !NAP.transition) NAP.scene.onDown(input.mouse.x, input.mouse.y, 0);
+      if (justA && NAP.scene.onDown && !NAP.transition) NAP.scene.onDown(input.mouse.x, input.mouse.y, 0);
       if (justBack && NAP.scene.onKey && !NAP.transition) NAP.scene.onKey("escape");
     }
     const np = {}; for (let i = 0; i < gp.buttons.length; i++) np[i] = gp.buttons[i].pressed; input.padPrev = np;
@@ -283,9 +288,10 @@ window.NAP = window.NAP || {};
         const el = NAP.scene.element;
         btn(z.rng, "◎", (el && el.color) || "#7bd8ff");   // ranged button (element-tinted)
       }
+      btn(pauseBtnZone(), "❚❚", "#9b8bd0");                // pause button (top-center)
       ctx.restore(); ctx.globalAlpha = 1; ctx.textAlign = "left";
     }
-    if (input.padActive && NAP.scene !== NAP.scenes.dream) {   // gamepad cursor in menus
+    if (input.padActive && (NAP.scene !== NAP.scenes.dream || NAP.scene.paused)) {   // gamepad cursor in menus + pause
       ctx.save(); ctx.globalAlpha = 0.85; ctx.fillStyle = "#fff"; ctx.strokeStyle = "rgba(0,0,0,0.5)"; ctx.lineWidth = 2;
       ctx.beginPath(); ctx.arc(input.mouse.x, input.mouse.y, 7, 0, 6.28); ctx.fill(); ctx.stroke(); ctx.restore(); ctx.globalAlpha = 1;
     }
@@ -468,7 +474,7 @@ window.NAP = window.NAP || {};
     try { NAP.pollGamepad(dt); } catch (e) { /* input never blocks the frame */ }
     try {
       // held melee / ranged (pad + touch) — try* guard their own rate
-      const inDreamNow = NAP.scene === NAP.scenes.dream && !NAP.transition;
+      const inDreamNow = NAP.scene === NAP.scenes.dream && !NAP.transition && !NAP.scene.paused;
       if (input.fireAttack && inDreamNow && NAP.scene.tryAttack) NAP.scene.tryAttack();
       if (input.fireRanged && inDreamNow && NAP.scene.tryRanged) NAP.scene.tryRanged();
       if (NAP.scene) {

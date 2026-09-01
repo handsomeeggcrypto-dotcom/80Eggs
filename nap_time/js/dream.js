@@ -126,6 +126,8 @@
     this.xpMult = this.isRift ? 1 + this.depth * 0.2 : 1;
     this.outcome = null;       // 'win' | 'lose'
     this.outcomeT = 0;
+    this.paused = false;
+    this.pauseButtons = [];
     this.finished = false;
     this.bannerT = 3.2;        // objective banner fades
     this.setupObjective();
@@ -175,6 +177,21 @@
       else if (edge === 1) { const x = 1 + ((Math.random() * (C - 2)) | 0); for (let d = 1; d <= depth; d++) setWall(x, R - 1 - d, 2); }
       else if (edge === 2) { const y = 1 + ((Math.random() * (R - 2)) | 0); for (let d = 1; d <= depth; d++) setWall(d, y, 2); }
       else { const y = 1 + ((Math.random() * (R - 2)) | 0); for (let d = 1; d <= depth; d++) setWall(C - 1 - d, y, 2); }
+    }
+    // irregular footprint (Adventure): bite big rounded chunks out of the edges so the
+    // playable area is an organic sprawl, not a clean rectangle. connectRepair fixes the rest.
+    if (this.cfg.irregular) {
+      const bites = Math.round((C + R) / 7);
+      for (let i = 0; i < bites; i++) {
+        const edge = (Math.random() * 4) | 0, rad = 2 + ((Math.random() * 5) | 0);
+        let ex, ey;
+        if (edge === 0) { ex = 1 + ((Math.random() * (C - 2)) | 0); ey = 1; }
+        else if (edge === 1) { ex = 1 + ((Math.random() * (C - 2)) | 0); ey = R - 2; }
+        else if (edge === 2) { ex = 1; ey = 1 + ((Math.random() * (R - 2)) | 0); }
+        else { ex = C - 2; ey = 1 + ((Math.random() * (R - 2)) | 0); }
+        for (let dy = -rad; dy <= rad; dy++) for (let dx = -rad; dx <= rad; dx++)
+          if (dx * dx + dy * dy <= rad * rad) setWall(ex + dx, ey + dy, 2);
+      }
     }
     // library: a contained "infected" corner — corrupt floor (hazard) + corrupt wall
     if (this.tiles && this.tiles.corruptFloor) {
@@ -446,15 +463,41 @@
   // ---------- input ----------
   onKey(k) {
     if (this.outcome) { if (this.outcome === "riftlose") this.riftFinish(); return; }
-    if (this.adventure && (k === "e" || k === "escape")) { this.win(); return; }   // wake from Adventure
+    if (k === "escape") { this.togglePause(); return; }                 // pause any dream
+    if (this.paused) { if (k === " " || k === "enter") this.paused = false; return; }
+    if (this.adventure && k === "e") { this.win(); return; }            // quick-wake from Adventure
     if (k === " ") this.tryAttack();
     else if (k === "q") this.tryRanged();   // ranged on its own key (right-click too)
     else if (k === "shift") this.tryActive();
   },
   onDown(x, y, button) {
+    if (this.paused) { for (const b of this.pauseButtons) if (x >= b.x && x <= b.x + b.w && y >= b.y && y <= b.y + b.h) { b.act(); return; } return; }
     if (this.outcome === "riftclear") { for (const b of this.riftButtons) if (x >= b.x && x <= b.x + b.w && y >= b.y && y <= b.y + b.h) { b.act(); return; } return; }
     if (this.outcome === "riftlose") { this.riftFinish(); return; }
     if (!this.outcome) { if (button === 2) this.tryRanged(); else this.tryAttack(); }   // right-click = ranged
+  },
+  onResize() { if (this.paused) this.layoutPauseButtons(); },
+  togglePause() {
+    if (this.outcome) return;
+    this.paused = !this.paused;
+    if (this.paused) this.layoutPauseButtons();
+  },
+  layoutPauseButtons() {
+    const V = NAP.view, bw = 240, bh = 52, gap = 16;
+    const items = [{ label: "Resume", act: () => { this.paused = false; } },
+      { label: "Wake Up", act: () => this.wakeOut() }];
+    const cp = this.charProg;
+    if (cp && cp.points > 0) items.splice(1, 0, { label: "Spend " + cp.points + " pt" + (cp.points === 1 ? "" : "s"), act: () => { const id = this.charId; NAP.go(NAP.scenes.skills, { charId: id, back: "title" }, { type: "fade" }); } });
+    const totalH = items.length * bh + (items.length - 1) * gap;
+    let y = V.h / 2 - totalH / 2 + 20;
+    this.pauseButtons = items.map(it => { const b = { label: it.label, act: it.act, x: (V.w - bw) / 2, y, w: bw, h: bh }; y += bh + gap; return b; });
+  },
+  wakeOut() {
+    this.paused = false;
+    if (this.adventure) { this.win(); }                       // adventure -> XP/result card
+    else if (NAP.chapter) { NAP.chapterQuit(); }              // story night -> back to title
+    else if (this.isRift) { this.riftFinish(); }              // rift -> keep earned XP, wake
+    else { NAP.go(NAP.scenes.title, {}, { type: "wake" }); }  // standalone dream
   },
   tryAttack() {
     const p = this.player; if (p.attacking) return;
@@ -663,6 +706,7 @@
 
   // ---------- update ----------
   update(dt) {
+    if (this.paused) return;                 // frozen while the pause menu is open
     this.time += dt;
     if (this.bannerT > 0) this.bannerT -= dt;
     if (this.outcome) { this.outcomeT += dt;
@@ -1263,6 +1307,26 @@
     this.drawHUD(ctx);
     if (this.outcome) { ctx.fillStyle = "rgba(10,6,22," + U.clamp(this.outcomeT, 0, 0.5) + ")"; ctx.fillRect(0, 0, V.w, V.h); }
     if (this.outcome === "riftclear" || this.outcome === "riftlose") this.drawRiftOverlay(ctx);
+    if (this.paused) this.drawPause(ctx, V);
+  },
+  drawPause(ctx, V) {
+    ctx.fillStyle = "rgba(10,6,22,0.72)"; ctx.fillRect(0, 0, V.w, V.h);
+    ctx.textAlign = "center";
+    ctx.fillStyle = "#e9dcff"; ctx.font = "bold 40px 'Trebuchet MS',sans-serif";
+    ctx.fillText("Paused", V.w / 2, V.h / 2 - (this.pauseButtons.length * 34) - 20);
+    ctx.fillStyle = "rgba(233,220,255,0.6)"; ctx.font = "italic 15px 'Trebuchet MS',sans-serif";
+    ctx.fillText("zzz…", V.w / 2, V.h / 2 - (this.pauseButtons.length * 34) + 4);
+    const mx = NAP.input.mouse.x, my = NAP.input.mouse.y;
+    for (const b of this.pauseButtons) {
+      const hot = mx >= b.x && mx <= b.x + b.w && my >= b.y && my <= b.y + b.h;
+      ctx.fillStyle = hot ? "rgba(123,216,143,0.30)" : "rgba(40,26,64,0.94)";
+      D.rr(b.x, b.y, b.w, b.h, 12); ctx.fill();
+      ctx.strokeStyle = hot ? "#a8e6cf" : "rgba(255,255,255,0.22)"; ctx.lineWidth = 2;
+      D.rr(b.x, b.y, b.w, b.h, 12); ctx.stroke();
+      ctx.fillStyle = "#fff"; ctx.font = "bold 18px 'Trebuchet MS',sans-serif";
+      ctx.fillText(b.label, b.x + b.w / 2, b.y + b.h / 2 + 6);
+    }
+    ctx.textAlign = "left";
   },
 
   drawRiftOverlay(ctx) {
@@ -1552,6 +1616,7 @@
       }
       ctx.textAlign = "right"; ctx.fillStyle = "rgba(255,255,255,0.6)"; ctx.font = "11px 'Trebuchet MS',sans-serif";
       ctx.fillText("press E / Start to wake", V.w - 14, 14 + bh + 16); ctx.textAlign = "left";
+      this.drawMinimap(ctx, V, 14 + bh + 28);
     }
 
     // objective tracker (top-right) — non-adventure modes
@@ -1620,6 +1685,26 @@
       ctx.restore(); ctx.globalAlpha = 1;
     }
     ctx.textAlign = "left";
+  },
+
+  // Adventure minimap: whole map scaled down + player / enemies / boss / chests
+  drawMinimap(ctx, V, y0) {
+    const C = this.cols, R = this.rows;
+    const mmW = Math.min(156, V.w * 0.2), cell = mmW / C, mmH = cell * R;
+    const x0 = V.w - mmW - 14;
+    ctx.fillStyle = "rgba(15,10,28,0.74)"; D.rr(x0 - 5, y0 - 5, mmW + 10, mmH + 10, 8); ctx.fill();
+    ctx.strokeStyle = "rgba(255,255,255,0.14)"; ctx.lineWidth = 1.5; D.rr(x0 - 5, y0 - 5, mmW + 10, mmH + 10, 8); ctx.stroke();
+    ctx.fillStyle = "rgba(120,100,160,0.16)"; ctx.fillRect(x0, y0, mmW, mmH);
+    ctx.fillStyle = "rgba(66,48,104,0.95)";
+    for (let y = 0; y < R; y++) for (let x = 0; x < C; x++) {
+      const t = this.grid[y][x];
+      if (t === 2 || t === 3 || t === 5) ctx.fillRect(x0 + x * cell, y0 + y * cell, cell + 0.6, cell + 0.6);
+    }
+    const dot = (wx, wy, col, r) => { ctx.fillStyle = col; ctx.beginPath(); ctx.arc(x0 + (wx / TILE) * cell, y0 + (wy / TILE) * cell, r, 0, 6.28); ctx.fill(); };
+    for (const ch of this.chests) if (!ch.opened) dot(ch.x, ch.y, "#ffd36b", 2);
+    for (const en of this.enemies) { if (en.dead || en.dying) continue; dot(en.x, en.y, en.isBoss ? "#ff3bb0" : "#ff6b8a", en.isBoss ? 3 : 1.6); }
+    const p = this.player, pulse = 2.4 + Math.sin(this.time * 5) * 0.8;
+    dot(p.x, p.y, "#8dffb0", pulse);
   },
 
   };

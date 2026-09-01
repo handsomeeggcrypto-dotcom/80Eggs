@@ -710,7 +710,7 @@
       playerChar: charId, adventure: true, objective: "adventure",
       theme: "cloud",                                 // base tileset (no water/corruption features)
       biomes: ["cloud", "rooftop", "library", "meadow"],
-      cols: 40, rows: 28, packs: 7, chests: 6, title: "Adventure",
+      cols: 58, rows: 40, packs: 11, chests: 9, irregular: true, title: "Adventure",
     });
     NAP.go(NAP.scenes.dream, { config: cfg }, { type: "sleep", outDur: 1.0, inDur: 0.9 });
   };
