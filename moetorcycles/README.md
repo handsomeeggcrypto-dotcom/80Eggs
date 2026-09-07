@@ -69,7 +69,7 @@ through. They share one collision box (`HAZARDS` size bands in `game.js`); only
 the art differs (`o.kind`, drawn by `drawHazard*`): Neon City = crayon pillar,
 Countryside = hay bale, China City = red lantern stack, Crystal City = crystal
 spike, Tokyo Night = neon construction barricade, MoeMoe Land = red-ringed
-heart-eyes emoji.
+heart-eyes emoji, Glitch City = RGB-glitch traffic cone.
 
 ## Condition-unlocked maps
 
@@ -100,11 +100,15 @@ Permanent boosts bought with banked stars, on their own screen (⬆ UPGRADES on 
 select screen, or `T`; `Esc`/BACK to return). Four branches, each a chain you buy
 in order (`UPGRADES` array in `game.js`):
 
-- **Jump** — Triple Jump → Quad Jump
-- **Dash** — Long Dash → Quick Charge → Double Dash (two charges)
-- **Speed** — Cruiser (+base) → Overdrive (+top speed)
-- **Stars** — Star Magnet → Double Value
-- **Rescue** — Dustoff (survive 1 crash) → Reinforced (survive 2)
+- **Jump** — Triple Jump → Quad Jump → Feather Fall (gentler descent, longer hang) → Penta Jump
+- **Dash** — Long Dash → Quick Charge → Double Dash → Triple Dash (3 charges) → Overdash (longer + faster recharge)
+- **Speed** — Cruiser → Overdrive → Cruiser II → Overdrive II
+- **Stars** — Star Magnet → Double Value → Mag-Lev (bigger/stronger magnet) → Triple Value
+- **Rescue** — Dustoff (survive 1) → Reinforced (survive 2) → Full Squadron (survive 3)
+
+The upgrade screen lays out columns adaptively so the tallest branch always fits.
+Add a tier by appending a node to a branch's `nodes` and wiring its effect in
+`computeUpgrades()`.
 
 The **MOE Zedong Dustoff** shield: with a rescue charge, a crash triggers a
 helicopter (`assets/dustoff.png`) that swoops in, hooks the bike, carries it to
@@ -133,8 +137,10 @@ swatches/chips or use the arrow keys; the choice previews live behind the bike
 and is saved to localStorage.
 
 - Colors: `TRAIL_COLORS` in `game.js`. Styles: `TRAIL_DESIGNS` (`line`, `ribbon`,
-  `rainbow`, `dashed`, `bubbles`, `stars`, `curtain`, `air`); `rainbow` cycles hue
-  and ignores color; `curtain` is a bike-height banner; `air` is thin wind streaks.
+  `rainbow`, `dashed`, `bubbles`, `stars`, `curtain`, `air`, `soapbubbles`,
+  `glitch`); `rainbow` cycles hue and ignores color; `curtain` is a bike-height
+  banner; `air` is thin wind streaks; `glitch` is an RGB-split datamosh trail
+  (ignores color, draws cyan/magenta/white offsets + flickering blocks).
 - Add a color/style by appending to those arrays. New path styles slot into
   `drawTrail()`; the picker and preview pick them up automatically.
 
@@ -156,6 +162,14 @@ Some AI batches arrive on a **solid white background** (e.g. Bradley's action
 poses). `remove_white_bg` in the pipeline keys that out via a **border
 flood-fill** (so white *on* the bike is preserved) — pass it as `preprocess=` to
 `build_ride`. Frames that are already transparent pass through untouched.
+
+Others arrive fully opaque with a **transparency checkerboard baked into the
+pixels** (e.g. Glitch's wheelie & landing). Pass `preprocess=auto_key`: it skips
+already-transparent frames, and for opaque ones runs a border flood-fill plus
+`remove_checker_bg`, which removes the two-tone checker pattern — including
+pockets enclosed by the subject (wheel spokes, arm gaps) — while preserving
+solid subject whites (a pixel is background only if it's light-neutral with both
+checker tones within a small radius, so a lone white sneaker survives).
 
 The pipeline has two alignment modes (AI art framing varies between batches):
 

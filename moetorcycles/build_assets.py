@@ -56,6 +56,48 @@ def remove_white_bg(im, thresh=34):
     return im
 
 
+from PIL import ImageChops, ImageFilter
+
+
+def remove_checker_bg(im, radius=7):
+    """Key out a flattened transparency *checkerboard* (two light-grey tones
+    interleaved) — including pockets enclosed by the subject (wheel spokes, arm
+    gaps) that a border flood-fill can't reach. A pixel is treated as background
+    only if it's one of the two checker tones AND the *other* tone appears within
+    `radius` px — i.e. it's part of the fine two-tone pattern. Solid subject
+    whites (a sneaker, silver parts) are a single tone with no partner nearby, so
+    they're preserved."""
+    im = im.convert("RGBA")
+    r, g, b, a = im.split()
+    maxc = ImageChops.lighter(ImageChops.lighter(r, g), b)
+    minc = ImageChops.darker(ImageChops.darker(r, g), b)
+    neutral = ImageChops.subtract(maxc, minc).point(lambda p: 255 if p <= 12 else 0)
+    light = ImageChops.multiply(maxc.point(lambda p: 255 if p >= 228 else 0), neutral)
+    A = ImageChops.multiply(maxc.point(lambda p: 255 if p >= 249 else 0), neutral)  # ~254
+    B = ImageChops.multiply(maxc.point(lambda p: 255 if 231 <= p <= 243 else 0), neutral)  # ~237
+    mf = ImageFilter.MaxFilter(radius * 2 + 1)
+    both = ImageChops.multiply(A.filter(mf), B.filter(mf))        # both tones within radius
+    # a light-neutral pixel with BOTH checker tones nearby is background — the
+    # radius must exceed the checker square size so a mid-square pixel still sees
+    # its partner tone. Warm skin (not neutral) and dark outlines (not light) in
+    # the same gap are kept; solid subject whites have no grey partner nearby.
+    checker = ImageChops.multiply(light, both)
+    im.putalpha(ImageChops.subtract(a, checker))                  # zero alpha on checker
+    return im
+
+
+def auto_key(im):
+    """For frames that arrive fully opaque (no alpha) — a solid white bg or a
+    flattened transparency checkerboard baked into the pixels — key the
+    background out: a border flood-fill (bridges both checker tones / plain
+    white) plus a pattern pass for any checker pockets the flood can't reach.
+    Frames that already have transparency pass straight through untouched."""
+    im = im.convert("RGBA")
+    if im.split()[3].getextrema()[0] < 255:
+        return im  # already has transparency
+    return remove_checker_bg(remove_white_bg(im, thresh=62))
+
+
 def save(im, name):
     im.save(os.path.join(OUT, name))
     print(f"  {name:26s} {im.size}")
@@ -163,6 +205,18 @@ build_ride_aligned("designer", {
     "land":    "designer_landing_01.png",
     "crash":   "designer_crash_01.png",
 })
+
+# ===========================================================================
+#  RIDE: Glitch  (mixed canvas sizes -> aligned mode; wheelie & landing arrived
+#  as a flattened transparency checkerboard, keyed out by auto_key)
+# ===========================================================================
+build_ride_aligned("glitch", {
+    "ride":    "glitch_idle_01.png",
+    "wheelie": "glitch_wheelie_01.png",
+    "air":     "glitch_airborn_01.png",   # (source filename: "airborn")
+    "land":    "glitch_landing_01.png",
+    "crash":   "glitch_crash_01.png",
+}, preprocess=auto_key)
 
 # ---- MOE Zedong Dustoff (shield rescue helicopter) ----
 heli = load("skill_dustoff.png")

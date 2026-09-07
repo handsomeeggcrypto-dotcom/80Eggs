@@ -107,6 +107,22 @@ const RIDES = [
     },
     preview: "assets/player_designer_ride.png",
   },
+  {
+    id: "glitch",
+    name: "Glitch",
+    tagline: "Heaven's Gate. Reality not found.",
+    cost: 350,
+    scale: 1.5,
+    wheelFrac: 0.987,
+    frames: {
+      ride:    "assets/player_glitch_ride.png",
+      wheelie: "assets/player_glitch_wheelie.png",
+      air:     "assets/player_glitch_air.png",
+      land:    "assets/player_glitch_land.png",
+      crash:   "assets/player_glitch_crash.png",
+    },
+    preview: "assets/player_glitch_ride.png",
+  },
 ];
 
 /* ---------- Maps (selectable independently of the character) ----------
@@ -122,6 +138,7 @@ const MAPS = [
       { url: "assets/bg/tokyo_mid.png",  speed: 0.42 },
       { url: "assets/bg/tokyo_near.png", speed: 0.80 },
   ]},
+  { id: "glitch",  name: "Glitch City",  cost: 350, bg: bgSet("glitch"), road: "glitch", hazard: "cone" },
   // Secret meme level: unlocks once you own 4 characters (no star cost).
   { id: "moemoe",  name: "MoeMoe Land",  cost: 0, bg: bgSet("moemoe"), road: "moemoe", hazard: "emoji",
     req: () => unlockedCharCount() >= 4, reqText: "🔒 4 CHARS" },
@@ -136,6 +153,7 @@ const HAZARDS = {
   crystal:   { w: 58,  hMin: 78,  hMax: 128 },
   barricade: { w: 84,  hMin: 60,  hMax: 84  },
   emoji:     { w: 58,  hMin: 58,  hMax: 96  },
+  cone:      { w: 56,  hMin: 66,  hMax: 104 },
 };
 
 /* ---------- Asset loading (by URL, cached) ---------- */
@@ -195,6 +213,7 @@ const TRAIL_DESIGNS = [
   { id: "curtain", name: "Curtain",    cost: 70 }, // full bike-height banner
   { id: "air",     name: "Air Streams", cost: 50 }, // thin wind streaks
   { id: "soapbubbles", name: "Soap Bubbles", cost: 60 }, // hollow, glassy bubbles
+  { id: "glitch",  name: "Glitch",     cost: 70 }, // RGB-split datamosh streaks
 ];
 
 /* ---------- Currency + unlocks ----------
@@ -239,23 +258,32 @@ const UPGRADES = [
   { id: "jump", name: "Jump", icon: "🦘", nodes: [
     { id: "jump_triple", name: "Triple Jump", desc: "A 3rd mid-air jump", cost: 140 },
     { id: "jump_quad",   name: "Quad Jump",   desc: "A 4th mid-air jump", cost: 300 },
+    { id: "jump_float",  name: "Feather Fall", desc: "Float down gentler — longer hang", cost: 420 },
+    { id: "jump_penta",  name: "Penta Jump",  desc: "A 5th mid-air jump", cost: 650 },
   ]},
   { id: "dash", name: "Dash", icon: "💨", nodes: [
     { id: "dash_long",     name: "Long Dash",   desc: "Dash lasts 60% longer", cost: 130 },
     { id: "dash_recharge", name: "Quick Charge", desc: "Dash recharges faster", cost: 170 },
     { id: "dash_double",   name: "Double Dash",  desc: "Hold two dash charges", cost: 300 },
+    { id: "dash_triple",   name: "Triple Dash",  desc: "Hold three dash charges", cost: 480 },
+    { id: "dash_power",    name: "Overdash",     desc: "Dash even longer + faster recharge", cost: 560 },
   ]},
   { id: "speed", name: "Speed", icon: "⚡", nodes: [
-    { id: "speed_base", name: "Cruiser",   desc: "Higher starting speed", cost: 110 },
-    { id: "speed_cap",  name: "Overdrive", desc: "Higher top speed",      cost: 240 },
+    { id: "speed_base",  name: "Cruiser",    desc: "Higher starting speed", cost: 110 },
+    { id: "speed_cap",   name: "Overdrive",  desc: "Higher top speed",      cost: 240 },
+    { id: "speed_base2", name: "Cruiser II", desc: "Even higher starting speed", cost: 360 },
+    { id: "speed_cap2",  name: "Overdrive II", desc: "Even higher top speed", cost: 520 },
   ]},
   { id: "stars", name: "Stars", icon: "⭐", nodes: [
-    { id: "star_magnet", name: "Star Magnet", desc: "Pull in nearby stars", cost: 160 },
-    { id: "star_value",  name: "Double Value", desc: "Stars worth 2×",      cost: 260 },
+    { id: "star_magnet",  name: "Star Magnet", desc: "Pull in nearby stars", cost: 160 },
+    { id: "star_value",   name: "Double Value", desc: "Stars worth 2×",      cost: 260 },
+    { id: "star_magnet2", name: "Mag-Lev",      desc: "Bigger, stronger magnet", cost: 380 },
+    { id: "star_value3",  name: "Triple Value", desc: "Stars worth 3×",      cost: 560 },
   ]},
   { id: "rescue", name: "Rescue", icon: "🚁", nodes: [
-    { id: "shield_1", name: "Dustoff",  desc: "Survive 1 crash — airlift out", cost: 350 },
+    { id: "shield_1", name: "Dustoff",    desc: "Survive 1 crash — airlift out", cost: 350 },
     { id: "shield_2", name: "Reinforced", desc: "Survive 2 crashes per run",   cost: 600 },
+    { id: "shield_3", name: "Full Squadron", desc: "Survive 3 crashes per run", cost: 900 },
   ]},
 ];
 let upgrades = new Set();
@@ -274,15 +302,19 @@ function buyUp(node, available) {
 let up = {};
 function computeUpgrades() {
   up = {
-    maxJumps:  2 + (hasUp("jump_triple") ? 1 : 0) + (hasUp("jump_quad") ? 1 : 0),
-    dashTime:  0.42 * (hasUp("dash_long") ? 1.6 : 1),
-    dashCd:    0.9  * (hasUp("dash_recharge") ? 0.55 : 1),
-    dashMax:   hasUp("dash_double") ? 2 : 1,
-    speedStart: SPEED_START + (hasUp("speed_base") ? 90 : 0),
-    speedMax:   SPEED_MAX + (hasUp("speed_cap") ? 220 : 0),
+    maxJumps:  2 + (hasUp("jump_triple") ? 1 : 0) + (hasUp("jump_quad") ? 1 : 0)
+                 + (hasUp("jump_penta") ? 1 : 0),
+    fallMult:  hasUp("jump_float") ? 0.78 : 1,   // gentler descent = longer hang
+    dashTime:  0.42 * (hasUp("dash_long") ? 1.6 : 1) * (hasUp("dash_power") ? 1.3 : 1),
+    dashCd:    0.9  * (hasUp("dash_recharge") ? 0.55 : 1) * (hasUp("dash_power") ? 0.8 : 1),
+    dashMax:   hasUp("dash_triple") ? 3 : hasUp("dash_double") ? 2 : 1,
+    speedStart: SPEED_START + (hasUp("speed_base") ? 90 : 0) + (hasUp("speed_base2") ? 90 : 0),
+    speedMax:   SPEED_MAX + (hasUp("speed_cap") ? 220 : 0) + (hasUp("speed_cap2") ? 200 : 0),
     magnet:    hasUp("star_magnet"),
-    starValue: hasUp("star_value") ? 2 : 1,
-    shields:   (hasUp("shield_1") ? 1 : 0) + (hasUp("shield_2") ? 1 : 0),
+    magnetR:   hasUp("star_magnet2") ? 320 : 210,
+    magnetPull: hasUp("star_magnet2") ? 10 : 7,
+    starValue: hasUp("star_value3") ? 3 : hasUp("star_value") ? 2 : 1,
+    shields:   (hasUp("shield_1") ? 1 : 0) + (hasUp("shield_2") ? 1 : 0) + (hasUp("shield_3") ? 1 : 0),
   };
 }
 
@@ -699,8 +731,9 @@ function update(dt) {
   const jumpHeld = keys.Space || keys.ArrowUp || keys.KeyW || touchJumpHeld;
   if (!jumpHeld && player.jumpGrace <= 0 && player.vy < 0) player.vy *= Math.pow(JUMP_CUT, dt * 60);
 
-  // physics
-  player.vy = Math.min(player.vy + GRAVITY * dt, MAX_FALL);
+  // physics (Feather Fall upgrade softens the descent for a longer hang)
+  const grav = GRAVITY * (player.vy > 0 ? up.fallMult : 1);
+  player.vy = Math.min(player.vy + grav * dt, MAX_FALL);
   player.y += player.vy * dt;
 
   // ground collision (feet at player.y + PLAYER_H)
@@ -747,7 +780,9 @@ function update(dt) {
     // Star Magnet upgrade: pull nearby stars toward the rider
     if (up.magnet) {
       const wdx = (distance + pcx) - s.x, wdy = pcy - s.y;
-      if (wdx * wdx + wdy * wdy < 210 * 210) { s.x += wdx * 7 * dt; s.y += wdy * 7 * dt; }
+      if (wdx * wdx + wdy * wdy < up.magnetR * up.magnetR) {
+        s.x += wdx * up.magnetPull * dt; s.y += wdy * up.magnetPull * dt;
+      }
     }
     const sx = s.x - distance;
     if (Math.abs(sx - pcx) < 55 && Math.abs(s.y - pcy) < 70) {
@@ -1117,6 +1152,7 @@ function drawRoad(x, topY, w, worldX) {
   else if (style === "crystal") drawRoadCrystal(x, topY, w, worldX);
   else if (style === "tokyo") drawRoadTokyo(x, topY, w, worldX);
   else if (style === "moemoe") drawRoadMoe(x, topY, w, worldX);
+  else if (style === "glitch") drawRoadGlitch(x, topY, w, worldX);
   else drawRoadNeon(x, topY, w, worldX);
 }
 
@@ -1349,6 +1385,65 @@ function drawRoadMoe(x, topY, w, worldX) {
   ctx.restore();
 }
 
+// Glitch City: dark asphalt with an RGB-split neon curb and scrolling datamosh
+// streaks (chromatic-aberration bars) that flicker — matches the glitchy scene.
+function drawRoadGlitch(x, topY, w, worldX) {
+  const botY = roadBottom(topY);
+  ctx.save();
+  ctx.fillStyle = "rgba(4,2,10,0.7)";
+  ctx.fillRect(x - 2, topY - 10, w + 4, 10);
+
+  const body = ctx.createLinearGradient(0, topY, 0, botY);
+  body.addColorStop(0, "#141021");
+  body.addColorStop(0.14, "#0c0918");
+  body.addColorStop(1, "#04030a");
+  ctx.fillStyle = body;
+  ctx.fillRect(x, topY, w, botY - topY);
+
+  // scrolling datamosh streaks: short chromatic bars offset in R/C, flickering
+  ctx.save();
+  ctx.beginPath(); ctx.rect(x, topY, w, botY - topY); ctx.clip();
+  const per = 90;
+  const start = worldX - ((worldX % per) + per) % per;
+  for (let d = start; d < worldX + w + per; d += per) {
+    const h1 = Math.sin(d * 12.9) * 43758.5; const r1 = h1 - Math.floor(h1);
+    const h2 = Math.sin(d * 7.7) * 1273.1;   const r2 = h2 - Math.floor(h2);
+    // flicker: each bar blinks on/off over time
+    if (((Math.floor(t * 8) + Math.floor(d)) % 3) === 0) continue;
+    const sx = d - worldX + x + r2 * 30;
+    const sy = topY + 14 + r1 * Math.max(10, botY - topY - 20);
+    const bw = 26 + r2 * 60, bh = 3 + Math.floor(r1 * 3);
+    ctx.globalAlpha = 0.5;
+    ctx.fillStyle = "#00e5ff"; ctx.fillRect(sx - 3, sy, bw, bh);       // cyan
+    ctx.fillStyle = "#ff2bd6"; ctx.fillRect(sx + 3, sy, bw, bh);       // magenta
+    ctx.globalAlpha = 0.8;
+    ctx.fillStyle = "rgba(230,230,255,0.9)"; ctx.fillRect(sx, sy, bw, bh);
+  }
+  ctx.globalAlpha = 1;
+  ctx.restore();
+
+  // RGB-split neon curb (magenta + cyan offset) with a white top line
+  ctx.fillStyle = "rgba(255,43,214,0.9)"; ctx.fillRect(x - 2, topY, w + 4, 8);
+  ctx.fillStyle = "rgba(0,229,255,0.8)";  ctx.fillRect(x + 2, topY + 2, w, 6);
+  ctx.fillStyle = "rgba(255,255,255,0.95)"; ctx.fillRect(x, topY, w, 2);
+
+  // scrolling dashed centre line, occasionally jittered
+  const dashY = topY + 34, dashW = 44, gap = 44, period = dashW + gap;
+  const s2 = worldX - ((worldX % period) + period) % period;
+  for (let d = s2; d < worldX + w + period; d += period) {
+    const j = (((Math.floor(t * 10) + Math.floor(d / period)) % 4) === 0) ? 6 : 0; // jitter
+    const sx = d - worldX + x;
+    const clipL = Math.max(sx, x), clipR = Math.min(sx + dashW, x + w);
+    if (clipR > clipL) {
+      ctx.fillStyle = j ? "#00e5ff" : "rgba(200,200,230,0.8)";
+      ctx.fillRect(clipL, dashY + j, clipR - clipL, 5);
+    }
+  }
+
+  drawPlatformUnderside(x, topY, w, botY);
+  ctx.restore();
+}
+
 // Countryside: packed dirt / gravel — earthy body, grassy fringe, scattered
 // pebbles + wheel ruts (all positioned by world-x so they scroll, no flicker).
 function drawRoadDirt(x, topY, w, worldX) {
@@ -1457,8 +1552,64 @@ function drawObstacle(x, o) {
     case "crystal":   return drawHazardCrystal(x, o);
     case "barricade": return drawHazardBarricade(x, o);
     case "emoji":     return drawHazardEmoji(x, o);
+    case "cone":      return drawHazardCone(x, o);
     default:          return drawHazardCrayon(x, o);
   }
+}
+
+// Glitch City: a traffic cone with reflective bands and an RGB-glitch shimmer.
+function drawHazardCone(x, o) {
+  const oTop = o.top - o.h, cx = x + o.w / 2;
+  const tipW = o.w * 0.22, baseW = o.w;
+  ctx.save();
+  // occasional chromatic-split ghost of the cone (glitch flicker)
+  if ((Math.floor(t * 9) % 4) === 0) {
+    const off = 5;
+    const ghost = (dx, col) => {
+      ctx.fillStyle = col;
+      ctx.beginPath();
+      ctx.moveTo(cx + dx, oTop);
+      ctx.lineTo(cx + baseW / 2 * 0.9 + dx, o.top);
+      ctx.lineTo(cx - baseW / 2 * 0.9 + dx, o.top);
+      ctx.closePath(); ctx.fill();
+    };
+    ctx.globalAlpha = 0.35; ghost(-off, "#00e5ff"); ghost(off, "#ff2bd6");
+    ctx.globalAlpha = 1;
+  }
+  // white halo + dark base shadow for legibility
+  ctx.shadowColor = "rgba(255,120,0,0.6)"; ctx.shadowBlur = 14;
+  ctx.fillStyle = "#fff";
+  ctx.beginPath();
+  ctx.moveTo(cx, oTop - 4);
+  ctx.lineTo(cx + baseW / 2 + 3, o.top + 2);
+  ctx.lineTo(cx - baseW / 2 - 3, o.top + 2);
+  ctx.closePath(); ctx.fill();
+  ctx.shadowBlur = 0;
+  // orange cone body
+  const g = ctx.createLinearGradient(cx - baseW / 2, 0, cx + baseW / 2, 0);
+  g.addColorStop(0, "#c74a00"); g.addColorStop(0.5, "#ff7a1a"); g.addColorStop(1, "#c74a00");
+  ctx.fillStyle = g;
+  ctx.beginPath();
+  ctx.moveTo(cx, oTop);
+  ctx.lineTo(cx + baseW / 2, o.top);
+  ctx.lineTo(cx - baseW / 2, o.top);
+  ctx.closePath(); ctx.fill();
+  ctx.lineWidth = 2.5; ctx.strokeStyle = "#3a1500"; ctx.stroke();
+  // two reflective white bands (trapezoids following the cone taper)
+  const band = (fy, hh) => {
+    const y0 = oTop + o.h * fy, y1 = y0 + hh;
+    const wAt = (yy) => tipW + (baseW - tipW) * ((yy - oTop) / o.h);
+    ctx.fillStyle = "rgba(255,255,255,0.92)";
+    ctx.beginPath();
+    ctx.moveTo(cx - wAt(y0) / 2, y0); ctx.lineTo(cx + wAt(y0) / 2, y0);
+    ctx.lineTo(cx + wAt(y1) / 2, y1); ctx.lineTo(cx - wAt(y1) / 2, y1);
+    ctx.closePath(); ctx.fill();
+  };
+  band(0.34, o.h * 0.1); band(0.56, o.h * 0.12);
+  // base slab
+  ctx.fillStyle = "#1a0a00";
+  ctx.fillRect(cx - baseW / 2 - 3, o.top - 4, baseW + 6, 5);
+  ctx.restore();
 }
 
 // MoeMoe Land: a stack of kawaii heart-eyes emoji faces (the scene's mascots).
@@ -1769,6 +1920,36 @@ function drawTrail(pts) {
       ctx.shadowColor = colCss; ctx.shadowBlur = 6;
       ctx.lineWidth = 2.2;
       ctx.stroke();
+    }
+    ctx.restore();
+    return;
+  }
+
+  if (design === "glitch") {
+    // RGB-split datamosh: the path drawn thrice (cyan / magenta / white) with
+    // per-point jitter, plus flickering chromatic blocks. Ignores trail colour.
+    const drawOffset = (dx, col, alpha) => {
+      ctx.beginPath();
+      for (let i = 0; i < len; i++) {
+        const jit = ((Math.floor(t * 12) + i) % 5 === 0) ? rand(-4, 4) : 0;
+        const px = pts[i].x + dx, py = pts[i].y + jit;
+        if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+      }
+      ctx.strokeStyle = col; ctx.globalAlpha = alpha;
+      ctx.shadowColor = col; ctx.shadowBlur = 8; ctx.lineWidth = 7;
+      ctx.stroke();
+    };
+    drawOffset(-4, "#00e5ff", 0.6);
+    drawOffset(4, "#ff2bd6", 0.6);
+    drawOffset(0, "rgba(230,230,255,0.92)", 0.85);
+    ctx.shadowBlur = 0;
+    for (let i = 0; i < len; i += 5) {
+      if (((Math.floor(t * 10) + i) % 4) !== 0) continue;
+      const p = pts[i], tp = taper(i / len);
+      const bw = 10 + Math.random() * 26, bh = 3 + Math.random() * 5;
+      ctx.globalAlpha = 0.5 * tp;
+      ctx.fillStyle = Math.random() < 0.5 ? "#00e5ff" : "#ff2bd6";
+      ctx.fillRect(p.x - bw / 2 + rand(-5, 5), p.y - bh / 2, bw, bh);
     }
     ctx.restore();
     return;
@@ -2095,16 +2276,20 @@ function drawUpgradeTree() {
   uiHits.upnodes.length = 0;
 
   const N = UPGRADES.length;
-  const nodeW = N > 4 ? 206 : 220, nodeH = 104, spacing = 150, top = 214;
+  // adaptive vertical layout so the tallest branch always fits above the BACK button
+  const maxNodes = Math.max(...UPGRADES.map((c) => c.nodes.length));
+  const nodeW = N > 4 ? 206 : 220, nodeH = maxNodes >= 5 ? 80 : 100;
+  const top = 172, bottomLimit = H * 0.875;
+  const spacing = maxNodes > 1 ? Math.min(150, (bottomLimit - nodeH / 2 - top) / (maxNodes - 1)) : 150;
   const colGap = Math.min(300, (W - nodeW - 40) / (N - 1));
   for (let c = 0; c < N; c++) {
     const cat = UPGRADES[c];
     const cxs = W / 2 + (c - (N - 1) / 2) * colGap;
     ctx.save();
     ctx.textAlign = "center"; ctx.textBaseline = "middle";
-    ctx.font = "30px system-ui, sans-serif"; ctx.fillText(cat.icon, cxs, 118);
-    ctx.font = "bold 20px Trebuchet MS, sans-serif"; ctx.fillStyle = "#fff";
-    ctx.fillText(cat.name.toUpperCase(), cxs, 148);
+    ctx.font = "28px system-ui, sans-serif"; ctx.fillText(cat.icon, cxs, 104);
+    ctx.font = "bold 19px Trebuchet MS, sans-serif"; ctx.fillStyle = "#fff";
+    ctx.fillText(cat.name.toUpperCase(), cxs, 132);
     ctx.restore();
 
     for (let n = 0; n < cat.nodes.length; n++) {
@@ -2131,15 +2316,15 @@ function drawUpgradeTree() {
 
       ctx.textAlign = "center"; ctx.textBaseline = "alphabetic";
       ctx.fillStyle = owned ? "#eafff0" : available ? "#fff" : "rgba(255,255,255,0.5)";
-      ctx.font = "bold 18px Trebuchet MS, sans-serif";
-      ctx.fillText(node.name, cxs, ny + 30);
-      ctx.font = "13px Trebuchet MS, sans-serif";
+      ctx.font = "bold 17px Trebuchet MS, sans-serif";
+      ctx.fillText(node.name, cxs, ny + nodeH * 0.30);
+      ctx.font = "12px Trebuchet MS, sans-serif";
       ctx.fillStyle = owned ? "rgba(255,255,255,0.7)" : available ? "rgba(255,255,255,0.78)" : "rgba(255,255,255,0.4)";
-      ctx.fillText(node.desc, cxs, ny + 52);
-      ctx.font = "bold 15px Trebuchet MS, sans-serif";
-      if (owned) { ctx.fillStyle = "#7dff9b"; ctx.fillText("✓ OWNED", cxs, ny + 82); }
-      else if (available) { ctx.fillStyle = bank >= node.cost ? "#ffe066" : "#ff8a94"; ctx.fillText(`${node.cost} 🌟`, cxs, ny + 84); }
-      else { ctx.fillStyle = "rgba(255,255,255,0.4)"; ctx.fillText(`🔒 ${node.cost} 🌟`, cxs, ny + 84); }
+      ctx.fillText(node.desc, cxs, ny + nodeH * 0.52);
+      ctx.font = "bold 14px Trebuchet MS, sans-serif";
+      if (owned) { ctx.fillStyle = "#7dff9b"; ctx.fillText("✓ OWNED", cxs, ny + nodeH * 0.82); }
+      else if (available) { ctx.fillStyle = bank >= node.cost ? "#ffe066" : "#ff8a94"; ctx.fillText(`${node.cost} 🌟`, cxs, ny + nodeH * 0.84); }
+      else { ctx.fillStyle = "rgba(255,255,255,0.4)"; ctx.fillText(`🔒 ${node.cost} 🌟`, cxs, ny + nodeH * 0.84); }
       ctx.restore();
 
       uiHits.upnodes.push({ x: nx, y: ny, w: nodeW, h: nodeH, node, available });
