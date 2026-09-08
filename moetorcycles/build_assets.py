@@ -218,6 +218,18 @@ build_ride_aligned("glitch", {
     "crash":   "glitch_crash_01.png",
 }, preprocess=auto_key)
 
+# ===========================================================================
+#  RIDE: Squish  (all poses share one 1254² canvas at a consistent scale, and
+#  all frames are already transparent -> shared-crop keeps the bike registered)
+# ===========================================================================
+build_ride("squish", {
+    "ride":    "squish_idle_01.png",
+    "wheelie": "squish_wheelie_01.png",
+    "air":     "squish_airborn_01.png",   # (source filename: "airborn")
+    "land":    "squish_landing_01.png",
+    "crash":   "squish_crash_01.png",
+}, preprocess=auto_key)
+
 # ---- MOE Zedong Dustoff (shield rescue helicopter) ----
 heli = load("skill_dustoff.png")
 save(heli.crop(content_bbox(heli, 30)), "dustoff.png")

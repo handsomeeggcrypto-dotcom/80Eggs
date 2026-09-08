@@ -123,6 +123,22 @@ const RIDES = [
     },
     preview: "assets/player_glitch_ride.png",
   },
+  {
+    id: "squish",
+    name: "Squish",
+    tagline: "Send in the clowns. Ride the wreck.",
+    cost: 350,
+    scale: 1.5,
+    wheelFrac: 0.99,
+    frames: {
+      ride:    "assets/player_squish_ride.png",
+      wheelie: "assets/player_squish_wheelie.png",
+      air:     "assets/player_squish_air.png",
+      land:    "assets/player_squish_land.png",
+      crash:   "assets/player_squish_crash.png",
+    },
+    preview: "assets/player_squish_ride.png",
+  },
 ];
 
 /* ---------- Maps (selectable independently of the character) ----------
@@ -139,6 +155,7 @@ const MAPS = [
       { url: "assets/bg/tokyo_near.png", speed: 0.80 },
   ]},
   { id: "glitch",  name: "Glitch City",  cost: 350, bg: bgSet("glitch"), road: "glitch", hazard: "cone" },
+  { id: "circus",  name: "Haunted Circus", cost: 350, bg: bgSet("circus"), road: "circus", hazard: "barrel" },
   // Secret meme level: unlocks once you own 4 characters (no star cost).
   { id: "moemoe",  name: "MoeMoe Land",  cost: 0, bg: bgSet("moemoe"), road: "moemoe", hazard: "emoji",
     req: () => unlockedCharCount() >= 4, reqText: "🔒 4 CHARS" },
@@ -154,6 +171,7 @@ const HAZARDS = {
   barricade: { w: 84,  hMin: 60,  hMax: 84  },
   emoji:     { w: 58,  hMin: 58,  hMax: 96  },
   cone:      { w: 56,  hMin: 66,  hMax: 104 },
+  barrel:    { w: 66,  hMin: 72,  hMax: 104 },
 };
 
 /* ---------- Asset loading (by URL, cached) ---------- */
@@ -214,6 +232,7 @@ const TRAIL_DESIGNS = [
   { id: "air",     name: "Air Streams", cost: 50 }, // thin wind streaks
   { id: "soapbubbles", name: "Soap Bubbles", cost: 60 }, // hollow, glassy bubbles
   { id: "glitch",  name: "Glitch",     cost: 70 }, // RGB-split datamosh streaks
+  { id: "bunting", name: "Circus Flags", cost: 60 }, // triangular pennant bunting
 ];
 
 /* ---------- Currency + unlocks ----------
@@ -1153,6 +1172,7 @@ function drawRoad(x, topY, w, worldX) {
   else if (style === "tokyo") drawRoadTokyo(x, topY, w, worldX);
   else if (style === "moemoe") drawRoadMoe(x, topY, w, worldX);
   else if (style === "glitch") drawRoadGlitch(x, topY, w, worldX);
+  else if (style === "circus") drawRoadCircus(x, topY, w, worldX);
   else drawRoadNeon(x, topY, w, worldX);
 }
 
@@ -1444,6 +1464,72 @@ function drawRoadGlitch(x, topY, w, worldX) {
   ctx.restore();
 }
 
+// Haunted Circus: dark carnival ground, warm amber underglow, a red+cream
+// candy-stripe curb, a strand of glowing string-lights, and scrolling gold stars.
+function drawRoadCircus(x, topY, w, worldX) {
+  const botY = roadBottom(topY);
+  ctx.save();
+  ctx.fillStyle = "rgba(6,2,4,0.7)";
+  ctx.fillRect(x - 2, topY - 10, w + 4, 10);
+
+  const body = ctx.createLinearGradient(0, topY, 0, botY);
+  body.addColorStop(0, "#2a0f14");
+  body.addColorStop(0.14, "#1a0a0e");
+  body.addColorStop(1, "#070305");
+  ctx.fillStyle = body;
+  ctx.fillRect(x, topY, w, botY - topY);
+
+  // warm amber glow just under the surface
+  const glow = ctx.createLinearGradient(0, topY, 0, topY + 40);
+  glow.addColorStop(0, "rgba(255,150,40,0.28)");
+  glow.addColorStop(1, "rgba(255,120,30,0)");
+  ctx.fillStyle = glow;
+  ctx.fillRect(x, topY + 3, w, 40);
+
+  // red + cream candy-stripe curb (diagonal circus stripes), clipped to a band
+  ctx.save();
+  ctx.beginPath(); ctx.rect(x, topY, w, 10); ctx.clip();
+  const sw = 16, period = sw * 2;
+  const start = worldX - ((worldX % period) + period) % period;
+  for (let d = start; d < worldX + w + period; d += period) {
+    const sx = d - worldX + x;
+    ctx.fillStyle = "#d81f3a"; ctx.beginPath();
+    ctx.moveTo(sx, topY); ctx.lineTo(sx + sw, topY); ctx.lineTo(sx + sw - 10, topY + 10); ctx.lineTo(sx - 10, topY + 10);
+    ctx.closePath(); ctx.fill();
+    ctx.fillStyle = "#f6e6c8"; ctx.beginPath();
+    ctx.moveTo(sx + sw, topY); ctx.lineTo(sx + sw * 2, topY); ctx.lineTo(sx + sw * 2 - 10, topY + 10); ctx.lineTo(sx + sw - 10, topY + 10);
+    ctx.closePath(); ctx.fill();
+  }
+  ctx.restore();
+  ctx.fillStyle = "rgba(255,240,200,0.9)"; ctx.fillRect(x, topY, w, 2);
+
+  // strand of glowing string-lights sagging just below the curb
+  const lper = 46;
+  const ls = worldX - ((worldX % lper) + lper) % lper;
+  const lcols = ["#ffd23f", "#ff5bd0", "#7dff9b", "#5bc8ff"];
+  for (let d = ls; d < worldX + w + lper; d += lper) {
+    const sx = d - worldX + x;
+    if (sx < x || sx > x + w) continue;
+    const ly = topY + 16 + Math.sin(d * 0.09) * 3;
+    const c = lcols[Math.floor(Math.abs(d / lper)) % lcols.length];
+    ctx.shadowColor = c; ctx.shadowBlur = 8;
+    ctx.fillStyle = c; ctx.beginPath(); ctx.arc(sx, ly, 2.6, 0, Math.PI * 2); ctx.fill();
+  }
+  ctx.shadowBlur = 0;
+
+  // scrolling gold star dashes down the centre
+  const dY = topY + 40, dper = 118;
+  const s2 = worldX - ((worldX % dper) + dper) % dper;
+  for (let d = s2; d < worldX + w + dper; d += dper) {
+    const sx = d - worldX + x;
+    if (sx < x + 8 || sx > x + w - 8) continue;
+    sparkle(sx, dY, 9, 0, "#ffcf33");
+  }
+
+  drawPlatformUnderside(x, topY, w, botY);
+  ctx.restore();
+}
+
 // Countryside: packed dirt / gravel — earthy body, grassy fringe, scattered
 // pebbles + wheel ruts (all positioned by world-x so they scroll, no flicker).
 function drawRoadDirt(x, topY, w, worldX) {
@@ -1553,8 +1639,59 @@ function drawObstacle(x, o) {
     case "barricade": return drawHazardBarricade(x, o);
     case "emoji":     return drawHazardEmoji(x, o);
     case "cone":      return drawHazardCone(x, o);
+    case "barrel":    return drawHazardBarrel(x, o);
     default:          return drawHazardCrayon(x, o);
   }
+}
+
+// Haunted Circus: a red/cream striped barrel with metal hoops and a spooky-cute
+// face, ringed by a soft amber glow so it reads on the dark carnival ground.
+function drawHazardBarrel(x, o) {
+  const oTop = o.top - o.h, cx = x + o.w / 2;
+  const r = o.w / 2, bulge = 5;
+  ctx.save();
+  ctx.shadowColor = "rgba(255,160,40,0.6)"; ctx.shadowBlur = 16;
+  // white halo silhouette for legibility
+  ctx.fillStyle = "#fff";
+  roundRect(x - 3, oTop - 3, o.w + 6, o.h + 6, 12, true);
+  ctx.shadowBlur = 0;
+  // barrel body (clip a slightly barrel-shaped rounded rect)
+  ctx.save();
+  ctx.beginPath(); roundRect(x, oTop, o.w, o.h, 10, false); ctx.clip();
+  // vertical red/cream circus staves
+  const sw = 13;
+  for (let i = 0; i * sw < o.w + sw; i++) {
+    ctx.fillStyle = (i % 2 === 0) ? "#c11a30" : "#efdcbb";
+    ctx.fillRect(x + i * sw, oTop, sw, o.h);
+  }
+  // shading for roundness
+  const sh = ctx.createLinearGradient(x, 0, x + o.w, 0);
+  sh.addColorStop(0, "rgba(0,0,0,0.35)"); sh.addColorStop(0.5, "rgba(255,255,255,0.12)");
+  sh.addColorStop(1, "rgba(0,0,0,0.4)");
+  ctx.fillStyle = sh; ctx.fillRect(x, oTop, o.w, o.h);
+  ctx.restore();
+  // dark outline + metal hoops
+  ctx.lineWidth = 2.5; ctx.strokeStyle = "#2a0d10";
+  roundRect(x, oTop, o.w, o.h, 10, false); ctx.stroke();
+  ctx.fillStyle = "#8a8f99";
+  ctx.fillRect(x, oTop + o.h * 0.16, o.w, 5);
+  ctx.fillRect(x, oTop + o.h * 0.78, o.w, 5);
+  ctx.fillStyle = "rgba(255,255,255,0.35)";
+  ctx.fillRect(x, oTop + o.h * 0.16, o.w, 2);
+  // spooky-cute face
+  const fy = oTop + o.h * 0.5;
+  for (const s of [-1, 1]) {
+    const ex = cx + s * r * 0.42;
+    ctx.fillStyle = "#160306";
+    ctx.beginPath(); ctx.ellipse(ex, fy, r * 0.2, r * 0.3, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = "#fff";
+    ctx.beginPath(); ctx.arc(ex - r * 0.07, fy - r * 0.12, r * 0.08, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = "rgba(255,110,140,0.6)"; // blush
+    ctx.beginPath(); ctx.ellipse(ex, fy + r * 0.34, r * 0.14, r * 0.09, 0, 0, Math.PI * 2); ctx.fill();
+  }
+  ctx.lineWidth = 2.5; ctx.strokeStyle = "#2a0d10"; ctx.lineCap = "round"; // little frown
+  ctx.beginPath(); ctx.arc(cx, fy + r * 0.66, r * 0.26, 1.2 * Math.PI, 1.8 * Math.PI); ctx.stroke();
+  ctx.restore();
 }
 
 // Glitch City: a traffic cone with reflective bands and an RGB-glitch shimmer.
@@ -1921,6 +2058,36 @@ function drawTrail(pts) {
       ctx.lineWidth = 2.2;
       ctx.stroke();
     }
+    ctx.restore();
+    return;
+  }
+
+  if (design === "bunting") {
+    // a swagged string with triangular pennant flags in circus colours, hung
+    // along the trail path and fluttering. Ignores trail colour.
+    const flagCols = ["#ff3b5c", "#ffcf33", "#ff5bd0", "#5bc8ff", "#7dff9b"];
+    // the string
+    ctx.beginPath();
+    for (let i = 0; i < len; i++) {
+      const sy = pts[i].y - 10 + Math.sin(pts[i].x * 0.05 + t * 6) * 3;
+      if (i === 0) ctx.moveTo(pts[i].x, sy); else ctx.lineTo(pts[i].x, sy);
+    }
+    ctx.strokeStyle = "rgba(255,240,210,0.8)"; ctx.lineWidth = 2; ctx.stroke();
+    // pennants hanging from the string
+    for (let i = 0; i < len; i += 5) {
+      const f = i / len, tp = taper(f);
+      const px = pts[i].x;
+      const py = pts[i].y - 10 + Math.sin(px * 0.05 + t * 6) * 3;
+      const flutter = Math.sin(px * 0.08 + t * 7) * 3;
+      const fw = 13, fh = 18 * (0.5 + 0.5 * tp);
+      ctx.globalAlpha = 0.3 + 0.7 * tp;
+      ctx.fillStyle = flagCols[Math.floor(Math.abs(px / 18)) % flagCols.length];
+      ctx.beginPath();
+      ctx.moveTo(px - fw / 2, py); ctx.lineTo(px + fw / 2, py);
+      ctx.lineTo(px + flutter, py + fh);
+      ctx.closePath(); ctx.fill();
+    }
+    ctx.globalAlpha = 1;
     ctx.restore();
     return;
   }
@@ -2400,7 +2567,9 @@ function drawCharacterCard() {
 
 function drawMapRow() {
   centerText("MAP", H * 0.475, 16, "rgba(255,255,255,0.8)");
-  const cardW = 152, cardH = 62, gap = 20, y = H * 0.495;
+  // adaptive card width so the whole row always fits (shrinks as maps are added)
+  const gap = 12, cardH = 62, y = H * 0.495, avail = W - 40;
+  const cardW = Math.min(152, (avail - (MAPS.length - 1) * gap) / MAPS.length);
   const total = MAPS.length * cardW + (MAPS.length - 1) * gap;
   const x0 = W / 2 - total / 2;
   for (let i = 0; i < MAPS.length; i++) {
@@ -2461,33 +2630,47 @@ function drawTrailPickers() {
     uiHits.swatches.push({ x: cxs, y: sy, r: sr + 8, i, locked, key: "tc:" + i, cost: TRAIL_COLORS[i].cost });
   }
 
-  // ---- styles ----
-  centerText("TRAIL STYLE", H * 0.71, 16, "rgba(255,255,255,0.8)");
-  const chipY = H * 0.745, chipH = 38, pad = 16, gap = 11;
-  ctx.font = "bold 17px Trebuchet MS, sans-serif";
-  const widths = TRAIL_DESIGNS.map(d => ctx.measureText(d.name).width + pad * 2 + (isUnlocked("ts:" + TRAIL_DESIGNS.indexOf(d), d.cost) ? 0 : 22));
-  const totalW = widths.reduce((a, b) => a + b, 0) + gap * (TRAIL_DESIGNS.length - 1);
-  let cxp = W / 2 - totalW / 2;
+  // ---- styles (wrap into as many centered rows as it takes to fit the width) ----
+  centerText("TRAIL STYLE", H * 0.70, 16, "rgba(255,255,255,0.8)");
+  const chipH = 34, pad = 14, gap = 10, rowGap = 8, avail = W - 40;
+  ctx.font = "bold 16px Trebuchet MS, sans-serif";
+  const label = (i) => isUnlocked("ts:" + i, TRAIL_DESIGNS[i].cost)
+    ? TRAIL_DESIGNS[i].name : `${TRAIL_DESIGNS[i].name} 🔒${TRAIL_DESIGNS[i].cost}`;
+  const chipW = TRAIL_DESIGNS.map((d, i) => ctx.measureText(label(i)).width + pad * 2);
+  const rows = [[]];
+  let rw = 0;
   for (let i = 0; i < TRAIL_DESIGNS.length; i++) {
-    const cw = widths[i], on = i === selTrailDesign;
-    const locked = !isUnlocked("ts:" + i, TRAIL_DESIGNS[i].cost);
-    ctx.save();
-    ctx.fillStyle = on ? "rgba(125,255,155,0.22)" : "rgba(255,255,255,0.06)";
-    ctx.strokeStyle = on ? "#7dff9b" : "rgba(255,255,255,0.25)";
-    ctx.lineWidth = on ? 3 : 1.5;
-    roundRect(cxp, chipY, cw, chipH, chipH / 2, true); ctx.stroke();
-    ctx.fillStyle = locked ? "rgba(255,255,255,0.55)" : (on ? "#eafff0" : "rgba(255,255,255,0.8)");
-    ctx.font = "bold 17px Trebuchet MS, sans-serif";
-    ctx.textAlign = "center"; ctx.textBaseline = "middle";
-    const label = locked ? `${TRAIL_DESIGNS[i].name} 🔒${TRAIL_DESIGNS[i].cost}` : TRAIL_DESIGNS[i].name;
-    ctx.fillText(label, cxp + cw / 2, chipY + chipH / 2 + 1);
-    ctx.restore();
-    uiHits.chips.push({ x: cxp, y: chipY, w: cw, h: chipH, i, locked, key: "ts:" + i, cost: TRAIL_DESIGNS[i].cost });
-    cxp += cw + gap;
+    const cur = rows[rows.length - 1];
+    const add = (cur.length ? gap : 0) + chipW[i];
+    if (cur.length && rw + add > avail) { rows.push([]); rw = 0; }
+    rows[rows.length - 1].push(i);
+    rw += (rows[rows.length - 1].length > 1 ? gap : 0) + chipW[i];
+  }
+  let chipY = H * 0.735;
+  for (const row of rows) {
+    const tw = row.reduce((a, i) => a + chipW[i], 0) + gap * (row.length - 1);
+    let cxp = W / 2 - tw / 2;
+    for (const i of row) {
+      const cw = chipW[i], on = i === selTrailDesign;
+      const locked = !isUnlocked("ts:" + i, TRAIL_DESIGNS[i].cost);
+      ctx.save();
+      ctx.fillStyle = on ? "rgba(125,255,155,0.22)" : "rgba(255,255,255,0.06)";
+      ctx.strokeStyle = on ? "#7dff9b" : "rgba(255,255,255,0.25)";
+      ctx.lineWidth = on ? 3 : 1.5;
+      roundRect(cxp, chipY, cw, chipH, chipH / 2, true); ctx.stroke();
+      ctx.fillStyle = locked ? "rgba(255,255,255,0.55)" : (on ? "#eafff0" : "rgba(255,255,255,0.8)");
+      ctx.font = "bold 16px Trebuchet MS, sans-serif";
+      ctx.textAlign = "center"; ctx.textBaseline = "middle";
+      ctx.fillText(label(i), cxp + cw / 2, chipY + chipH / 2 + 1);
+      ctx.restore();
+      uiHits.chips.push({ x: cxp, y: chipY, w: cw, h: chipH, i, locked, key: "ts:" + i, cost: TRAIL_DESIGNS[i].cost });
+      cxp += cw + gap;
+    }
+    chipY += chipH + rowGap;
   }
 
   const hint = "←/→ character   ↑/↓ style   C = color   ·  tap locked items to unlock";
-  centerText(hint, H * 0.83, 14, "rgba(255,255,255,0.5)");
+  centerText(hint, H * 0.87, 14, "rgba(255,255,255,0.5)");
 }
 
 function drawChevron(cx, cy, dir) {

@@ -69,7 +69,8 @@ through. They share one collision box (`HAZARDS` size bands in `game.js`); only
 the art differs (`o.kind`, drawn by `drawHazard*`): Neon City = crayon pillar,
 Countryside = hay bale, China City = red lantern stack, Crystal City = crystal
 spike, Tokyo Night = neon construction barricade, MoeMoe Land = red-ringed
-heart-eyes emoji, Glitch City = RGB-glitch traffic cone.
+heart-eyes emoji, Glitch City = RGB-glitch traffic cone, Haunted Circus =
+spooky-cute striped barrel.
 
 ## Condition-unlocked maps
 
@@ -138,9 +139,12 @@ and is saved to localStorage.
 
 - Colors: `TRAIL_COLORS` in `game.js`. Styles: `TRAIL_DESIGNS` (`line`, `ribbon`,
   `rainbow`, `dashed`, `bubbles`, `stars`, `curtain`, `air`, `soapbubbles`,
-  `glitch`); `rainbow` cycles hue and ignores color; `curtain` is a bike-height
-  banner; `air` is thin wind streaks; `glitch` is an RGB-split datamosh trail
-  (ignores color, draws cyan/magenta/white offsets + flickering blocks).
+  `glitch`, `bunting`); `rainbow` cycles hue and ignores color; `curtain` is a
+  bike-height banner; `air` is thin wind streaks; `glitch` is an RGB-split
+  datamosh trail (ignores color, cyan/magenta/white offsets + flickering blocks);
+  `bunting` is a swagged string of triangular circus pennants (ignores color).
+- The select-screen trail-style row wraps into as many centered rows as needed,
+  and the map row auto-shrinks its cards, so both keep fitting as content grows.
 - Add a color/style by appending to those arrays. New path styles slot into
   `drawTrail()`; the picker and preview pick them up automatically.
 
