@@ -35,10 +35,10 @@ Then open http://localhost:8777/ in your browser.
 | --- | --- | --- |
 | Jump / double-jump | `Space` / `↑` / `W` | tap left ~60% of screen |
 | Dash (speed burst, smashes obstacles) | `Shift` / `X` | tap right ~40% of screen |
-| Character (select screen) | `←` / `→` | tap left/right of the card |
-| Trail style (select screen) | `↑` / `↓` | tap a chip |
-| Trail color (select screen) | `C` | tap a swatch |
-| Start / menu select | `Space` | tap the ride card or "RIDE!" |
+| Character (select screen) | `←` / `→` | tap the side arrows |
+| Map / trail color / trail style menus | `1` / `2` / `3` (arrows + `Enter` inside, `Esc` closes) | tap a tile |
+| Quick-cycle trail style / color / map | `↑` `↓` / `C` / `[` `]` | — |
+| Start | `Space` | tap "RIDE!" (becomes "UNLOCK …" when something's locked) |
 | Back to select (on crash) | `Esc` | — |
 | Mute / unmute | `M` | tap the 🔊 button (bottom-right) |
 
@@ -96,8 +96,18 @@ chosen map as its live background). Each map also sets its **road style**
 = dirt/gravel. Unlock state persists in
 `moetorcycles_unlocks`; the bank in `moetorcycles_bank`.
 
-Select controls: `←/→` character, `[ ]` map (or tap a map card), `↑/↓` trail
-style, `C` trail color, `U` unlock, `Space`/tap the bottom prompt to ride.
+Select screen layout: a character carousel (`←/→` or the side arrows), then
+three **loadout tiles** — MAP, TRAIL COLOR, TRAIL STYLE — each opening a popup
+grid (`drawPicker`) showing every option with its live preview + lock/cost; tap
+one to pick it (or buy it if locked). The big bottom button is RIDE, or UNLOCK
+<thing> when the character / map is locked. Last ride + map are remembered
+(`moetorcycles_ride` / `moetorcycles_map`).
+
+**Lazy loading:** boot only waits for the last-used character + map, the tiny
+map thumbnails (`assets/bg/thumbs/*.jpg`, built by `build_assets.py`), and the
+heli (~5 MB instead of everything). Characters' previews load as you browse,
+a map's layers load when picked, and RIDE shows "LOADING…" and starts itself
+if a pick hasn't finished downloading (`pendingStart`).
 
 ## Upgrade tree
 

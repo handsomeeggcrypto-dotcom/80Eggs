@@ -328,5 +328,20 @@ for m in ["crayons", "eggs", "china", "crystal", "tokyo", "glitch", "circus", "m
             print(f"  (missing bg {m}_{layer})"); continue
         im = Image.open(src)
         fit(im, max_h=720).save(dst, optimize=True)
+    # small composited thumbnail (all 4 layers flattened) for the map picker —
+    # tiny, so the menu can show every map without downloading full layers
+    TH_W, TH_H = 360, 240
+    thumb = Image.new("RGBA", (TH_W, TH_H), (26, 1, 54, 255))
+    for layer in ["sky", "far", "mid", "near"]:
+        p = os.path.join(BG_OUT, f"{m}_{layer}.png")
+        if not os.path.exists(p):
+            continue
+        L = Image.open(p).convert("RGBA")
+        L = L.resize((max(1, round(L.width * TH_H / L.height)), TH_H), Image.LANCZOS)
+        for x in range(0, TH_W, L.width):   # tile like the game does
+            thumb.alpha_composite(L, (x, 0)) if x + L.width <= TH_W else \
+                thumb.alpha_composite(L.crop((0, 0, TH_W - x, TH_H)), (x, 0))
+    os.makedirs(os.path.join(BG_OUT, "thumbs"), exist_ok=True)
+    thumb.convert("RGB").save(os.path.join(BG_OUT, "thumbs", f"{m}.jpg"), quality=86)
 
 print("Done. Assets in", OUT)

@@ -206,39 +206,49 @@ const HAZARDS = {
 
 /* ---------- Asset loading (by URL, cached) ---------- */
 const imgCache = {};
-let assetsLoaded = 0;
-let assetTotal = 0;
 
 function loadImg(url) {
   if (imgCache[url]) return imgCache[url];
   const img = new Image();
-  img.onload = () => { assetsLoaded++; };
-  img.onerror = () => { assetsLoaded++; console.warn("missing asset", url); };
+  img.onerror = () => console.warn("missing asset", url);
   img.src = url;
   imgCache[url] = img;
   return img;
 }
 function img(url) { return imgCache[url] || loadImg(url); }
 
-// preload every unique image referenced by the roster
-(function preload() {
-  const urls = new Set();
-  for (const r of RIDES) {
-    urls.add(r.preview);
-    for (const k in r.frames) urls.add(r.frames[k]);
-  }
-  for (const m of MAPS) for (const L of m.bg) urls.add(L.url);
-  urls.add(DUSTOFF);
-  assetTotal = urls.size;
-  urls.forEach(loadImg);
-})();
-
+/* Lazy loading: only what's on screen is downloaded. Boot waits for the last-used
+   character + map, the tiny map thumbnails, and the rescue heli; other
+   characters load as you browse to them, and a map's full layers load when you
+   pick it. Pressing RIDE before they've arrived queues the start (pendingStart). */
+const rideUrls = (r) => [r.preview, ...Object.values(r.frames)];
+const mapUrls  = (m) => m.bg.map((L) => L.url);
+const mapThumb = (m) => `assets/bg/thumbs/${m.id}.jpg`;
+const isLoaded = (u) => { const i = imgCache[u]; return !!(i && i.complete); }; // errors count as done
+const allLoaded = (urls) => urls.every(isLoaded);
+let bootUrls = [];
+let pendingStart = false;
 /* ---------- Game state machine ---------- */
 const STATE = { LOADING: "loading", TITLE: "title", SELECT: "select", UPGRADES: "upgrades", PLAY: "play", RESCUE: "rescue", DEAD: "dead" };
 let state = STATE.LOADING;
 
 let selRide = 0; // index into RIDES (character)
 let selMap = 0;  // index into MAPS
+// switch character / map, fetching only what the new choice needs
+function setRide(i) {
+  selRide = (i + RIDES.length) % RIDES.length;
+  pendingStart = false;
+  for (const d of [0, 1, -1]) loadImg(RIDES[(selRide + d + RIDES.length) % RIDES.length].preview);
+}
+function setMap(i) {
+  selMap = (i + MAPS.length) % MAPS.length;
+  pendingStart = false;
+  mapUrls(MAPS[selMap]).forEach(loadImg);
+}
+function saveSelection() {
+  localStorage.setItem("moetorcycles_ride", RIDES[selRide].id);
+  localStorage.setItem("moetorcycles_map", MAPS[selMap].id);
+}
 
 /* ---------- Tron-style trail options (cost = stars to unlock) ---------- */
 const TRAIL_COLORS = [
@@ -379,7 +389,22 @@ function saveTrail() {
   localStorage.setItem("moetorcycles_trail_design", selTrailDesign);
 }
 // clickable regions on the select screen, refreshed each frame it's drawn
-const uiHits = { swatches: [], chips: [], maps: [], charUnlock: null, upnodes: [], upBack: null, toUpgrades: null, deadBack: null };
+const uiHits = { tiles: [], pickItems: [], pickClose: null, pickPanel: null, rideBtn: null,
+  upnodes: [], upBack: null, toUpgrades: null, deadBack: null };
+
+// select-screen popup menu: null | "map" | "color" | "style"; pickCursor = keyboard focus
+let picker = null, pickCursor = 0;
+
+// restore the last ride/map (if still owned) and fetch only the boot set
+(function boot() {
+  const ri = RIDES.findIndex((r) => r.id === localStorage.getItem("moetorcycles_ride"));
+  const mi = MAPS.findIndex((m) => m.id === localStorage.getItem("moetorcycles_map"));
+  if (ri >= 0 && isUnlocked("char:" + RIDES[ri].id, RIDES[ri].cost)) selRide = ri;
+  if (mi >= 0 && mapUnlocked(MAPS[mi])) selMap = mi;
+  bootUrls = [...rideUrls(RIDES[selRide]), ...mapUrls(MAPS[selMap]), ...MAPS.map(mapThumb), DUSTOFF];
+  bootUrls.forEach(loadImg);
+  setRide(selRide);
+})();
 
 let best = Number(localStorage.getItem("moetorcycles_best") || 0);
 let menuCd = 0; // debounce so one tap/press can't skip a whole screen
@@ -465,18 +490,23 @@ function handleMenuKey(code) {
   if (state === STATE.TITLE) {
     if ((code === "Space" || code === "Enter") && menuCd <= 0) { state = STATE.SELECT; menuCd = 0.3; }
   } else if (state === STATE.SELECT) {
-    // Left/Right = character, Up/Down = trail style, C = color, [ ] = map, U = unlock
-    if (code === "ArrowLeft")  { selRide = (selRide - 1 + RIDES.length) % RIDES.length; Sound.ui(); }
-    else if (code === "ArrowRight") { selRide = (selRide + 1) % RIDES.length; Sound.ui(); }
+    if (picker) { pickerKey(code); return; }
+    // ←/→ character, 1/2/3 open the map / color / style menus, [ ] map,
+    // ↑/↓ style, C color, U unlock, T upgrades, Space/Enter ride
+    if (code === "ArrowLeft")       { setRide(selRide - 1); Sound.ui(); }
+    else if (code === "ArrowRight") { setRide(selRide + 1); Sound.ui(); }
+    else if (code === "Digit1") openPicker("map");
+    else if (code === "Digit2") openPicker("color");
+    else if (code === "Digit3") openPicker("style");
     else if (code === "ArrowUp")   cycleTrailStyle(-1);
     else if (code === "ArrowDown") cycleTrailStyle(1);
     else if (code === "KeyC")      cycleTrailColor(1);
-    else if (code === "BracketLeft")  { selMap = (selMap - 1 + MAPS.length) % MAPS.length; Sound.ui(); }
-    else if (code === "BracketRight") { selMap = (selMap + 1) % MAPS.length; Sound.ui(); }
+    else if (code === "BracketLeft")  { setMap(selMap - 1); Sound.ui(); }
+    else if (code === "BracketRight") { setMap(selMap + 1); Sound.ui(); }
     else if (code === "KeyU") {
       const c = RIDES[selRide], m = MAPS[selMap];
       if (!isUnlocked("char:" + c.id, c.cost)) tryUnlock("char:" + c.id, c.cost);
-      else if (!isUnlocked("map:" + m.id, m.cost)) tryUnlock("map:" + m.id, m.cost);
+      else if (!m.req && !isUnlocked("map:" + m.id, m.cost)) tryUnlock("map:" + m.id, m.cost);
     }
     else if (code === "KeyT") { state = STATE.UPGRADES; menuCd = 0.2; Sound.ui(); }
     else if ((code === "Space" || code === "Enter") && menuCd <= 0) attemptStart();
@@ -494,46 +524,26 @@ function pointerMenu(e, r) {
   else if (state === STATE.SELECT) {
     const mx = (e.clientX - r.left) / r.width * W;
     const my = (e.clientY - r.top) / r.height * H;
-    const inRect = (b) => mx >= b.x && mx <= b.x + b.w && my >= b.y && my <= b.y + b.h;
+    const inRect = (b) => b && mx >= b.x && mx <= b.x + b.w && my >= b.y && my <= b.y + b.h;
 
-    // UPGRADES button
-    if (uiHits.toUpgrades && inRect(uiHits.toUpgrades)) { state = STATE.UPGRADES; menuCd = 0.2; Sound.ui(); return; }
-    // character unlock button
-    if (uiHits.charUnlock && inRect(uiHits.charUnlock)) {
-      tryUnlock(uiHits.charUnlock.key, uiHits.charUnlock.cost); menuCd = 0.15; return;
-    }
-    // trail color swatches (tap locked = unlock, then select)
-    for (const s of uiHits.swatches) {
-      if (Math.hypot(mx - s.x, my - s.y) <= s.r) {
-        if (tryUnlock(s.key, s.cost)) { selTrailColor = s.i; saveTrail(); }
-        menuCd = 0.15; return;
+    // popup menu open: it swallows every tap (outside the panel / ✕ = close)
+    if (picker) {
+      if (inRect(uiHits.pickClose) || !inRect(uiHits.pickPanel)) { closePicker(); return; }
+      for (const it of uiHits.pickItems) {
+        if (inRect(it)) { pickCursor = it.i; pickItem(it.i); menuCd = 0.15; return; }
       }
+      return;
     }
-    // trail style chips
-    for (const c of uiHits.chips) {
-      if (inRect(c)) {
-        if (tryUnlock(c.key, c.cost)) { selTrailDesign = c.i; saveTrail(); }
-        menuCd = 0.15; return;
-      }
+    if (inRect(uiHits.toUpgrades)) { state = STATE.UPGRADES; menuCd = 0.2; Sound.ui(); return; }
+    for (const tl of uiHits.tiles) {
+      if (inRect(tl)) { openPicker(tl.kind); return; }
     }
-    // map cards
-    for (const m of uiHits.maps) {
-      if (inRect(m)) {
-        const mm = MAPS[m.i];
-        if (mapUnlocked(mm)) { selMap = m.i; Sound.ui(); }         // available -> select
-        else if (mm.req) { unlockFlash = 0.5; Sound.ui(); }        // condition-locked -> can't buy
-        else if (tryUnlock(m.key, m.cost)) { selMap = m.i; Sound.ui(); } // star-locked -> buy
-        menuCd = 0.15; return;
-      }
+    if (inRect(uiHits.rideBtn)) { rideButtonAction(); return; }
+    // character arrows: left/right of the card (within its vertical band)
+    if (RIDES.length > 1 && Math.abs(my - CARD.cy) < CARD.h / 2 + 20) {
+      if (mx < CARD.cx - CARD.w / 2) { setRide(selRide - 1); Sound.ui(); menuCd = 0.2; return; }
+      if (mx > CARD.cx + CARD.w / 2) { setRide(selRide + 1); Sound.ui(); menuCd = 0.2; return; }
     }
-    // character chevrons: left/right of the card (within its vertical band)
-    const cardMidY = H * 0.28;
-    if (RIDES.length > 1 && Math.abs(my - cardMidY) < 130) {
-      if (mx < W / 2 - 288) { selRide = (selRide - 1 + RIDES.length) % RIDES.length; Sound.ui(); menuCd = 0.2; return; }
-      if (mx > W / 2 + 288) { selRide = (selRide + 1) % RIDES.length; Sound.ui(); menuCd = 0.2; return; }
-    }
-    // start only from the bottom prompt band
-    if (my > H * 0.90) attemptStart();
   }
   else if (state === STATE.UPGRADES) {
     const mx = (e.clientX - r.left) / r.width * W;
@@ -700,8 +710,12 @@ function startGame() {
 // only ride when both the character and the map are unlocked
 function attemptStart() {
   const c = RIDES[selRide], m = MAPS[selMap];
-  if (isUnlocked("char:" + c.id, c.cost) && mapUnlocked(m)) startGame();
-  else unlockFlash = 0.5;
+  if (!(isUnlocked("char:" + c.id, c.cost) && mapUnlocked(m))) { unlockFlash = 0.5; return; }
+  saveSelection();
+  const need = [...rideUrls(c), ...mapUrls(m)];
+  need.forEach(loadImg);
+  if (allLoaded(need)) { pendingStart = false; startGame(); }
+  else pendingStart = true; // the main loop starts the run once they arrive
 }
 // cycle to the next UNLOCKED trail color / style (skips locked ones)
 function cycleTrailColor(dir) {
@@ -1130,6 +1144,9 @@ function drawScene() {
   const layers = MAPS[selMap].bg; // selected map
   // sky (opaque) — gradient fallback until the art loads
   if (!drawTiledLayer(layers[0].url, layers[0].speed)) {
+    // map layers still downloading: stretch its tiny thumbnail meanwhile
+    const th = img(mapThumb(MAPS[selMap]));
+    if (th && th.complete && th.width) { drawThumb(mapThumb(MAPS[selMap]), 0, 0, W, H); return; }
     const g = ctx.createLinearGradient(0, 0, 0, H);
     g.addColorStop(0, "#2a0a52");
     g.addColorStop(1, "#12042e");
@@ -2550,7 +2567,7 @@ function drawHUD() {
 /* ---- Screens ---- */
 function drawLoading() {
   centerText("Loading the crayons…", H / 2, 40, "#fff");
-  const p = assetsLoaded / assetTotal;
+  const p = bootUrls.filter(isLoaded).length / Math.max(1, bootUrls.length);
   ctx.fillStyle = "rgba(255,255,255,0.2)";
   ctx.fillRect(W/2 - 160, H/2 + 40, 320, 14);
   ctx.fillStyle = "#ff5bd0";
@@ -2592,13 +2609,10 @@ function drawTitle() {
 
 function drawSelect() {
   menuScrim();
-  centerText("CHOOSE YOUR RIDE", H * 0.055, 32, "#fff");
-  drawBankPill();
+  centerText("CHOOSE YOUR RIDE", 40, 32, "#fff");
 
-  uiHits.swatches.length = 0;
-  uiHits.chips.length = 0;
-  uiHits.maps.length = 0;
-  uiHits.charUnlock = null;
+  uiHits.tiles.length = 0;
+  uiHits.pickClose = uiHits.pickPanel = null;
 
   // UPGRADES button (top-left)
   const ub = { x: 24, y: 20, w: 172, h: 40 };
@@ -2612,16 +2626,17 @@ function drawSelect() {
   uiHits.toUpgrades = ub;
 
   drawCharacterCard();
-  drawMapRow();
-  drawTrailPickers();
+  drawLoadoutTiles();
+  drawRideButton();
+  ctx.save();
+  ctx.fillStyle = "rgba(10,2,30,0.55)";
+  roundRect(W / 2 - 250, H - 44, 500, 28, 14, true);
+  ctx.restore();
+  centerText("←/→ character   ·   1 map   2 color   3 style   ·   SPACE ride", H - 30, 14,
+    "rgba(255,255,255,0.75)");
 
-  const char = RIDES[selRide], map = MAPS[selMap];
-  const ready = isUnlocked("char:" + char.id, char.cost) && mapUnlocked(map);
-  const pulse = 0.6 + 0.4 * Math.sin(t * 4);
-  ctx.globalAlpha = ready ? pulse : 0.9;
-  centerText(ready ? "Press SPACE / Tap to RIDE!" : "🔒  Unlock this character & map to ride",
-    H * 0.945, ready ? 26 : 21, ready ? "#7dff9b" : "rgba(255,255,255,0.7)");
-  ctx.globalAlpha = 1;
+  if (picker) drawPicker();
+  drawBankPill(); // on top of the popup scrim so the balance stays readable
 }
 
 function drawBankPill() {
@@ -2714,23 +2729,37 @@ function drawUpgradeTree() {
   uiHits.upBack = back;
 }
 
+/* ---------- Select screen: character carousel + loadout tiles + popup menus ----------
+   The character is browsed in place (←/→ or the side arrows). Map, trail color
+   and trail style are summarised as three tiles; tapping one opens a popup grid
+   (drawPicker) where every option is shown with its lock/cost. */
+const CARD = { cx: W / 2, cy: 238, w: 620, h: 300 };
+
 function drawCharacterCard() {
   const char = RIDES[selRide];
-  const cx = W / 2, cy = H * 0.28, w = 560, h = 226;
+  const { cx, cy, w, h } = CARD;
   const x = cx - w / 2, y = cy - h / 2;
   const locked = !isUnlocked("char:" + char.id, char.cost);
 
   ctx.save();
-  ctx.fillStyle = "rgba(255,91,208,0.14)";
+  ctx.fillStyle = "rgba(40,10,72,0.55)";
   ctx.strokeStyle = locked ? "rgba(255,255,255,0.35)" : "#ff5bd0";
   ctx.lineWidth = 5;
   roundRect(x, y, w, h, 24, true);
   ctx.stroke();
   ctx.restore();
 
+  // "3 / 9" counter
+  ctx.save();
+  ctx.fillStyle = "rgba(255,255,255,0.5)"; ctx.font = "bold 14px Trebuchet MS, sans-serif";
+  ctx.textAlign = "right"; ctx.textBaseline = "top";
+  ctx.fillText(`${selRide + 1} / ${RIDES.length}`, x + w - 18, y + 14);
+  ctx.restore();
+
+  const boxTop = y + 14, boxBot = y + h - 76, boxW = w - 170, boxH = boxBot - boxTop;
   // trail preview behind the bike (unlocked only)
   if (!locked) {
-    const baseY = cy + h * 0.12, samp = [], nS = 26, headX = cx + 6, tailX = x + 44;
+    const baseY = boxBot - 22, samp = [], nS = 26, headX = cx + 6, tailX = x + 40;
     for (let i = 0; i < nS; i++) {
       const f = i / (nS - 1);
       samp.push({ x: tailX + (headX - tailX) * f, y: baseY + Math.sin(f * 6 + t * 3) * 9 });
@@ -2739,143 +2768,285 @@ function drawCharacterCard() {
   }
 
   const p = img(char.preview);
-  if (p && p.width) {
-    const boxTop = y + 24, boxBot = y + h - 50, boxW = w - 150, boxH = boxBot - boxTop;
-    const s = Math.min(boxW / p.width, boxH / p.height), iw = p.width * s, ih = p.height * s;
+  if (p && p.complete && p.width) {
+    const s = Math.min(boxW / p.width, boxH / p.height, (char.scale || 1.36) / 1.5 * boxH / p.height);
+    const iw = p.width * s, ih = p.height * s;
     const bob = Math.sin(t * 2.5) * 5;
     ctx.save();
-    if (locked) ctx.globalAlpha = 0.3;
-    ctx.drawImage(p, cx - iw / 2, boxTop + (boxH - ih) / 2 + bob, iw, ih);
+    if (locked) { ctx.filter = "grayscale(0.7) brightness(0.6)"; ctx.globalAlpha = 0.85; }
+    ctx.drawImage(p, cx - iw / 2, boxBot - ih + bob, iw, ih); // sit on the card's "floor"
     ctx.restore();
+  } else {
+    centerText("loading…", cy - 30, 20, "rgba(255,255,255,0.6)");
   }
-  if (!locked) { ctx.fillStyle = "#fff"; centerAt(char.name, cx, y + h - 30, 26); }
+
+  ctx.fillStyle = locked ? "rgba(255,255,255,0.75)" : "#fff";
+  centerAt(char.name, cx, y + h - 54, 30);
+  ctx.fillStyle = "rgba(255,255,255,0.6)";
+  centerAt(char.tagline || "", cx, y + h - 24, 16);
 
   if (RIDES.length > 1) { drawChevron(x - 38, cy, -1); drawChevron(x + w + 38, cy, 1); }
 
-  if (locked) {
-    centerText("🔒", cy - 34, 46, "rgba(255,255,255,0.9)");
+  if (locked) { // badge only — the big bottom button does the unlocking
     const afford = bank >= char.cost;
-    const bw = 240, bh = 44, bx = cx - bw / 2, by = cy + 12;
     ctx.save();
-    ctx.fillStyle = afford ? "rgba(125,255,155,0.22)" : "rgba(255,90,110,0.16)";
-    ctx.strokeStyle = afford ? "#7dff9b" : "#ff5b6e";
-    ctx.lineWidth = 2.5;
-    roundRect(bx, by, bw, bh, bh / 2, true); ctx.stroke();
-    ctx.fillStyle = afford ? "#eafff0" : "#ffd7dc";
-    ctx.font = "bold 19px Trebuchet MS, sans-serif";
+    ctx.fillStyle = "rgba(10,2,30,0.8)"; ctx.strokeStyle = afford ? "#7dff9b" : "#ff5b6e"; ctx.lineWidth = 2;
+    roundRect(x + 16, y + 12, 128, 30, 15, true); ctx.stroke();
+    ctx.fillStyle = afford ? "#eafff0" : "#ffd7dc"; ctx.font = "bold 15px Trebuchet MS, sans-serif";
     ctx.textAlign = "center"; ctx.textBaseline = "middle";
-    ctx.fillText(`UNLOCK   ${char.cost} 🌟`, cx, by + bh / 2 + 1);
+    ctx.fillText(costLabel(char.cost), x + 80, y + 28);
     ctx.restore();
-    uiHits.charUnlock = { x: bx, y: by, w: bw, h: bh, key: "char:" + char.id, cost: char.cost };
   }
 }
 
-function drawMapRow() {
-  centerText("MAP", H * 0.475, 16, "rgba(255,255,255,0.8)");
-  // adaptive card width so the whole row always fits (shrinks as maps are added)
-  const gap = 12, cardH = 62, y = H * 0.495, avail = W - 40;
-  const cardW = Math.min(152, (avail - (MAPS.length - 1) * gap) / MAPS.length);
-  const total = MAPS.length * cardW + (MAPS.length - 1) * gap;
-  const x0 = W / 2 - total / 2;
-  for (let i = 0; i < MAPS.length; i++) {
-    const m = MAPS[i], x = x0 + i * (cardW + gap);
-    const locked = !mapUnlocked(m);
-    const on = i === selMap;
-
-    ctx.save();
-    roundRect(x, y, cardW, cardH, 10, false); ctx.clip();
-    const thumb = img(m.bg[0].url); // sky = full opaque scene
-    if (thumb && thumb.width) {
-      const s = Math.max(cardW / thumb.width, cardH / thumb.height);
-      const iw = thumb.width * s, ih = thumb.height * s;
-      ctx.globalAlpha = locked ? 0.4 : 1;
-      ctx.drawImage(thumb, x + (cardW - iw) / 2, y + (cardH - ih) / 2, iw, ih);
-    } else {
-      ctx.fillStyle = "#223"; ctx.fillRect(x, y, cardW, cardH);
-    }
-    ctx.globalAlpha = 1;
-    ctx.fillStyle = "rgba(10,4,30,0.6)"; ctx.fillRect(x, y + cardH - 20, cardW, 20);
-    ctx.fillStyle = on ? "#ffe066" : "#fff";
-    ctx.font = "bold 13px Trebuchet MS, sans-serif";
-    ctx.textAlign = "center"; ctx.textBaseline = "middle";
-    const lockLabel = m.req ? `${m.name}  ${m.reqText}` : `${m.name}  🔒${m.cost}`;
-    ctx.fillText(locked ? lockLabel : m.name, x + cardW / 2, y + cardH - 10);
-    ctx.restore();
-
-    ctx.lineWidth = on ? 4 : 2;
-    ctx.strokeStyle = on ? "#ffe066" : "rgba(255,255,255,0.35)";
-    roundRect(x, y, cardW, cardH, 10, false); ctx.stroke();
-
-    uiHits.maps.push({ x, y, w: cardW, h: cardH, i, locked, key: "map:" + m.id, cost: m.cost });
-  }
+// run fn with the trail color/style temporarily swapped (drawTrail reads globals)
+function withTrail(ci, di, fn) {
+  const c0 = selTrailColor, d0 = selTrailDesign;
+  selTrailColor = ci; selTrailDesign = di;
+  try { fn(); } finally { selTrailColor = c0; selTrailDesign = d0; }
 }
+function trailSamples(x0, x1, y, n = 24, amp = 7) {
+  const out = [];
+  for (let i = 0; i < n; i++) {
+    const f = i / (n - 1);
+    out.push({ x: x0 + (x1 - x0) * f, y: y + Math.sin(f * 6 + t * 3) * amp });
+  }
+  return out;
+}
+function drawThumb(url, x, y, w, h, alpha = 1) {
+  const im = img(url);
+  if (!im || !im.complete || !im.width) { ctx.fillStyle = "#223"; ctx.fillRect(x, y, w, h); return; }
+  const s = Math.max(w / im.width, h / im.height), iw = im.width * s, ih = im.height * s;
+  ctx.globalAlpha = alpha;
+  ctx.drawImage(im, x + (w - iw) / 2, y + (h - ih) / 2, iw, ih);
+  ctx.globalAlpha = 1;
+}
+function costLabel(cost) { return `🔒 ${cost} 🌟`; }
 
-// Trail color swatches + style chips (with lock badges), records hit-boxes.
-function drawTrailPickers() {
-  // ---- colors ----
-  centerText("TRAIL COLOR", H * 0.61, 16, "rgba(255,255,255,0.8)");
-  const sy = H * 0.65, sr = 16, sgap = 62;
-  const sStart = W / 2 - (TRAIL_COLORS.length - 1) * sgap / 2;
-  for (let i = 0; i < TRAIL_COLORS.length; i++) {
-    const cxs = sStart + i * sgap;
-    const on = i === selTrailColor;
-    const locked = !isUnlocked("tc:" + i, TRAIL_COLORS[i].cost);
+function drawLoadoutTiles() {
+  const tw = 300, th = 118, gap = 26, y = 410;
+  const x0 = W / 2 - (tw * 3 + gap * 2) / 2;
+  const kinds = ["map", "color", "style"], titles = ["MAP", "TRAIL COLOR", "TRAIL STYLE"];
+  for (let k = 0; k < 3; k++) {
+    const x = x0 + k * (tw + gap), kind = kinds[k];
     ctx.save();
-    ctx.beginPath(); ctx.arc(cxs, sy, sr + (on ? 5 : 0), 0, Math.PI * 2);
-    ctx.fillStyle = TRAIL_COLORS[i].css;
-    ctx.globalAlpha = locked ? 0.4 : 1;
-    ctx.shadowColor = TRAIL_COLORS[i].css; ctx.shadowBlur = on ? 18 : 8;
-    ctx.fill();
-    ctx.globalAlpha = 1; ctx.shadowBlur = 0;
-    ctx.lineWidth = on ? 4 : 2;
-    ctx.strokeStyle = on ? "#fff" : "rgba(255,255,255,0.4)";
-    ctx.stroke();
-    if (locked) { ctx.font = "13px system-ui"; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText("🔒", cxs, sy); }
-    ctx.restore();
-    uiHits.swatches.push({ x: cxs, y: sy, r: sr + 8, i, locked, key: "tc:" + i, cost: TRAIL_COLORS[i].cost });
-  }
+    ctx.fillStyle = "rgba(20,6,50,0.62)";
+    ctx.strokeStyle = "rgba(255,255,255,0.3)"; ctx.lineWidth = 2;
+    roundRect(x, y, tw, th, 16, true); ctx.stroke();
+    ctx.clip();
+    ctx.font = "bold 13px Trebuchet MS, sans-serif"; ctx.textBaseline = "middle";
+    ctx.fillStyle = "rgba(255,255,255,0.6)"; ctx.textAlign = "left";
+    ctx.fillText(`${k + 1} · ${titles[k]}`, x + 16, y + 18);
+    ctx.fillStyle = "#ff9bdf"; ctx.textAlign = "right";
+    ctx.fillText("CHANGE ▸", x + tw - 16, y + 18);
 
-  // ---- styles (wrap into as many centered rows as it takes to fit the width) ----
-  centerText("TRAIL STYLE", H * 0.70, 16, "rgba(255,255,255,0.8)");
-  const chipH = 34, pad = 14, gap = 10, rowGap = 8, avail = W - 40;
-  ctx.font = "bold 16px Trebuchet MS, sans-serif";
-  const label = (i) => isUnlocked("ts:" + i, TRAIL_DESIGNS[i].cost)
-    ? TRAIL_DESIGNS[i].name : `${TRAIL_DESIGNS[i].name} 🔒${TRAIL_DESIGNS[i].cost}`;
-  const chipW = TRAIL_DESIGNS.map((d, i) => ctx.measureText(label(i)).width + pad * 2);
-  const rows = [[]];
-  let rw = 0;
-  for (let i = 0; i < TRAIL_DESIGNS.length; i++) {
-    const cur = rows[rows.length - 1];
-    const add = (cur.length ? gap : 0) + chipW[i];
-    if (cur.length && rw + add > avail) { rows.push([]); rw = 0; }
-    rows[rows.length - 1].push(i);
-    rw += (rows[rows.length - 1].length > 1 ? gap : 0) + chipW[i];
-  }
-  let chipY = H * 0.735;
-  for (const row of rows) {
-    const tw = row.reduce((a, i) => a + chipW[i], 0) + gap * (row.length - 1);
-    let cxp = W / 2 - tw / 2;
-    for (const i of row) {
-      const cw = chipW[i], on = i === selTrailDesign;
-      const locked = !isUnlocked("ts:" + i, TRAIL_DESIGNS[i].cost);
-      ctx.save();
-      ctx.fillStyle = on ? "rgba(125,255,155,0.22)" : "rgba(255,255,255,0.06)";
-      ctx.strokeStyle = on ? "#7dff9b" : "rgba(255,255,255,0.25)";
-      ctx.lineWidth = on ? 3 : 1.5;
-      roundRect(cxp, chipY, cw, chipH, chipH / 2, true); ctx.stroke();
-      ctx.fillStyle = locked ? "rgba(255,255,255,0.55)" : (on ? "#eafff0" : "rgba(255,255,255,0.8)");
-      ctx.font = "bold 16px Trebuchet MS, sans-serif";
-      ctx.textAlign = "center"; ctx.textBaseline = "middle";
-      ctx.fillText(label(i), cxp + cw / 2, chipY + chipH / 2 + 1);
+    const cy = y + 72;           // content centre line
+    let name = "", sub = "", subCol = "rgba(255,255,255,0.55)";
+    if (kind === "map") {
+      const m = MAPS[selMap], locked = !mapUnlocked(m);
+      ctx.save(); roundRect(x + 14, cy - 34, 118, 68, 8, false); ctx.clip();
+      drawThumb(mapThumb(m), x + 14, cy - 34, 118, 68, locked ? 0.45 : 1);
       ctx.restore();
-      uiHits.chips.push({ x: cxp, y: chipY, w: cw, h: chipH, i, locked, key: "ts:" + i, cost: TRAIL_DESIGNS[i].cost });
-      cxp += cw + gap;
+      name = m.name;
+      if (locked) { sub = m.req ? m.reqText : costLabel(m.cost); subCol = "#ff9bb0"; }
+    } else if (kind === "color") {
+      const c = TRAIL_COLORS[selTrailColor];
+      ctx.beginPath(); ctx.arc(x + 72, cy, 28, 0, Math.PI * 2);
+      ctx.fillStyle = c.css; ctx.shadowColor = c.css; ctx.shadowBlur = 16; ctx.fill();
+      ctx.shadowBlur = 0; ctx.strokeStyle = "#fff"; ctx.lineWidth = 3; ctx.stroke();
+      name = c.name;
+    } else {
+      drawTrail(trailSamples(x + 12, x + 132, cy + 10, 22, 6));
+      name = TRAIL_DESIGNS[selTrailDesign].name;
     }
-    chipY += chipH + rowGap;
+    ctx.textAlign = "left"; ctx.fillStyle = "#fff";
+    let fs = 22; ctx.font = `bold ${fs}px Trebuchet MS, sans-serif`;
+    while (fs > 14 && ctx.measureText(name).width > tw - 160) { fs--; ctx.font = `bold ${fs}px Trebuchet MS, sans-serif`; }
+    ctx.fillText(name, x + 146, sub ? cy - 10 : cy);
+    if (sub) {
+      ctx.font = "bold 14px Trebuchet MS, sans-serif"; ctx.fillStyle = subCol;
+      ctx.fillText(sub, x + 146, cy + 16);
+    }
+    ctx.restore();
+    uiHits.tiles.push({ x, y, w: tw, h: th, kind });
   }
+}
 
-  const hint = "←/→ character   ↑/↓ style   C = color   ·  tap locked items to unlock";
-  centerText(hint, H * 0.87, 14, "rgba(255,255,255,0.5)");
+// The big bottom button: RIDE when everything's owned, otherwise it's the
+// unlock button for whatever is locked (character first, then map).
+function rideButtonAction() {
+  const c = RIDES[selRide], m = MAPS[selMap];
+  if (!isUnlocked("char:" + c.id, c.cost)) { tryUnlock("char:" + c.id, c.cost); menuCd = 0.2; }
+  else if (!mapUnlocked(m)) {
+    if (m.req) openPicker("map");                          // condition map: pick another
+    else { tryUnlock("map:" + m.id, m.cost); menuCd = 0.2; }
+  }
+  else attemptStart();
+}
+
+function drawRideButton() {
+  const char = RIDES[selRide], map = MAPS[selMap];
+  const charOk = isUnlocked("char:" + char.id, char.cost), mapOk = mapUnlocked(map);
+  const bw = 400, bh = 66, bx = W / 2 - bw / 2, by = 556;
+  let label, fill, stroke, col, glow = null;
+  if (!charOk || (!mapOk && !map.req)) {
+    const cost = !charOk ? char.cost : map.cost, afford = bank >= cost;
+    label = `🔒 UNLOCK ${(!charOk ? char.name : map.name).toUpperCase()}  ·  ${cost} 🌟`;
+    fill = afford ? "rgba(30,90,50,0.9)" : "rgba(70,16,36,0.9)";
+    stroke = afford ? "#7dff9b" : "#ff5b6e"; col = afford ? "#eafff0" : "#ffd7dc";
+    if (afford) glow = "#7dff9b";
+  } else if (!mapOk) {
+    label = `🔒 ${map.name}: ${map.reqText.replace("🔒", "").trim()}`;
+    fill = "rgba(20,6,50,0.9)"; stroke = "rgba(255,255,255,0.35)"; col = "rgba(255,255,255,0.8)";
+  } else if (pendingStart) {
+    const need = [...rideUrls(char), ...mapUrls(map)];
+    label = `LOADING… ${Math.round(need.filter(isLoaded).length / need.length * 100)}%`;
+    fill = "rgba(20,40,80,0.9)"; stroke = "#5bc8ff"; col = "#dff2ff";
+  } else {
+    label = "RIDE!  ▶";
+    fill = "rgba(40,150,80,0.85)"; stroke = "#7dff9b"; col = "#eafff0"; glow = "#7dff9b";
+  }
+  const big = label === "RIDE!  ▶";
+  const s = glow ? 1 + 0.03 * Math.sin(t * 4) : 1;
+  ctx.save();
+  ctx.translate(W / 2, by + bh / 2); ctx.scale(s, s); ctx.translate(-W / 2, -(by + bh / 2));
+  ctx.fillStyle = fill; ctx.strokeStyle = stroke; ctx.lineWidth = 3;
+  if (glow) { ctx.shadowColor = glow; ctx.shadowBlur = 18; }
+  roundRect(bx, by, bw, bh, bh / 2, true); ctx.shadowBlur = 0; ctx.stroke();
+  ctx.fillStyle = col;
+  let fs = big ? 30 : 21; ctx.font = `bold ${fs}px Trebuchet MS, sans-serif`;
+  while (fs > 13 && ctx.measureText(label).width > bw - 40) { fs--; ctx.font = `bold ${fs}px Trebuchet MS, sans-serif`; }
+  ctx.textAlign = "center"; ctx.textBaseline = "middle";
+  ctx.fillText(label, W / 2, by + bh / 2 + 1);
+  ctx.restore();
+  uiHits.rideBtn = { x: bx, y: by, w: bw, h: bh };
+}
+
+/* ---- popup picker (map / trail color / trail style) ---- */
+const PICK = { x: 110, y: 56, w: 1060, h: 612 };
+function pickerCount() {
+  return picker === "map" ? MAPS.length : picker === "color" ? TRAIL_COLORS.length : TRAIL_DESIGNS.length;
+}
+function pickerCols() { return picker === "map" && MAPS.length <= 9 ? 3 : 4; }
+function pickerCurrent(kind) {
+  return kind === "map" ? selMap : kind === "color" ? selTrailColor : selTrailDesign;
+}
+function openPicker(kind) {
+  if (picker === kind) { closePicker(); return; }
+  picker = kind; pickCursor = pickerCurrent(kind); menuCd = 0.15; Sound.ui();
+}
+function closePicker() { picker = null; menuCd = 0.15; Sound.ui(); }
+function pickItem(i) {
+  if (picker === "map") {
+    const m = MAPS[i];
+    if (mapUnlocked(m)) { setMap(i); closePicker(); }
+    else if (m.req) { unlockFlash = 0.5; Sound.ui(); }               // condition-locked
+    else if (tryUnlock("map:" + m.id, m.cost)) { setMap(i); closePicker(); }
+  } else if (picker === "color") {
+    if (tryUnlock("tc:" + i, TRAIL_COLORS[i].cost)) { selTrailColor = i; saveTrail(); closePicker(); }
+  } else if (picker === "style") {
+    if (tryUnlock("ts:" + i, TRAIL_DESIGNS[i].cost)) { selTrailDesign = i; saveTrail(); closePicker(); }
+  }
+}
+function pickerKey(code) {
+  const n = pickerCount(), cols = pickerCols();
+  const digit = { Digit1: "map", Digit2: "color", Digit3: "style" }[code];
+  if (code === "Escape") closePicker();
+  else if (digit) openPicker(digit);
+  else if (code === "ArrowLeft")  pickCursor = (pickCursor - 1 + n) % n;
+  else if (code === "ArrowRight") pickCursor = (pickCursor + 1) % n;
+  else if (code === "ArrowUp"   && pickCursor - cols >= 0) pickCursor -= cols;
+  else if (code === "ArrowDown" && pickCursor + cols < n)  pickCursor += cols;
+  else if ((code === "Enter" || code === "Space") && menuCd <= 0) pickItem(pickCursor);
+}
+
+function drawPicker() {
+  uiHits.pickItems.length = 0;
+  ctx.fillStyle = "rgba(6,1,20,0.74)"; ctx.fillRect(0, 0, W, H);
+  const P = PICK;
+  ctx.save();
+  ctx.fillStyle = "rgba(34,10,70,0.97)"; ctx.strokeStyle = "#ff5bd0"; ctx.lineWidth = 3;
+  roundRect(P.x, P.y, P.w, P.h, 26, true); ctx.stroke();
+  ctx.restore();
+  uiHits.pickPanel = P;
+  const title = { map: "CHOOSE A MAP", color: "TRAIL COLOR", style: "TRAIL STYLE" }[picker];
+  centerText(title, P.y + 40, 30, "#fff");
+
+  // close button
+  const cx = P.x + P.w - 42, cyb = P.y + 40;
+  ctx.save();
+  ctx.beginPath(); ctx.arc(cx, cyb, 22, 0, Math.PI * 2);
+  ctx.fillStyle = "rgba(255,255,255,0.1)"; ctx.fill();
+  ctx.strokeStyle = "rgba(255,255,255,0.5)"; ctx.lineWidth = 2; ctx.stroke();
+  ctx.fillStyle = "#fff"; ctx.font = "bold 22px Trebuchet MS, sans-serif";
+  ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText("✕", cx, cyb + 1);
+  ctx.restore();
+  uiHits.pickClose = { x: cx - 26, y: cyb - 26, w: 52, h: 52 };
+
+  const n = pickerCount(), cols = pickerCols(), rows = Math.ceil(n / cols);
+  const pad = 30, gap = 16, top = P.y + 82;
+  const cw = (P.w - pad * 2 - gap * (cols - 1)) / cols;
+  const ch = Math.min(170, (P.y + P.h - pad - top - gap * (rows - 1)) / rows);
+  const gridH = rows * ch + (rows - 1) * gap;
+  const y0 = top + Math.max(0, (P.y + P.h - pad - top - gridH) / 2);
+  for (let i = 0; i < n; i++) {
+    const x = P.x + pad + (i % cols) * (cw + gap), y = y0 + Math.floor(i / cols) * (ch + gap);
+    drawPickCell(i, x, y, cw, ch);
+    uiHits.pickItems.push({ x, y, w: cw, h: ch, i });
+  }
+}
+
+function drawPickCell(i, x, y, w, h) {
+  const sel = i === pickerCurrent(picker), cur = i === pickCursor;
+  let name, locked, cost, reqText = null;
+  if (picker === "map") {
+    const m = MAPS[i]; name = m.name; locked = !mapUnlocked(m); cost = m.cost; reqText = m.req ? m.reqText : null;
+  } else if (picker === "color") {
+    const c = TRAIL_COLORS[i]; name = c.name; cost = c.cost; locked = !isUnlocked("tc:" + i, cost);
+  } else {
+    const d = TRAIL_DESIGNS[i]; name = d.name; cost = d.cost; locked = !isUnlocked("ts:" + i, cost);
+  }
+  const barH = 32, ch = h - barH; // content area above the name bar
+  ctx.save();
+  roundRect(x, y, w, h, 14, false);
+  ctx.fillStyle = "rgba(255,255,255,0.06)"; ctx.fill();
+  ctx.clip();
+  const a = locked ? 0.42 : 1;
+  if (picker === "map") {
+    drawThumb(mapThumb(MAPS[i]), x, y, w, ch, a);
+  } else if (picker === "color") {
+    const c = TRAIL_COLORS[i];
+    ctx.globalAlpha = a;
+    withTrail(i, 0, () => drawTrail(trailSamples(x + 24, x + w - 24, y + ch * 0.55, 24, 8)));
+    ctx.beginPath(); ctx.arc(x + w / 2, y + ch * 0.5, 22, 0, Math.PI * 2);
+    ctx.fillStyle = c.css; ctx.shadowColor = c.css; ctx.shadowBlur = 16; ctx.fill();
+    ctx.shadowBlur = 0; ctx.strokeStyle = "#fff"; ctx.lineWidth = 2.5; ctx.stroke();
+    ctx.globalAlpha = 1;
+  } else {
+    ctx.globalAlpha = a;
+    withTrail(selTrailColor, i, () => drawTrail(trailSamples(x + 20, x + w - 20, y + ch * 0.62, 26, 8)));
+    ctx.globalAlpha = 1;
+  }
+  // name bar
+  ctx.fillStyle = "rgba(10,4,30,0.78)"; ctx.fillRect(x, y + ch, w, barH);
+  ctx.font = "bold 16px Trebuchet MS, sans-serif"; ctx.textBaseline = "middle";
+  ctx.textAlign = "left"; ctx.fillStyle = sel ? "#ffe066" : "#fff";
+  ctx.fillText(name, x + 12, y + ch + barH / 2 + 1);
+  ctx.textAlign = "right";
+  if (locked) {
+    ctx.fillStyle = reqText ? "#ffcf7d" : bank >= cost ? "#7dff9b" : "#ff9bb0";
+    ctx.fillText(reqText || costLabel(cost), x + w - 12, y + ch + barH / 2 + 1);
+  } else if (sel) {
+    ctx.fillStyle = "#ffe066"; ctx.fillText("✓", x + w - 12, y + ch + barH / 2 + 1);
+  }
+  ctx.restore();
+  // border: selected = gold, keyboard cursor = white
+  ctx.save();
+  ctx.lineWidth = sel ? 4 : cur ? 3 : 1.5;
+  ctx.strokeStyle = sel ? "#ffe066" : cur ? "#fff" : "rgba(255,255,255,0.22)";
+  roundRect(x, y, w, h, 14, false); ctx.stroke();
+  if (cur && !sel) { ctx.globalAlpha = 0.25; ctx.strokeStyle = "#fff"; ctx.lineWidth = 8; roundRect(x - 3, y - 3, w + 6, h + 6, 16, false); ctx.stroke(); }
+  ctx.restore();
 }
 
 function drawChevron(cx, cy, dir) {
@@ -2885,9 +3056,9 @@ function drawChevron(cx, cy, dir) {
   ctx.lineCap = "round"; ctx.lineJoin = "round";
   const s = 18, bob = Math.sin(t * 4) * 3 * dir;
   ctx.beginPath();
-  ctx.moveTo(cx + s * dir + bob, cy - s);
-  ctx.lineTo(cx - s * dir + bob, cy);
-  ctx.lineTo(cx + s * dir + bob, cy + s);
+  ctx.moveTo(cx - s * dir + bob, cy - s);   // dir -1 = "<", +1 = ">"
+  ctx.lineTo(cx + s * dir + bob, cy);
+  ctx.lineTo(cx - s * dir + bob, cy + s);
   ctx.stroke();
   ctx.restore();
 }
@@ -2965,8 +3136,12 @@ function loop(now) {
   if (unlockFlash > 0) unlockFlash -= dt;
   if (unlockPulse > 0) unlockPulse -= dt;
 
-  if (state === STATE.LOADING && assetsLoaded >= assetTotal) {
+  if (state === STATE.LOADING && allLoaded(bootUrls)) {
     state = STATE.TITLE;
+  }
+  if (pendingStart && state === STATE.SELECT) {
+    const c = RIDES[selRide], m = MAPS[selMap];
+    if (allLoaded([...rideUrls(c), ...mapUrls(m)])) { pendingStart = false; startGame(); }
   }
 
   update(dt);
