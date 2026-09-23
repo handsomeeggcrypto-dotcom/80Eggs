@@ -139,6 +139,22 @@ const RIDES = [
     },
     preview: "assets/player_squish_ride.png",
   },
+  {
+    id: "chonky",
+    name: "Chonky",
+    tagline: "Too cool. Too chonky. Pure vibes.",
+    cost: 350,
+    scale: 1.5,
+    wheelFrac: 0.99,
+    frames: {
+      ride:    "assets/player_chonky_ride.png",
+      wheelie: "assets/player_chonky_wheelie.png",
+      air:     "assets/player_chonky_air.png",
+      land:    "assets/player_chonky_land.png",
+      crash:   "assets/player_chonky_crash.png",
+    },
+    preview: "assets/player_chonky_ride.png",
+  },
 ];
 
 /* ---------- Maps (selectable independently of the character) ----------
@@ -156,6 +172,7 @@ const MAPS = [
   ]},
   { id: "glitch",  name: "Glitch City",  cost: 350, bg: bgSet("glitch"), road: "glitch", hazard: "cone" },
   { id: "circus",  name: "Haunted Circus", cost: 350, bg: bgSet("circus"), road: "circus", hazard: "barrel" },
+  { id: "miami",   name: "Miami Beach",  cost: 350, bg: bgSet("miami"), road: "miami", hazard: "surfboard" },
   // Secret meme level: unlocks once you own 4 characters (no star cost).
   { id: "moemoe",  name: "MoeMoe Land",  cost: 0, bg: bgSet("moemoe"), road: "moemoe", hazard: "emoji",
     req: () => unlockedCharCount() >= 4, reqText: "🔒 4 CHARS" },
@@ -172,6 +189,7 @@ const HAZARDS = {
   emoji:     { w: 58,  hMin: 58,  hMax: 96  },
   cone:      { w: 56,  hMin: 66,  hMax: 104 },
   barrel:    { w: 66,  hMin: 72,  hMax: 104 },
+  surfboard: { w: 44,  hMin: 92,  hMax: 132 },
 };
 
 /* ---------- Asset loading (by URL, cached) ---------- */
@@ -233,6 +251,7 @@ const TRAIL_DESIGNS = [
   { id: "soapbubbles", name: "Soap Bubbles", cost: 60 }, // hollow, glassy bubbles
   { id: "glitch",  name: "Glitch",     cost: 70 }, // RGB-split datamosh streaks
   { id: "bunting", name: "Circus Flags", cost: 60 }, // triangular pennant bunting
+  { id: "paws",    name: "Paw Prints",  cost: 60 }, // cat paw prints padding along
 ];
 
 /* ---------- Currency + unlocks ----------
@@ -1173,6 +1192,7 @@ function drawRoad(x, topY, w, worldX) {
   else if (style === "moemoe") drawRoadMoe(x, topY, w, worldX);
   else if (style === "glitch") drawRoadGlitch(x, topY, w, worldX);
   else if (style === "circus") drawRoadCircus(x, topY, w, worldX);
+  else if (style === "miami") drawRoadMiami(x, topY, w, worldX);
   else drawRoadNeon(x, topY, w, worldX);
 }
 
@@ -1530,6 +1550,69 @@ function drawRoadCircus(x, topY, w, worldX) {
   ctx.restore();
 }
 
+// Miami Beach: an 80s synthwave seafront road — dark teal asphalt with a warm
+// sunset underglow, a hot-pink + cyan neon curb, scrolling vaporwave grid lines
+// and cyan centre dashes.
+function drawRoadMiami(x, topY, w, worldX) {
+  const botY = roadBottom(topY);
+  ctx.save();
+  ctx.fillStyle = "rgba(4,6,16,0.7)";
+  ctx.fillRect(x - 2, topY - 10, w + 4, 10);
+
+  const body = ctx.createLinearGradient(0, topY, 0, botY);
+  body.addColorStop(0, "#123448");
+  body.addColorStop(0.14, "#0b2233");
+  body.addColorStop(1, "#050a14");
+  ctx.fillStyle = body;
+  ctx.fillRect(x, topY, w, botY - topY);
+
+  // warm sunset underglow just below the surface (ties into the 80s sun)
+  const glow = ctx.createLinearGradient(0, topY, 0, topY + 44);
+  glow.addColorStop(0, "rgba(255,120,180,0.30)");
+  glow.addColorStop(0.5, "rgba(255,150,90,0.14)");
+  glow.addColorStop(1, "rgba(255,120,180,0)");
+  ctx.fillStyle = glow;
+  ctx.fillRect(x, topY + 3, w, 44);
+
+  // scrolling vaporwave grid: faint vertical magenta lines
+  ctx.save();
+  ctx.beginPath(); ctx.rect(x, topY, w, botY - topY); ctx.clip();
+  ctx.strokeStyle = "rgba(255,60,200,0.18)"; ctx.lineWidth = 1.5;
+  const gper = 54;
+  const gs = worldX - ((worldX % gper) + gper) % gper;
+  for (let d = gs; d < worldX + w + gper; d += gper) {
+    const sx = d - worldX + x;
+    ctx.beginPath(); ctx.moveTo(sx, topY + 8); ctx.lineTo(sx, botY); ctx.stroke();
+  }
+  // a couple of horizontal cyan grid lines
+  ctx.strokeStyle = "rgba(60,220,255,0.16)";
+  for (const fy of [0.42, 0.72]) {
+    const gy = topY + (botY - topY) * fy;
+    ctx.beginPath(); ctx.moveTo(x, gy); ctx.lineTo(x + w, gy); ctx.stroke();
+  }
+  ctx.restore();
+
+  // neon curb: hot-pink over cyan, with a white top line
+  ctx.fillStyle = "#ff3ba0"; ctx.fillRect(x, topY, w, 8);
+  ctx.fillStyle = "rgba(60,220,255,0.85)"; ctx.fillRect(x, topY + 6, w, 4);
+  ctx.fillStyle = "rgba(255,255,255,0.95)"; ctx.fillRect(x, topY, w, 2);
+
+  // scrolling cyan centre dashes
+  const dashY = topY + 34, dashW = 46, gap = 42, period = dashW + gap;
+  ctx.fillStyle = "rgba(120,240,255,0.85)";
+  ctx.shadowColor = "#3ce0ff"; ctx.shadowBlur = 6;
+  const s2 = worldX - ((worldX % period) + period) % period;
+  for (let d = s2; d < worldX + w + period; d += period) {
+    const sx = d - worldX + x;
+    const clipL = Math.max(sx, x), clipR = Math.min(sx + dashW, x + w);
+    if (clipR > clipL) ctx.fillRect(clipL, dashY, clipR - clipL, 5);
+  }
+  ctx.shadowBlur = 0;
+
+  drawPlatformUnderside(x, topY, w, botY);
+  ctx.restore();
+}
+
 // Countryside: packed dirt / gravel — earthy body, grassy fringe, scattered
 // pebbles + wheel ruts (all positioned by world-x so they scroll, no flicker).
 function drawRoadDirt(x, topY, w, worldX) {
@@ -1640,8 +1723,48 @@ function drawObstacle(x, o) {
     case "emoji":     return drawHazardEmoji(x, o);
     case "cone":      return drawHazardCone(x, o);
     case "barrel":    return drawHazardBarrel(x, o);
+    case "surfboard": return drawHazardSurfboard(x, o);
     default:          return drawHazardCrayon(x, o);
   }
+}
+
+// Miami Beach: an upright neon surfboard planted in a little sand mound.
+function drawHazardSurfboard(x, o) {
+  const oTop = o.top - o.h, cx = x + o.w / 2;
+  const bw = o.w * 0.7, bTop = oTop, bBot = o.top - 6;
+  const halfH = (bBot - bTop) / 2, midY = (bTop + bBot) / 2;
+  ctx.save();
+  // little sand mound at the base
+  ctx.fillStyle = "#e8d089";
+  ctx.beginPath(); ctx.ellipse(cx, o.top - 1, o.w * 0.6, 8, 0, 0, Math.PI * 2); ctx.fill();
+  ctx.strokeStyle = "rgba(120,90,30,0.4)"; ctx.lineWidth = 1.5; ctx.stroke();
+  // board silhouette: pointed top + rounded bottom (a lens shape), with halo
+  const boardPath = (inset) => {
+    const bwi = bw / 2 - inset;
+    ctx.beginPath();
+    ctx.moveTo(cx, bTop + inset);                          // pointed nose
+    ctx.quadraticCurveTo(cx + bwi, midY - halfH * 0.4, cx + bwi, midY);
+    ctx.quadraticCurveTo(cx + bwi, bBot - inset - 6, cx, bBot - inset); // rounded tail
+    ctx.quadraticCurveTo(cx - bwi, bBot - inset - 6, cx - bwi, midY);
+    ctx.quadraticCurveTo(cx - bwi, midY - halfH * 0.4, cx, bTop + inset);
+    ctx.closePath();
+  };
+  ctx.shadowColor = "rgba(255,60,180,0.5)"; ctx.shadowBlur = 14;
+  ctx.fillStyle = "#fff"; boardPath(-3); ctx.fill();
+  ctx.shadowBlur = 0;
+  // deck gradient (neon 80s)
+  const g = ctx.createLinearGradient(cx - bw / 2, 0, cx + bw / 2, 0);
+  g.addColorStop(0, "#ff3ba0"); g.addColorStop(0.5, "#ffd23f"); g.addColorStop(1, "#3ce0ff");
+  ctx.fillStyle = g; boardPath(0); ctx.fill();
+  ctx.lineWidth = 2.5; ctx.strokeStyle = "#2a0a2e"; boardPath(0); ctx.stroke();
+  // centre stringer line + a couple of stripes
+  ctx.save(); boardPath(2); ctx.clip();
+  ctx.strokeStyle = "rgba(255,255,255,0.85)"; ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.moveTo(cx, bTop); ctx.lineTo(cx, bBot); ctx.stroke();
+  ctx.fillStyle = "rgba(255,255,255,0.5)";
+  ctx.fillRect(cx - bw / 2, midY - 4, bw, 5);
+  ctx.restore();
+  ctx.restore();
 }
 
 // Haunted Circus: a red/cream striped barrel with metal hoops and a spooky-cute
@@ -2088,6 +2211,27 @@ function drawTrail(pts) {
       ctx.closePath(); ctx.fill();
     }
     ctx.globalAlpha = 1;
+    ctx.restore();
+    return;
+  }
+
+  if (design === "paws") {
+    // a line of cat paw prints padding along, alternating up/down like footsteps
+    const step = 5;
+    for (let i = 0; i < len; i += step) {
+      const p = pts[i], tp = taper(i / len);
+      const col = trailColorAt(i, len, colCss);
+      const r = 5 + tp * 5;
+      const py = p.y + (((i / step) % 2 === 0) ? -6 : 6);
+      ctx.globalAlpha = 0.25 + tp * 0.75;
+      ctx.shadowColor = col; ctx.shadowBlur = 8;
+      ctx.fillStyle = col;
+      ctx.beginPath(); ctx.ellipse(p.x, py + r * 0.35, r * 0.9, r * 0.72, 0, 0, Math.PI * 2); ctx.fill();
+      for (const [dx, dy, tr] of [[-0.85, -0.7, 0.42], [-0.3, -1.05, 0.4], [0.3, -1.05, 0.4], [0.85, -0.7, 0.42]]) {
+        ctx.beginPath(); ctx.arc(p.x + dx * r, py + dy * r, tr * r, 0, Math.PI * 2); ctx.fill();
+      }
+    }
+    ctx.globalAlpha = 1; ctx.shadowBlur = 0;
     ctx.restore();
     return;
   }

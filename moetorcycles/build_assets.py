@@ -230,6 +230,18 @@ build_ride("squish", {
     "crash":   "squish_crash_01.png",
 }, preprocess=auto_key)
 
+# ===========================================================================
+#  RIDE: Chonky  (chonky sunglasses cat on a red cruiser; all poses share one
+#  1254² canvas + already transparent -> shared-crop)
+# ===========================================================================
+build_ride("chonky", {
+    "ride":    "chonky_idle_01.png",
+    "wheelie": "chonky_wheelie_01.png",
+    "air":     "chonky_airborn_01.png",   # (source filename: "airborn")
+    "land":    "chonky_landing_01.png",
+    "crash":   "chonky_crash_01.png",
+}, preprocess=auto_key)
+
 # ---- MOE Zedong Dustoff (shield rescue helicopter) ----
 heli = load("skill_dustoff.png")
 save(heli.crop(content_bbox(heli, 30)), "dustoff.png")

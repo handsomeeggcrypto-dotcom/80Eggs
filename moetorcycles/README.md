@@ -70,7 +70,7 @@ the art differs (`o.kind`, drawn by `drawHazard*`): Neon City = crayon pillar,
 Countryside = hay bale, China City = red lantern stack, Crystal City = crystal
 spike, Tokyo Night = neon construction barricade, MoeMoe Land = red-ringed
 heart-eyes emoji, Glitch City = RGB-glitch traffic cone, Haunted Circus =
-spooky-cute striped barrel.
+spooky-cute striped barrel, Miami Beach = upright neon surfboard.
 
 ## Condition-unlocked maps
 
@@ -142,7 +142,8 @@ and is saved to localStorage.
   `glitch`, `bunting`); `rainbow` cycles hue and ignores color; `curtain` is a
   bike-height banner; `air` is thin wind streaks; `glitch` is an RGB-split
   datamosh trail (ignores color, cyan/magenta/white offsets + flickering blocks);
-  `bunting` is a swagged string of triangular circus pennants (ignores color).
+  `bunting` is a swagged string of triangular circus pennants (ignores color);
+  `paws` stamps a line of cat paw prints (pad + 4 toe beans) along the ground.
 - The select-screen trail-style row wraps into as many centered rows as needed,
   and the map row auto-shrinks its cards, so both keep fitting as content grows.
 - Add a color/style by appending to those arrays. New path styles slot into
