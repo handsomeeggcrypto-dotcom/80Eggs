@@ -134,8 +134,24 @@ def remove_grey_checker(im, radius=7):
     return im
 
 
+# The game canvas is a fixed 1280x720 (CSS-scaled), so art bigger than it is ever
+# drawn is wasted download. Riders draw at most ~245px tall (PLAYER_H*scale) and
+# ~300px in the select-screen preview -> cap sprites at 480px tall (≈2x headroom).
+MAX_SPRITE_H = 480
+
+
+def fit(im, max_w=None, max_h=None):
+    """Downscale (never upscale) to fit within max_w x max_h, high-quality."""
+    s = min((max_w or im.width) / im.width, (max_h or im.height) / im.height, 1.0)
+    if s >= 1.0:
+        return im
+    return im.resize((round(im.width * s), round(im.height * s)), Image.LANCZOS)
+
+
 def save(im, name):
-    im.save(os.path.join(OUT, name))
+    if name.startswith("player_"):
+        im = fit(im, max_h=MAX_SPRITE_H)
+    im.save(os.path.join(OUT, name), optimize=True)
     print(f"  {name:26s} {im.size}")
 
 
@@ -293,6 +309,24 @@ build_ride("poki", {
 
 # ---- MOE Zedong Dustoff (shield rescue helicopter) ----
 heli = load("skill_dustoff.png")
-save(heli.crop(content_bbox(heli, 30)), "dustoff.png")
+save(fit(heli.crop(content_bbox(heli, 30)), max_w=760), "dustoff.png")  # drawn 380px wide
+
+# ===========================================================================
+#  BACKGROUNDS: parallax layers are drawn scaled to the canvas height (720), so
+#  store them at exactly 720px tall. Source = ~/Desktop/moetorcycle/<map>_bg_<layer>.png
+#  when present, else the existing asset (china/crystal sources aren't on disk).
+#  Idempotent: an already-720px layer is left as-is.
+# ===========================================================================
+BG_OUT = os.path.join(OUT, "bg")
+for m in ["crayons", "eggs", "china", "crystal", "tokyo", "glitch", "circus", "miami", "moemoe"]:
+    for layer in ["sky", "far", "mid", "near"]:
+        src = os.path.join(SRC, f"{m}_bg_{layer}.png")
+        dst = os.path.join(BG_OUT, f"{m}_{layer}.png")
+        if not os.path.exists(src):
+            src = dst
+        if not os.path.exists(src):
+            print(f"  (missing bg {m}_{layer})"); continue
+        im = Image.open(src)
+        fit(im, max_h=720).save(dst, optimize=True)
 
 print("Done. Assets in", OUT)

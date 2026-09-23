@@ -181,12 +181,7 @@ const MAPS = [
   { id: "eggs",    name: "Countryside",  cost: 100, bg: bgSet("eggs"),    road: "dirt",    hazard: "hay" },
   { id: "china",   name: "China City",   cost: 200, bg: bgSet("china"),   road: "china",   hazard: "lantern" },
   { id: "crystal", name: "Crystal City", cost: 250, bg: bgSet("crystal"), road: "crystal", hazard: "crystal" },
-  // Tokyo art has only sky/mid/near (no far layer)
-  { id: "tokyo",   name: "Tokyo Night",  cost: 250, road: "tokyo", hazard: "barricade", bg: [
-      { url: "assets/bg/tokyo_sky.png",  speed: 0.06 },
-      { url: "assets/bg/tokyo_mid.png",  speed: 0.42 },
-      { url: "assets/bg/tokyo_near.png", speed: 0.80 },
-  ]},
+  { id: "tokyo",   name: "Tokyo Night",  cost: 250, bg: bgSet("tokyo"),   road: "tokyo",   hazard: "barricade" },
   { id: "glitch",  name: "Glitch City",  cost: 350, bg: bgSet("glitch"), road: "glitch", hazard: "cone" },
   { id: "circus",  name: "Haunted Circus", cost: 350, bg: bgSet("circus"), road: "circus", hazard: "barrel" },
   { id: "miami",   name: "Miami Beach",  cost: 350, bg: bgSet("miami"), road: "miami", hazard: "umbrella", groundFill: "sand" },
