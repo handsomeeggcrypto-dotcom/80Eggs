@@ -155,6 +155,23 @@ const RIDES = [
     },
     preview: "assets/player_chonky_ride.png",
   },
+  {
+    id: "poki",
+    name: "Poki",
+    tagline: "Tiny hamster. Tiny car. Full send.",
+    cost: 350,
+    scale: 0.95,      // intentionally small — a toy car, not a motorcycle
+    wheelFrac: 0.993,
+    trailX: 44,       // rear wheel sits much closer to centre than on a bike
+    frames: {
+      ride:    "assets/player_poki_ride.png",
+      wheelie: "assets/player_poki_wheelie.png",
+      air:     "assets/player_poki_air.png",
+      land:    "assets/player_poki_land.png",
+      crash:   "assets/player_poki_crash.png",
+    },
+    preview: "assets/player_poki_ride.png",
+  },
 ];
 
 /* ---------- Maps (selectable independently of the character) ----------
@@ -796,7 +813,7 @@ function update(dt) {
   player.tilt = clamp(player.vy / 3000, -0.28, 0.42);
 
   // record trail point at the rear wheel (stored in world-x so it scrolls)
-  trail.push({ wx: distance + PLAYER_X - 108, y: player.y + PLAYER_H * 0.90, dash: player.dashT > 0 });
+  trail.push({ wx: distance + PLAYER_X - (RIDES[selRide].trailX || 108), y: player.y + PLAYER_H * 0.90, dash: player.dashT > 0 });
   if (trail.length > 120) trail.shift();
   while (trail.length && trail[0].wx - distance < -60) trail.shift();
 

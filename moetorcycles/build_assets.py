@@ -98,6 +98,42 @@ def auto_key(im):
     return remove_checker_bg(remove_white_bg(im, thresh=62))
 
 
+def remove_grey_checker(im, radius=7):
+    """Some frames arrive with a darker GREY transparency checkerboard baked in
+    (two tones ~135 / ~195 with noise) — too dark for remove_checker_bg, and the
+    subject's own whites (Poki's belly) must survive. Background = neutral grey
+    pixels in the checker's value band that are either (1) flood-connected to the
+    border, or (2) enclosed pockets with dense two-tone checker texture (window
+    gaps). Black outlines stop the flood; saturated colours and bright whites are
+    outside the band. Frames already transparent pass straight through."""
+    im = im.convert("RGBA")
+    r, g, b, a = im.split()
+    if a.getextrema()[0] < 255:
+        return im  # already has transparency
+    mx = ImageChops.lighter(ImageChops.lighter(r, g), b)
+    mn = ImageChops.darker(ImageChops.darker(r, g), b)
+    neutral = ImageChops.subtract(mx, mn).point(lambda p: 255 if p <= 14 else 0)
+    cand = ImageChops.multiply(mx.point(lambda p: 255 if 100 <= p <= 224 else 0), neutral)
+    # 1) flood from the border through candidate pixels
+    fl = cand.copy(); w, h = fl.size; px = fl.load()
+    seeds = [(x, 0) for x in range(0, w, 8)] + [(x, h - 1) for x in range(0, w, 8)] + \
+            [(0, y) for y in range(0, h, 8)] + [(w - 1, y) for y in range(0, h, 8)]
+    for s in seeds:
+        if px[s] == 255:
+            ImageDraw.floodfill(fl, s, 128, thresh=0)
+    border = fl.point(lambda p: 255 if p == 128 else 0)
+    # 2) enclosed pockets: both checker tones nearby AND a solid candidate patch
+    dark = ImageChops.multiply(cand, mx.point(lambda p: 255 if p < 168 else 0))
+    light = ImageChops.multiply(cand, mx.point(lambda p: 255 if p >= 168 else 0))
+    mf = ImageFilter.MaxFilter(radius * 2 + 1)
+    both = ImageChops.multiply(dark.filter(mf), light.filter(mf))
+    dense = cand.filter(ImageFilter.MinFilter(5))
+    pocket = ImageChops.multiply(
+        ImageChops.multiply(both, dense).filter(ImageFilter.MaxFilter(5)), cand)
+    im.putalpha(ImageChops.subtract(a, ImageChops.lighter(border, pocket)))
+    return im
+
+
 def save(im, name):
     im.save(os.path.join(OUT, name))
     print(f"  {name:26s} {im.size}")
@@ -241,6 +277,19 @@ build_ride("chonky", {
     "land":    "chonky_landing_01.png",
     "crash":   "chonky_crash_01.png",
 }, preprocess=auto_key)
+
+# ===========================================================================
+#  RIDE: Poki  (hamster in a Little Tikes-style toy car — drawn SMALL in game.
+#  All poses share one 1254² canvas; most arrived with a grey checkerboard
+#  baked in -> remove_grey_checker. Only one crash frame exists.)
+# ===========================================================================
+build_ride("poki", {
+    "ride":    "poki_idle_01.png",
+    "wheelie": "poki_wheelie_01.png",
+    "air":     "poki_airborne_01.png",
+    "land":    "poki_landing_01.png",
+    "crash":   "poki_crash_01.png",
+}, preprocess=remove_grey_checker)
 
 # ---- MOE Zedong Dustoff (shield rescue helicopter) ----
 heli = load("skill_dustoff.png")
