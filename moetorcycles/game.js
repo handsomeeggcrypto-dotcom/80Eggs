@@ -189,7 +189,7 @@ const MAPS = [
   { id: "moemoe",  name: "MoeMoe Land",  cost: 0, bg: bgSet("moemoe"), road: "moemoe", hazard: "emoji",
     req: () => unlockedCharCount() >= 4, reqText: "🔒 4 CHARS" },
   // Poki's pastel candy land: cake road + cute snack hazards
-  { id: "tomochi", name: "Tomochi",      cost: 350, bg: bgSet("tomochi"), road: "tomochi", hazard: "snack" },
+  { id: "tomochi", name: "Snack Land",   cost: 350, bg: bgSet("tomochi"), road: "tomochi", hazard: "snack" },
 ];
 
 // Per-map hazard footprints (all ground-mounted; jump over or dash/boost to smash).
