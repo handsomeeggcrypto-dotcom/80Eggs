@@ -263,7 +263,26 @@ const TRAIL_COLORS = [
   { name: "White",  css: "#ffffff", cost: 30 },
   { name: "China Red", css: "#ee1c25", cost: 40 }, // Chinese-flag red
   { name: "Black",  css: "#0d0d0d", cost: 40 },
+  { name: "Orange", css: "#ff7403", cost: 30 },
+  // Rainbow works with ANY trail style (hue cycles along the trail). Unlocks by
+  // condition, not stars: own 8 characters. Keep new colors appended so saved
+  // "tc:<index>" unlocks stay valid.
+  { name: "Rainbow", css: "#ff5bd0", cost: 0, rainbow: true,
+    req: () => unlockedCharCount() >= 8, reqText: "🔒 8 CHARS" },
 ];
+// a trail color is usable if its condition (if any) is met and it's free/bought
+function colorUnlocked(i) {
+  const c = TRAIL_COLORS[i];
+  if (c.req && !c.req()) return false;
+  return isUnlocked("tc:" + i, c.cost);
+}
+// fill for a color swatch (rainbow = hue gradient across the swatch)
+function swatchFill(c, x, r) {
+  if (!c.rainbow) return c.css;
+  const g = ctx.createLinearGradient(x - r, 0, x + r, 0);
+  for (let k = 0; k <= 6; k++) g.addColorStop(k / 6, `hsl(${(k * 60 + t * 90) % 360} 100% 60%)`);
+  return g;
+}
 const TRAIL_DESIGNS = [
   { id: "line",    name: "Neon Line",  cost: 0 },
   { id: "ribbon",  name: "Ribbon",     cost: 0 },
@@ -385,7 +404,7 @@ function clampIdx(v, n) { return Number.isFinite(v) && v >= 0 && v < n ? v : 0; 
 let selTrailColor  = clampIdx(+localStorage.getItem("moetorcycles_trail_color"),  TRAIL_COLORS.length);
 let selTrailDesign = clampIdx(+localStorage.getItem("moetorcycles_trail_design"), TRAIL_DESIGNS.length);
 // a previously-saved trail choice may now be behind a paywall — fall back to free
-if (!isUnlocked("tc:" + selTrailColor, TRAIL_COLORS[selTrailColor].cost)) selTrailColor = 0;
+if (!colorUnlocked(selTrailColor)) selTrailColor = 0;
 if (!isUnlocked("ts:" + selTrailDesign, TRAIL_DESIGNS[selTrailDesign].cost)) selTrailDesign = 0;
 function saveTrail() {
   localStorage.setItem("moetorcycles_trail_color", selTrailColor);
@@ -724,7 +743,7 @@ function attemptStart() {
 function cycleTrailColor(dir) {
   for (let k = 0, i = selTrailColor; k < TRAIL_COLORS.length; k++) {
     i = (i + dir + TRAIL_COLORS.length) % TRAIL_COLORS.length;
-    if (isUnlocked("tc:" + i, TRAIL_COLORS[i].cost)) { selTrailColor = i; saveTrail(); return; }
+    if (colorUnlocked(i)) { selTrailColor = i; saveTrail(); return; }
   }
 }
 function cycleTrailStyle(dir) {
@@ -2386,7 +2405,7 @@ function drawHazardBarricade(x, o) {
 
 /* ---------- Tron trail rendering ---------- */
 function trailColorAt(i, len, colCss) {
-  if (TRAIL_DESIGNS[selTrailDesign].id === "rainbow")
+  if (TRAIL_DESIGNS[selTrailDesign].id === "rainbow" || TRAIL_COLORS[selTrailColor].rainbow)
     return `hsl(${(i / len * 300 + t * 140) % 360} 100% 62%)`;
   return colCss;
 }
@@ -2395,7 +2414,10 @@ function trailColorAt(i, len, colCss) {
 function drawTrail(pts) {
   if (!pts || pts.length < 2) return;
   const design = TRAIL_DESIGNS[selTrailDesign].id;
-  const colCss = TRAIL_COLORS[selTrailColor].css;
+  // rainbow color: whole-trail uses (glows, bubble fills) cycle hue over time;
+  // per-segment uses go through trailColorAt for a hue sweep along the trail
+  const colCss = TRAIL_COLORS[selTrailColor].rainbow
+    ? `hsl(${(t * 140) % 360} 100% 62%)` : TRAIL_COLORS[selTrailColor].css;
   const len = pts.length;
   ctx.save();
   ctx.lineCap = "round"; ctx.lineJoin = "round";
@@ -2413,8 +2435,9 @@ function drawTrail(pts) {
       const bx = pts[i].x + Math.cos(t * 1.5 + i * 0.7) * 4;
       const by = pts[i].y - 8 + Math.sin(t * 2 + i) * 7;   // gentle bob/rise
       // translucent glass fill (see-through)
+      const bc = trailColorAt(i, len, colCss);
       ctx.globalAlpha = 0.14 + 0.08 * tp;
-      ctx.fillStyle = colCss;
+      ctx.fillStyle = bc;
       ctx.beginPath(); ctx.arc(bx, by, rad, 0, Math.PI * 2); ctx.fill();
       // dark outer rim so the bubble reads on bright backgrounds
       ctx.globalAlpha = 0.4 + 0.35 * tp;
@@ -2422,7 +2445,7 @@ function drawTrail(pts) {
       ctx.beginPath(); ctx.arc(bx, by, rad, 0, Math.PI * 2); ctx.stroke();
       // bright glassy rim
       ctx.globalAlpha = 0.55 + 0.35 * tp;
-      ctx.lineWidth = 2; ctx.strokeStyle = colCss;
+      ctx.lineWidth = 2; ctx.strokeStyle = bc;
       ctx.beginPath(); ctx.arc(bx, by, rad, 0, Math.PI * 2); ctx.stroke();
       // iridescent film arc (lower-right)
       ctx.globalAlpha = 0.5 * tp;
@@ -3089,7 +3112,7 @@ function drawLoadoutTiles() {
     } else if (kind === "color") {
       const c = TRAIL_COLORS[selTrailColor];
       ctx.beginPath(); ctx.arc(x + 72, cy, 28, 0, Math.PI * 2);
-      ctx.fillStyle = c.css; ctx.shadowColor = c.css; ctx.shadowBlur = 16; ctx.fill();
+      ctx.fillStyle = swatchFill(c, x + 72, 28); ctx.shadowColor = c.css; ctx.shadowBlur = 16; ctx.fill();
       ctx.shadowBlur = 0; ctx.strokeStyle = "#fff"; ctx.lineWidth = 3; ctx.stroke();
       name = c.name;
     } else {
@@ -3180,7 +3203,10 @@ function pickItem(i) {
     else if (m.req) { unlockFlash = 0.5; Sound.ui(); }               // condition-locked
     else if (tryUnlock("map:" + m.id, m.cost)) { setMap(i); closePicker(); }
   } else if (picker === "color") {
-    if (tryUnlock("tc:" + i, TRAIL_COLORS[i].cost)) { selTrailColor = i; saveTrail(); closePicker(); }
+    const c = TRAIL_COLORS[i];
+    if (colorUnlocked(i)) { selTrailColor = i; saveTrail(); closePicker(); }
+    else if (c.req) { unlockFlash = 0.5; Sound.ui(); }                // condition-locked
+    else if (tryUnlock("tc:" + i, c.cost)) { selTrailColor = i; saveTrail(); closePicker(); }
   } else if (picker === "style") {
     if (tryUnlock("ts:" + i, TRAIL_DESIGNS[i].cost)) { selTrailDesign = i; saveTrail(); closePicker(); }
   }
@@ -3239,7 +3265,7 @@ function drawPickCell(i, x, y, w, h) {
   if (picker === "map") {
     const m = MAPS[i]; name = m.name; locked = !mapUnlocked(m); cost = m.cost; reqText = m.req ? m.reqText : null;
   } else if (picker === "color") {
-    const c = TRAIL_COLORS[i]; name = c.name; cost = c.cost; locked = !isUnlocked("tc:" + i, cost);
+    const c = TRAIL_COLORS[i]; name = c.name; cost = c.cost; locked = !colorUnlocked(i); reqText = c.req ? c.reqText : null;
   } else {
     const d = TRAIL_DESIGNS[i]; name = d.name; cost = d.cost; locked = !isUnlocked("ts:" + i, cost);
   }
@@ -3256,7 +3282,7 @@ function drawPickCell(i, x, y, w, h) {
     ctx.globalAlpha = a;
     withTrail(i, 0, () => drawTrail(trailSamples(x + 24, x + w - 24, y + ch * 0.55, 24, 8)));
     ctx.beginPath(); ctx.arc(x + w / 2, y + ch * 0.5, 22, 0, Math.PI * 2);
-    ctx.fillStyle = c.css; ctx.shadowColor = c.css; ctx.shadowBlur = 16; ctx.fill();
+    ctx.fillStyle = swatchFill(c, x + w / 2, 22); ctx.shadowColor = c.css; ctx.shadowBlur = 16; ctx.fill();
     ctx.shadowBlur = 0; ctx.strokeStyle = "#fff"; ctx.lineWidth = 2.5; ctx.stroke();
     ctx.globalAlpha = 1;
   } else {
