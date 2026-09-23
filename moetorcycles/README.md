@@ -70,7 +70,11 @@ the art differs (`o.kind`, drawn by `drawHazard*`): Neon City = crayon pillar,
 Countryside = hay bale, China City = red lantern stack, Crystal City = crystal
 spike, Tokyo Night = neon construction barricade, MoeMoe Land = red-ringed
 heart-eyes emoji, Glitch City = RGB-glitch traffic cone, Haunted Circus =
-spooky-cute striped barrel, Miami Beach = upright neon surfboard.
+spooky-cute striped barrel, Miami Beach = striped beach umbrella.
+
+Some maps also set a `groundFill` (e.g. Miami's `"sand"`), a solid ground band
+`drawScene` paints just behind the nearest parallax layer so the foreground props
+sit on it and it hides the water/void behind them down to the road (`drawBeachFill`).
 
 ## Condition-unlocked maps
 

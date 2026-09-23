@@ -172,7 +172,7 @@ const MAPS = [
   ]},
   { id: "glitch",  name: "Glitch City",  cost: 350, bg: bgSet("glitch"), road: "glitch", hazard: "cone" },
   { id: "circus",  name: "Haunted Circus", cost: 350, bg: bgSet("circus"), road: "circus", hazard: "barrel" },
-  { id: "miami",   name: "Miami Beach",  cost: 350, bg: bgSet("miami"), road: "miami", hazard: "surfboard" },
+  { id: "miami",   name: "Miami Beach",  cost: 350, bg: bgSet("miami"), road: "miami", hazard: "umbrella", groundFill: "sand" },
   // Secret meme level: unlocks once you own 4 characters (no star cost).
   { id: "moemoe",  name: "MoeMoe Land",  cost: 0, bg: bgSet("moemoe"), road: "moemoe", hazard: "emoji",
     req: () => unlockedCharCount() >= 4, reqText: "🔒 4 CHARS" },
@@ -189,7 +189,7 @@ const HAZARDS = {
   emoji:     { w: 58,  hMin: 58,  hMax: 96  },
   cone:      { w: 56,  hMin: 66,  hMax: 104 },
   barrel:    { w: 66,  hMin: 72,  hMax: 104 },
-  surfboard: { w: 44,  hMin: 92,  hMax: 132 },
+  umbrella:  { w: 76,  hMin: 84,  hMax: 116 },
 };
 
 /* ---------- Asset loading (by URL, cached) ---------- */
@@ -1132,8 +1132,51 @@ function drawScene() {
     ctx.fillStyle = g;
     ctx.fillRect(0, 0, W, H);
   }
-  // parallax layers, far -> near
-  for (let i = 1; i < layers.length; i++) drawTiledLayer(layers[i].url, layers[i].speed);
+  // parallax layers, far -> near. A map can request a ground fill (e.g. a sand
+  // beach) drawn just BEFORE its nearest layer, so the foreground props sit on
+  // it while it covers the water/void behind them down to the road.
+  const last = layers.length - 1;
+  const fill = MAPS[selMap].groundFill;
+  for (let i = 1; i < layers.length; i++) {
+    if (i === last && fill === "sand") drawBeachFill();
+    drawTiledLayer(layers[i].url, layers[i].speed);
+  }
+}
+
+// A sand beach filling the bottom of the scene (Miami), with a foamy waterline
+// where it meets the ocean above. Static — reads as solid ground behind the road.
+function drawBeachFill() {
+  const yTop = H * 0.72;
+  ctx.save();
+  const sand = ctx.createLinearGradient(0, yTop, 0, H);
+  sand.addColorStop(0, "#efd9a4");
+  sand.addColorStop(1, "#c99a58");
+  ctx.fillStyle = sand;
+  // wavy top edge so the waterline isn't a dead-straight line
+  ctx.beginPath();
+  ctx.moveTo(0, H);
+  ctx.lineTo(0, yTop + 4);
+  for (let x = 0; x <= W; x += 24) {
+    ctx.lineTo(x, yTop + Math.sin(x * 0.03) * 4);
+  }
+  ctx.lineTo(W, H);
+  ctx.closePath(); ctx.fill();
+  // foamy wet line along the waterline
+  ctx.strokeStyle = "rgba(240,252,255,0.75)"; ctx.lineWidth = 3;
+  ctx.beginPath();
+  for (let x = 0; x <= W; x += 24) {
+    const y = yTop + Math.sin(x * 0.03) * 4;
+    if (x === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+  }
+  ctx.stroke();
+  // faint scattered specks for sand texture (deterministic, no flicker)
+  ctx.fillStyle = "rgba(120,90,40,0.18)";
+  for (let i = 0; i < 90; i++) {
+    const hx = Math.sin(i * 91.7) * 4137.1, r1 = hx - Math.floor(hx);
+    const hy = Math.sin(i * 33.3) * 7219.7, r2 = hy - Math.floor(hy);
+    ctx.fillRect(r1 * W, yTop + 10 + r2 * (H - yTop - 10), 2, 2);
+  }
+  ctx.restore();
 }
 
 function drawWorld() {
@@ -1723,47 +1766,53 @@ function drawObstacle(x, o) {
     case "emoji":     return drawHazardEmoji(x, o);
     case "cone":      return drawHazardCone(x, o);
     case "barrel":    return drawHazardBarrel(x, o);
-    case "surfboard": return drawHazardSurfboard(x, o);
+    case "umbrella":  return drawHazardUmbrella(x, o);
     default:          return drawHazardCrayon(x, o);
   }
 }
 
-// Miami Beach: an upright neon surfboard planted in a little sand mound.
-function drawHazardSurfboard(x, o) {
+// Miami Beach: a striped beach umbrella on a pole planted in the sand.
+function drawHazardUmbrella(x, o) {
   const oTop = o.top - o.h, cx = x + o.w / 2;
-  const bw = o.w * 0.7, bTop = oTop, bBot = o.top - 6;
-  const halfH = (bBot - bTop) / 2, midY = (bTop + bBot) / 2;
+  const R = o.w / 2;                 // canopy radius
+  const cy = oTop + R * 0.72;        // canopy centre (flat bottom sits here)
   ctx.save();
-  // little sand mound at the base
-  ctx.fillStyle = "#e8d089";
-  ctx.beginPath(); ctx.ellipse(cx, o.top - 1, o.w * 0.6, 8, 0, 0, Math.PI * 2); ctx.fill();
-  ctx.strokeStyle = "rgba(120,90,30,0.4)"; ctx.lineWidth = 1.5; ctx.stroke();
-  // board silhouette: pointed top + rounded bottom (a lens shape), with halo
-  const boardPath = (inset) => {
-    const bwi = bw / 2 - inset;
-    ctx.beginPath();
-    ctx.moveTo(cx, bTop + inset);                          // pointed nose
-    ctx.quadraticCurveTo(cx + bwi, midY - halfH * 0.4, cx + bwi, midY);
-    ctx.quadraticCurveTo(cx + bwi, bBot - inset - 6, cx, bBot - inset); // rounded tail
-    ctx.quadraticCurveTo(cx - bwi, bBot - inset - 6, cx - bwi, midY);
-    ctx.quadraticCurveTo(cx - bwi, midY - halfH * 0.4, cx, bTop + inset);
-    ctx.closePath();
-  };
-  ctx.shadowColor = "rgba(255,60,180,0.5)"; ctx.shadowBlur = 14;
-  ctx.fillStyle = "#fff"; boardPath(-3); ctx.fill();
+  // pole
+  ctx.fillStyle = "#7a5327";
+  ctx.fillRect(cx - 3, cy, 6, o.top - cy);
+  ctx.fillStyle = "rgba(255,255,255,0.25)"; ctx.fillRect(cx - 3, cy, 2, o.top - cy);
+  // white halo behind the canopy for legibility
+  ctx.shadowColor = "rgba(0,0,0,0.3)"; ctx.shadowBlur = 12;
+  ctx.fillStyle = "#fff";
+  ctx.beginPath(); ctx.arc(cx, cy, R + 3, Math.PI, 0); ctx.closePath(); ctx.fill();
   ctx.shadowBlur = 0;
-  // deck gradient (neon 80s)
-  const g = ctx.createLinearGradient(cx - bw / 2, 0, cx + bw / 2, 0);
-  g.addColorStop(0, "#ff3ba0"); g.addColorStop(0.5, "#ffd23f"); g.addColorStop(1, "#3ce0ff");
-  ctx.fillStyle = g; boardPath(0); ctx.fill();
-  ctx.lineWidth = 2.5; ctx.strokeStyle = "#2a0a2e"; boardPath(0); ctx.stroke();
-  // centre stringer line + a couple of stripes
-  ctx.save(); boardPath(2); ctx.clip();
-  ctx.strokeStyle = "rgba(255,255,255,0.85)"; ctx.lineWidth = 2;
-  ctx.beginPath(); ctx.moveTo(cx, bTop); ctx.lineTo(cx, bBot); ctx.stroke();
-  ctx.fillStyle = "rgba(255,255,255,0.5)";
-  ctx.fillRect(cx - bw / 2, midY - 4, bw, 5);
-  ctx.restore();
+  // alternating canopy panels (red / cream)
+  const panels = 6, cols = ["#ff3b5c", "#fff2e0"];
+  for (let i = 0; i < panels; i++) {
+    const a0 = Math.PI + (i / panels) * Math.PI;
+    const a1 = Math.PI + ((i + 1) / panels) * Math.PI;
+    ctx.fillStyle = cols[i % 2];
+    ctx.beginPath(); ctx.moveTo(cx, cy); ctx.arc(cx, cy, R, a0, a1); ctx.closePath(); ctx.fill();
+  }
+  // scalloped lower rim (little arcs hanging off the flat bottom)
+  const scallops = 6, sw = (R * 2) / scallops;
+  for (let i = 0; i < scallops; i++) {
+    const sx = cx - R + sw * (i + 0.5);
+    ctx.fillStyle = cols[i % 2];
+    ctx.beginPath(); ctx.arc(sx, cy, sw / 2, 0, Math.PI); ctx.closePath(); ctx.fill();
+  }
+  // outline + ribs
+  ctx.lineWidth = 2.5; ctx.strokeStyle = "#3a0d1c";
+  ctx.beginPath(); ctx.arc(cx, cy, R, Math.PI, 0); ctx.lineTo(cx - R, cy); ctx.stroke();
+  ctx.lineWidth = 1.2; ctx.strokeStyle = "rgba(58,13,28,0.5)";
+  for (let i = 1; i < panels; i++) {
+    const a = Math.PI + (i / panels) * Math.PI;
+    ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(cx + Math.cos(a) * R, cy + Math.sin(a) * R); ctx.stroke();
+  }
+  // top knob
+  ctx.fillStyle = "#ffd23f";
+  ctx.beginPath(); ctx.arc(cx, cy - R, 4, 0, Math.PI * 2); ctx.fill();
+  ctx.lineWidth = 1.5; ctx.strokeStyle = "#3a0d1c"; ctx.stroke();
   ctx.restore();
 }
 
