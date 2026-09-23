@@ -318,7 +318,7 @@ save(fit(heli.crop(content_bbox(heli, 30)), max_w=760), "dustoff.png")  # drawn 
 #  Idempotent: an already-720px layer is left as-is.
 # ===========================================================================
 BG_OUT = os.path.join(OUT, "bg")
-for m in ["crayons", "eggs", "china", "crystal", "tokyo", "glitch", "circus", "miami", "moemoe"]:
+for m in ["crayons", "eggs", "china", "crystal", "tokyo", "glitch", "circus", "miami", "moemoe", "tomochi"]:
     for layer in ["sky", "far", "mid", "near"]:
         src = os.path.join(SRC, f"{m}_bg_{layer}.png")
         dst = os.path.join(BG_OUT, f"{m}_{layer}.png")

@@ -188,6 +188,8 @@ const MAPS = [
   // Secret meme level: unlocks once you own 4 characters (no star cost).
   { id: "moemoe",  name: "MoeMoe Land",  cost: 0, bg: bgSet("moemoe"), road: "moemoe", hazard: "emoji",
     req: () => unlockedCharCount() >= 4, reqText: "🔒 4 CHARS" },
+  // Poki's pastel candy land: cake road + cute snack hazards
+  { id: "tomochi", name: "Tomochi",      cost: 350, bg: bgSet("tomochi"), road: "tomochi", hazard: "snack" },
 ];
 
 // Per-map hazard footprints (all ground-mounted; jump over or dash/boost to smash).
@@ -202,6 +204,7 @@ const HAZARDS = {
   cone:      { w: 56,  hMin: 66,  hMax: 104 },
   barrel:    { w: 66,  hMin: 72,  hMax: 104 },
   umbrella:  { w: 76,  hMin: 84,  hMax: 116 },
+  snack:     { w: 64,  hMin: 62,  hMax: 100 },
 };
 
 /* ---------- Asset loading (by URL, cached) ---------- */
@@ -685,7 +688,7 @@ function generateAhead() {
       const hz = HAZARDS[MAPS[selMap].hazard] || HAZARDS.crayon;
       obstacles.push({
         x: ox, top: seg.top, h: rand(hz.hMin, hz.hMax), w: hz.w,
-        kind: MAPS[selMap].hazard, dead: false, minClear: Infinity, scored: false,
+        kind: MAPS[selMap].hazard, variant: randi(0, 3), dead: false, minClear: Infinity, scored: false,
       });
     }
 
@@ -1265,6 +1268,7 @@ function drawRoad(x, topY, w, worldX) {
   else if (style === "glitch") drawRoadGlitch(x, topY, w, worldX);
   else if (style === "circus") drawRoadCircus(x, topY, w, worldX);
   else if (style === "miami") drawRoadMiami(x, topY, w, worldX);
+  else if (style === "tomochi") drawRoadTomochi(x, topY, w, worldX);
   else drawRoadNeon(x, topY, w, worldX);
 }
 
@@ -1622,6 +1626,59 @@ function drawRoadCircus(x, topY, w, worldX) {
   ctx.restore();
 }
 
+// Tomochi (Poki's candy land): a layered cake road — golden sponge with jam and
+// cream layers, pink icing dripping over the edge, and scrolling sprinkles.
+function drawRoadTomochi(x, topY, w, worldX) {
+  const botY = roadBottom(topY);
+  const h01 = (n) => { const v = Math.sin(n * 12.9898) * 43758.5453; return v - Math.floor(v); };
+  ctx.save();
+  ctx.beginPath(); ctx.rect(x, topY - 12, w, botY - topY + 12); ctx.clip();
+  // sponge body
+  const body = ctx.createLinearGradient(0, topY, 0, botY);
+  body.addColorStop(0, "#f7dca8"); body.addColorStop(1, "#d99e62");
+  ctx.fillStyle = body; ctx.fillRect(x, topY, w, botY - topY);
+  // jam + cream layers
+  const layer = (y, hgt, col) => { if (y < botY - 4) { ctx.fillStyle = col; ctx.fillRect(x, y, w, Math.min(hgt, botY - y)); } };
+  layer(topY + 44, 9, "#fffaf0");
+  layer(topY + 53, 8, "#e8436b");
+  layer(topY + 92, 9, "#fffaf0");
+  // sponge holes (world-anchored)
+  const hp = 26, hs = worldX - ((worldX % hp) + hp) % hp;
+  ctx.fillStyle = "rgba(170,110,50,0.35)";
+  for (let d = hs; d < worldX + w + hp; d += hp) {
+    for (let k = 0; k < 3; k++) {
+      const yy = topY + 24 + k * 34 + h01(d + k) * 12;
+      if (yy > botY - 6 || (yy > topY + 42 && yy < topY + 64)) continue;
+      ctx.beginPath(); ctx.ellipse(d - worldX + x + h01(d * 3 + k) * 14, yy, 2.5, 1.8, 0, 0, Math.PI * 2); ctx.fill();
+    }
+  }
+  // pink icing band + drips
+  ctx.fillStyle = "#ff9cc6";
+  ctx.fillRect(x, topY, w, 14);
+  const dp = 22, ds = worldX - ((worldX % dp) + dp) % dp;
+  for (let d = ds; d < worldX + w + dp; d += dp) {
+    const sx = d - worldX + x, len = 4 + h01(d) * 18, rw = 5 + h01(d + 1) * 3;
+    ctx.fillRect(sx - rw, topY + 10, rw * 2, len);
+    ctx.beginPath(); ctx.arc(sx, topY + 10 + len, rw, 0, Math.PI * 2); ctx.fill();
+  }
+  // glossy highlight + crayon ink edge on top
+  ctx.fillStyle = "rgba(255,255,255,0.55)"; ctx.fillRect(x, topY + 2, w, 3);
+  ctx.fillStyle = SNACK_INK; ctx.fillRect(x, topY - 1, w, 2);
+  // sprinkles on the icing
+  const sp = 17, ss = worldX - ((worldX % sp) + sp) % sp;
+  const sc = ["#ffe066", "#5bc8ff", "#7dff9b", "#c78bff", "#fff", "#ff5b6e"];
+  ctx.lineWidth = 2.4; ctx.lineCap = "round";
+  for (let d = ss; d < worldX + w + sp; d += sp) {
+    const sx = d - worldX + x + h01(d * 7) * 8, sy = topY + 5 + h01(d * 5) * 6, a = h01(d * 11) * Math.PI;
+    ctx.strokeStyle = sc[Math.floor(h01(d * 13) * sc.length)];
+    ctx.beginPath(); ctx.moveTo(sx - Math.cos(a) * 3, sy - Math.sin(a) * 3); ctx.lineTo(sx + Math.cos(a) * 3, sy + Math.sin(a) * 3); ctx.stroke();
+  }
+  ctx.restore();
+  ctx.save();
+  drawPlatformUnderside(x, topY, w, botY);
+  ctx.restore();
+}
+
 // Miami Beach: an 80s synthwave seafront road — dark teal asphalt with a warm
 // sunset underglow, a hot-pink + cyan neon curb, scrolling vaporwave grid lines
 // and cyan centre dashes.
@@ -1796,8 +1853,188 @@ function drawObstacle(x, o) {
     case "cone":      return drawHazardCone(x, o);
     case "barrel":    return drawHazardBarrel(x, o);
     case "umbrella":  return drawHazardUmbrella(x, o);
+    case "snack":     return drawHazardSnack(x, o);
     default:          return drawHazardCrayon(x, o);
   }
+}
+
+/* ---- Tomochi (Poki's candy land): cute kawaii snacks as hazards ----
+   Each obstacle picks a snack from o.variant: cupcake, macaron tower, pudding,
+   giant strawberry. The scenery is full of sweets too, so every snack gets a
+   white glow + dark crayon outline to read as "the thing you jump". */
+const SNACK_INK = "#4a2340";
+function kawaiiFace(cx, cy, s) {
+  ctx.save();
+  // blush
+  ctx.fillStyle = "rgba(255,110,150,0.55)";
+  ctx.beginPath(); ctx.ellipse(cx - s * 1.25, cy + s * 0.45, s * 0.5, s * 0.3, 0, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(cx + s * 1.25, cy + s * 0.45, s * 0.5, s * 0.3, 0, 0, Math.PI * 2); ctx.fill();
+  // eyes with a shine
+  ctx.fillStyle = SNACK_INK;
+  ctx.beginPath(); ctx.arc(cx - s * 0.8, cy, s * 0.32, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.arc(cx + s * 0.8, cy, s * 0.32, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = "#fff";
+  ctx.beginPath(); ctx.arc(cx - s * 0.9, cy - s * 0.12, s * 0.11, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.arc(cx + s * 0.7, cy - s * 0.12, s * 0.11, 0, Math.PI * 2); ctx.fill();
+  // little "w" mouth
+  ctx.strokeStyle = SNACK_INK; ctx.lineWidth = Math.max(1.4, s * 0.16); ctx.lineCap = "round";
+  ctx.beginPath();
+  ctx.arc(cx - s * 0.18, cy + s * 0.35, s * 0.18, 0, Math.PI);
+  ctx.arc(cx + s * 0.18, cy + s * 0.35, s * 0.18, 0, Math.PI);
+  ctx.stroke();
+  ctx.restore();
+}
+// fill + ink outline, with the white "pick me out" glow on the fill
+function snackShape(pathFn, fill) {
+  ctx.save();
+  ctx.shadowColor = "rgba(255,255,255,0.95)"; ctx.shadowBlur = 12;
+  pathFn(); ctx.fillStyle = fill; ctx.fill();
+  ctx.shadowBlur = 0;
+  ctx.lineWidth = 2.6; ctx.strokeStyle = SNACK_INK; ctx.lineJoin = "round";
+  pathFn(); ctx.stroke();
+  ctx.restore();
+}
+
+function drawHazardSnack(x, o) {
+  const cx = x + o.w / 2, bot = o.top, top = o.top - o.h, w = o.w, h = o.h;
+  // gentle squishy "breathing" (visual only — anchored at the base)
+  const sq = 1 + Math.sin(t * 4 + o.x * 0.05) * 0.03;
+  ctx.save();
+  ctx.translate(cx, bot); ctx.scale(1 / sq, sq); ctx.translate(-cx, -bot);
+  switch ((o.variant || 0) % 4) {
+    case 0: drawSnackCupcake(cx, top, bot, w, h); break;
+    case 1: drawSnackMacarons(cx, top, bot, w, h); break;
+    case 2: drawSnackPudding(cx, top, bot, w, h); break;
+    default: drawSnackStrawberry(cx, top, bot, w, h);
+  }
+  ctx.restore();
+}
+
+function drawSnackCupcake(cx, top, bot, w, h) {
+  const wrapTop = bot - h * 0.46, hw = w / 2;
+  // pleated wrapper (trapezoid)
+  const wrap = () => { ctx.beginPath(); ctx.moveTo(cx - hw, wrapTop); ctx.lineTo(cx + hw, wrapTop);
+    ctx.lineTo(cx + hw * 0.74, bot); ctx.lineTo(cx - hw * 0.74, bot); ctx.closePath(); };
+  // frosting swirl: three stacked blobs + cherry
+  const r1 = hw * 1.02, fr = () => {
+    ctx.beginPath();
+    ctx.ellipse(cx, wrapTop - r1 * 0.12, r1, r1 * 0.42, 0, 0, Math.PI * 2);
+    ctx.moveTo(cx + r1 * 0.78, wrapTop - r1 * 0.5);
+    ctx.ellipse(cx, wrapTop - r1 * 0.5, r1 * 0.78, r1 * 0.36, 0, 0, Math.PI * 2);
+    ctx.moveTo(cx + r1 * 0.5, top + r1 * 0.3);
+    ctx.ellipse(cx, Math.max(top + r1 * 0.3, wrapTop - r1 * 0.9), r1 * 0.5, r1 * 0.3, 0, 0, Math.PI * 2);
+  };
+  snackShape(fr, "#ffb3d1");
+  // filler between swirl and tip for tall cupcakes
+  const tipY = Math.max(top + 8, wrapTop - r1 * 0.9 - r1 * 0.34);
+  snackShape(() => { ctx.beginPath(); ctx.arc(cx + 2, tipY, 7, 0, Math.PI * 2); }, "#ff3b5c"); // cherry
+  ctx.save(); ctx.strokeStyle = SNACK_INK; ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.moveTo(cx + 2, tipY - 6); ctx.quadraticCurveTo(cx + 6, tipY - 14, cx + 11, tipY - 15); ctx.stroke();
+  ctx.restore();
+  snackShape(wrap, "#9fe3d0");
+  ctx.save(); ctx.strokeStyle = "rgba(74,35,64,0.35)"; ctx.lineWidth = 1.5;
+  for (let i = 1; i < 5; i++) {
+    const f = i / 5;
+    ctx.beginPath(); ctx.moveTo(cx - hw + w * f, wrapTop + 3); ctx.lineTo(cx - hw * 0.74 + hw * 1.48 * f, bot - 2); ctx.stroke();
+  }
+  ctx.restore();
+  // sprinkles on the frosting
+  const sc = ["#ffe066", "#5bc8ff", "#7dff9b", "#c78bff", "#fff"];
+  ctx.save(); ctx.lineWidth = 2.4; ctx.lineCap = "round";
+  for (let i = 0; i < 7; i++) {
+    const a = i * 2.39, rx = Math.cos(a) * r1 * 0.62, ry = Math.sin(a) * r1 * 0.2;
+    ctx.strokeStyle = sc[i % sc.length];
+    const px = cx + rx, py = wrapTop - r1 * 0.3 + ry;
+    ctx.beginPath(); ctx.moveTo(px - 2, py - 1); ctx.lineTo(px + 2, py + 1); ctx.stroke();
+  }
+  ctx.restore();
+  kawaiiFace(cx, (wrapTop + bot) / 2, Math.min(7, w / 9));
+}
+
+function drawSnackMacarons(cx, top, bot, w, h) {
+  const n = Math.max(2, Math.round(h / 32)), mh = h / n, hw = w / 2 * 0.95;
+  const cols = ["#ffb3d1", "#b9f0c8", "#c9b8ff", "#ffe39a", "#a8e4ff"];
+  for (let i = 0; i < n; i++) {           // bottom -> top, each a chunky cookie
+    const yb = bot - i * mh, yt = yb - mh + 2, col = cols[i % cols.length];
+    const r = (yb - yt) / 2;
+    snackShape(() => { ctx.beginPath(); roundRectPath(cx - hw, yt, hw * 2, yb - yt, r); }, col);
+    // cream filling band across the middle
+    ctx.save();
+    ctx.beginPath(); roundRectPath(cx - hw, yt, hw * 2, yb - yt, r); ctx.clip();
+    const my = (yt + yb) / 2;
+    ctx.fillStyle = "#fff8ee"; ctx.fillRect(cx - hw, my - 3, hw * 2, 6);
+    ctx.strokeStyle = "rgba(74,35,64,0.45)"; ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.moveTo(cx - hw, my - 3); ctx.lineTo(cx + hw, my - 3);
+    ctx.moveTo(cx - hw, my + 3); ctx.lineTo(cx + hw, my + 3); ctx.stroke();
+    // shine on the top shell
+    ctx.fillStyle = "rgba(255,255,255,0.6)";
+    ctx.beginPath(); ctx.ellipse(cx - hw * 0.45, yt + r * 0.35, hw * 0.28, r * 0.16, -0.15, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
+  }
+  kawaiiFace(cx, bot - mh * 0.25 - 1, Math.min(5.5, w / 11));
+}
+// rounded-rect path only (no begin/fill) for use inside a caller's path
+function roundRectPath(x, y, w, h, r) {
+  r = Math.min(r, w / 2, h / 2);
+  ctx.moveTo(x + r, y);
+  ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r);
+  ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath();
+}
+
+function drawSnackPudding(cx, top, bot, w, h) {
+  const hw = w / 2, capH = Math.min(18, h * 0.22), bodyTop = top + capH + 8;
+  const body = () => { ctx.beginPath();
+    ctx.moveTo(cx - hw * 0.72, bodyTop); ctx.lineTo(cx + hw * 0.72, bodyTop);
+    ctx.quadraticCurveTo(cx + hw * 1.02, bot - 4, cx + hw, bot);
+    ctx.lineTo(cx - hw, bot); ctx.quadraticCurveTo(cx - hw * 1.02, bot - 4, cx - hw * 0.72, bodyTop);
+    ctx.closePath(); };
+  snackShape(body, "#ffe08a");
+  // caramel top with drips
+  const cara = () => { ctx.beginPath();
+    ctx.moveTo(cx - hw * 0.74, bodyTop - 2); ctx.lineTo(cx + hw * 0.74, bodyTop - 2);
+    ctx.lineTo(cx + hw * 0.8, bodyTop + 8);
+    for (let i = 4; i >= 0; i--) {
+      const dx = cx - hw * 0.8 + (hw * 1.6) * (i / 4), dl = 6 + ((i * 7) % 3) * 5;
+      ctx.lineTo(dx + 4, bodyTop + 8); ctx.arc(dx, bodyTop + 8 + dl, 4, 0, Math.PI); ctx.lineTo(dx - 4, bodyTop + 8);
+    }
+    ctx.closePath(); };
+  snackShape(cara, "#b8662e");
+  // whipped cream + cherry
+  snackShape(() => { ctx.beginPath(); ctx.ellipse(cx, bodyTop - 4, hw * 0.42, capH * 0.5, 0, 0, Math.PI * 2); }, "#fffaf2");
+  snackShape(() => { ctx.beginPath(); ctx.arc(cx, bodyTop - 4 - capH * 0.55, 6.5, 0, Math.PI * 2); }, "#ff3b5c");
+  kawaiiFace(cx, (bodyTop + 14 + bot) / 2, Math.min(7, w / 9));
+}
+
+function drawSnackStrawberry(cx, top, bot, w, h) {
+  const hw = w / 2, leafH = 12, bTop = top + leafH;
+  const berry = () => { ctx.beginPath();
+    ctx.moveTo(cx, bot);
+    ctx.bezierCurveTo(cx - hw * 0.5, bot - 2, cx - hw * 1.08, bTop + (bot - bTop) * 0.45, cx - hw * 0.86, bTop + 6);
+    ctx.quadraticCurveTo(cx - hw * 0.6, bTop - 3, cx, bTop + 2);
+    ctx.quadraticCurveTo(cx + hw * 0.6, bTop - 3, cx + hw * 0.86, bTop + 6);
+    ctx.bezierCurveTo(cx + hw * 1.08, bTop + (bot - bTop) * 0.45, cx + hw * 0.5, bot - 2, cx, bot);
+    ctx.closePath(); };
+  snackShape(berry, "#ff4f6d");
+  // seeds
+  ctx.save(); ctx.fillStyle = "#ffe8a0";
+  const bh = bot - bTop;
+  for (let r = 0; r < 5; r++) for (let c = -2; c <= 2; c++) {
+    const yy = bTop + bh * (0.18 + r * 0.17), span = hw * (0.8 - r * 0.13);
+    const xx = cx + c * span * 0.42 + (r % 2 ? span * 0.2 : 0);
+    if (Math.abs(xx - cx) > span * 0.9) continue;
+    if (yy > bTop + bh * 0.42 && yy < bTop + bh * 0.72 && Math.abs(xx - cx) < hw * 0.55) continue; // face area
+    ctx.beginPath(); ctx.ellipse(xx, yy, 1.6, 2.6, 0, 0, Math.PI * 2); ctx.fill();
+  }
+  ctx.restore();
+  // leafy crown
+  const leaves = () => { ctx.beginPath();
+    for (let i = 0; i < 5; i++) {
+      const a = Math.PI + (i + 0.5) / 5 * Math.PI;
+      const lx = cx + Math.cos(a) * hw * 0.75, ly = bTop + 4 + Math.sin(a) * leafH;
+      ctx.moveTo(cx, bTop + 4); ctx.quadraticCurveTo((cx + lx) / 2 - 4, ly - 2, lx, ly); ctx.quadraticCurveTo((cx + lx) / 2 + 4, ly + 6, cx, bTop + 4);
+    } };
+  snackShape(leaves, "#6ccf6a");
+  kawaiiFace(cx, bTop + bh * 0.56, Math.min(7, w / 9));
 }
 
 // Miami Beach: a striped beach umbrella on a pole planted in the sand.
