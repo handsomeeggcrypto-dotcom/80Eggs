@@ -29,6 +29,24 @@ cd moetorcycles && python3 -m http.server 8777
 
 Then open http://localhost:8777/ in your browser.
 
+## Game modes
+
+Picked with the pills under the title on the select screen (or `Tab`); saved as
+`moetorcycles_mode`. Defined in `MODES` in `game.js` (`curMode()`).
+
+- **Normal** — the classic run (gaps, hazards, high score in `moetorcycles_best`).
+- **Cruise** — no gaps, no hazards, gentle hills (±30px, under the landing
+  tolerance) and a constant relaxed speed; you can't crash. Stars + the odd boost
+  ring still appear, but since it can't be lost it banks stars at
+  `CRUISE_STAR_RATE` (25%). HUD shows metres; `Esc` / the EXIT button leaves.
+- **Portal** — normal rules plus a floating warp portal every ~7–10k px over a
+  hazard-free stretch (`spawnPortal`). It shows its destination (one of your
+  OTHER owned maps, preloaded on spawn); fly through for a flash (`warp`,
+  `drawWarpFx`) that swaps `selMap` mid-run, re-skins hazards still ahead,
+  +250×combo and a boost. Needs 2 owned maps. Own best in
+  `moetorcycles_best_portal`. Restarting / leaving returns to your picked map
+  (`homeMap`).
+
 ## Controls
 
 | Action | Keyboard | Touch / Mouse |
@@ -38,6 +56,8 @@ Then open http://localhost:8777/ in your browser.
 | Character (select screen) | `←` / `→` | tap the side arrows |
 | Map / trail color / trail style menus | `1` / `2` / `3` (arrows + `Enter` inside, `Esc` closes) | tap a tile |
 | Quick-cycle trail style / color / map | `↑` `↓` / `C` / `[` `]` | — |
+| Game mode (select screen) | `Tab` | tap NORMAL / CRUISE / PORTAL |
+| Leave a Cruise ride | `Esc` | tap ‹ EXIT |
 | Start | `Space` | tap "RIDE!" (becomes "UNLOCK …" when something's locked) |
 | Back to select (on crash) | `Esc` | — |
 | Mute / unmute | `M` | tap the 🔊 button (bottom-right) |

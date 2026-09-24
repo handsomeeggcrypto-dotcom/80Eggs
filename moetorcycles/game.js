@@ -333,6 +333,28 @@ function mapUnlocked(m) {
   return isUnlocked("map:" + m.id, m.cost);
 }
 
+/* ---------- Game modes ----------
+   normal = the classic run. cruise = no gaps / hazards / death, gentle hills,
+   just ride (Esc or EXIT to leave). portal = normal rules plus floating portals
+   that warp you into one of your other maps mid-run (needs 2 owned maps). */
+const MODES = [
+  { id: "normal", name: "NORMAL", desc: "Classic run: jump the gaps, dodge hazards, chase a high score." },
+  { id: "cruise", name: "CRUISE", desc: "No gaps, no hazards, no crashing. Just cruise around and grab stars." },
+  { id: "portal", name: "PORTAL", desc: "Fly through portals to warp into your other maps mid-run!",
+    req: () => MAPS.filter(mapUnlocked).length >= 2, reqText: "🔒 OWN 2 MAPS" },
+];
+let selMode = Math.max(0, MODES.findIndex((m) => m.id === localStorage.getItem("moetorcycles_mode")));
+const curMode = () => MODES[selMode].id;
+const modeUnlocked = (i) => !MODES[i].req || MODES[i].req();
+const bestKey = () => curMode() === "portal" ? "moetorcycles_best_portal" : "moetorcycles_best";
+function setMode(i) {
+  selMode = (i + MODES.length) % MODES.length;
+  localStorage.setItem("moetorcycles_mode", MODES[selMode].id);
+  best = Number(localStorage.getItem(bestKey()) || 0);
+  pendingStart = false;
+  Sound.ui();
+}
+
 /* ---------- Upgrade tree ----------
    Permanent, bought with banked stars. Each branch is a chain: a node needs the
    one above it. Effects are baked into `up` at the start of each run. */
@@ -411,7 +433,7 @@ function saveTrail() {
   localStorage.setItem("moetorcycles_trail_design", selTrailDesign);
 }
 // clickable regions on the select screen, refreshed each frame it's drawn
-const uiHits = { tiles: [], pickItems: [], pickClose: null, pickPanel: null, rideBtn: null,
+const uiHits = { modes: [], exitBtn: null, tiles: [], pickItems: [], pickClose: null, pickPanel: null, rideBtn: null,
   upnodes: [], upBack: null, toUpgrades: null, deadBack: null };
 
 // select-screen popup menu: null | "map" | "color" | "style"; pickCursor = keyboard focus
@@ -423,12 +445,13 @@ let picker = null, pickCursor = 0;
   const mi = MAPS.findIndex((m) => m.id === localStorage.getItem("moetorcycles_map"));
   if (ri >= 0 && isUnlocked("char:" + RIDES[ri].id, RIDES[ri].cost)) selRide = ri;
   if (mi >= 0 && mapUnlocked(MAPS[mi])) selMap = mi;
+  if (!modeUnlocked(selMode)) selMode = 0;
   bootUrls = [...rideUrls(RIDES[selRide]), ...mapUrls(MAPS[selMap]), ...MAPS.map(mapThumb), DUSTOFF];
   bootUrls.forEach(loadImg);
   setRide(selRide);
 })();
 
-let best = Number(localStorage.getItem("moetorcycles_best") || 0);
+let best = Number(localStorage.getItem(bestKey()) || 0);
 let menuCd = 0; // debounce so one tap/press can't skip a whole screen
 
 /* ---------- Input ---------- */
@@ -475,7 +498,7 @@ document.addEventListener("touchend", (e) => {
 document.addEventListener("touchmove", (e) => { if (e.scale && e.scale !== 1) e.preventDefault(); }, { passive: false });
 
 window.addEventListener("keydown", (e) => {
-  if (["ArrowUp","ArrowDown","ArrowLeft","ArrowRight","Space"].includes(e.code)) e.preventDefault();
+  if (["ArrowUp","ArrowDown","ArrowLeft","ArrowRight","Space","Tab"].includes(e.code)) e.preventDefault();
   Sound.unlock();
   enterFullscreen();
   if (e.code === "KeyM") { Sound.toggleMute(); return; }
@@ -500,6 +523,8 @@ canvas.addEventListener("pointerdown", (e) => {
   const x = (e.clientX - r.left) / r.width;
   anyPressQueued = true;
   if (state === STATE.PLAY) {
+    const eb = uiHits.exitBtn;
+    if (eb && mx >= eb.x && mx <= eb.x + eb.w && my >= eb.y && my <= eb.y + eb.h) { backToSelect(); return; }
     if (x >= 0.5) { dashQueued = true; }               // right = dash
     else { jumpQueued = true; touchJumpHeld = true; jumpPointerId = e.pointerId; } // left = jump (held)
   } else {
@@ -509,6 +534,7 @@ canvas.addEventListener("pointerdown", (e) => {
 const MUTE_BTN = { x: W - 46, y: H - 42, r: 20 };
 
 function handleMenuKey(code) {
+  if (state === STATE.PLAY && code === "Escape" && curMode() === "cruise") { backToSelect(); return; }
   if (state === STATE.TITLE) {
     if ((code === "Space" || code === "Enter") && menuCd <= 0) { state = STATE.SELECT; menuCd = 0.3; }
   } else if (state === STATE.SELECT) {
@@ -517,6 +543,7 @@ function handleMenuKey(code) {
     // ↑/↓ style, C color, U unlock, T upgrades, Space/Enter ride
     if (code === "ArrowLeft")       { setRide(selRide - 1); Sound.ui(); }
     else if (code === "ArrowRight") { setRide(selRide + 1); Sound.ui(); }
+    else if (code === "Tab") cycleMode();
     else if (code === "Digit1") openPicker("map");
     else if (code === "Digit2") openPicker("color");
     else if (code === "Digit3") openPicker("style");
@@ -536,7 +563,7 @@ function handleMenuKey(code) {
     if (code === "Escape" || code === "KeyT") { state = STATE.SELECT; menuCd = 0.2; }
   } else if (state === STATE.DEAD) {
     if ((code === "Space" || code === "Enter") && menuCd <= 0) startGame();
-    if (code === "Escape") { state = STATE.SELECT; menuCd = 0.3; }
+    if (code === "Escape") backToSelect();
   }
 }
 
@@ -557,6 +584,12 @@ function pointerMenu(e, r) {
       return;
     }
     if (inRect(uiHits.toUpgrades)) { state = STATE.UPGRADES; menuCd = 0.2; Sound.ui(); return; }
+    for (const mb of uiHits.modes) {
+      if (inRect(mb)) {
+        if (modeUnlocked(mb.i)) setMode(mb.i); else { unlockFlash = 0.5; Sound.ui(); }
+        menuCd = 0.15; return;
+      }
+    }
     for (const tl of uiHits.tiles) {
       if (inRect(tl)) { openPicker(tl.kind); return; }
     }
@@ -581,7 +614,7 @@ function pointerMenu(e, r) {
     const my = (e.clientY - r.top) / r.height * H;
     const b = uiHits.deadBack;
     if (b && mx >= b.x && mx <= b.x + b.w && my >= b.y && my <= b.y + b.h) {
-      state = STATE.SELECT; menuCd = 0.3; Sound.ui(); return;   // back to character/map select
+      backToSelect(); return;   // back to character/map select
     }
     startGame(); // tap elsewhere = ride again
   }
@@ -612,6 +645,10 @@ const BOOST_LIFT = 320;         // upward impulse on entry (soar forward)
 
 let player, world, particles, stars, obstacles, rings, score, speed, distance, animT, screenShake, deathTimer, trail;
 let popups;                          // floating score/near-miss text
+let portals, nextPortalAt, warp, runWarps; // portal mode
+let starFrac = 0;                    // fractional star carry (cruise banks at a reduced rate)
+const CRUISE_STAR_RATE = 0.25;
+let homeMap = null;                  // the map picked on the select screen (portals change selMap mid-run)
 let combo, comboTimer, runStars;
 const COMBO_WINDOW = 2.6;           // seconds to keep the chain alive
 const NEAR_MISS_DIST = 52;          // clearing a hazard by <this many px = near miss
@@ -642,6 +679,7 @@ function resetRun() {
   trail = [];
   rings = [];
   popups = [];
+  portals = []; nextPortalAt = 3200; warp = null; runWarps = 0; starFrac = 0;
   combo = 0; comboTimer = 0; runStars = 0;
   score = 0;
   distance = 0;
@@ -665,13 +703,15 @@ function generateAhead() {
     // decide: platform or gap. Gaps are wide (the floaty jump carries ~690px)
     // so clearing them feels like a long, deliberate arc, but stays forgiving.
     const prevTop = lastTop;
-    const gap = Math.random() < 0.40 ? rand(200, 460) : 0;
+    const cruise = curMode() === "cruise";
+    const gap = !cruise && Math.random() < 0.40 ? rand(200, 460) : 0;
     const gapStart = world.nextX;
     world.nextX += gap;
 
     const w = rand(260, 620);
     // vary surface height, clamped to a playable band
-    let top = lastTop + rand(-120, 120);
+    // cruise: gentle hills only (a step under the 40px landing tolerance never trips you)
+    let top = lastTop + (cruise ? rand(-30, 30) : rand(-120, 120));
     top = clamp(top, H - GROUND_MARGIN - 230, H - GROUND_MARGIN + 60);
     const seg = { x: world.nextX, w, top };
     world.segs.push(seg);
@@ -701,8 +741,17 @@ function generateAhead() {
         stars.push({ x: sx, y: sy, got: false, spin: Math.random() * 6 });
       }
     }
+    // cruise: the odd floating boost ring just for fun
+    if (cruise && w > 380 && Math.random() < 0.2)
+      rings.push({ x: seg.x + w * 0.5, y: seg.top - 190, r: 58, got: false, spin: Math.random() * 6 });
+    // portal mode: a warp portal floating over a long, hazard-free stretch
+    let portalHere = false;
+    if (curMode() === "portal" && gap === 0 && w > 380 && seg.x > nextPortalAt) {
+      portalHere = spawnPortal(seg);
+      nextPortalAt = seg.x + rand(7000, 10000);
+    }
     // hazard (jump over, or dash/boost to smash) — themed per map
-    if (gap === 0 && w > 340 && Math.random() < 0.5) {
+    if (!cruise && !portalHere && gap === 0 && w > 340 && Math.random() < 0.5) {
       const ox = seg.x + rand(w * 0.35, w * 0.7);
       const hz = HAZARDS[MAPS[selMap].hazard] || HAZARDS.crayon;
       obstacles.push({
@@ -718,9 +767,44 @@ function generateAhead() {
   stars = stars.filter((s) => s.x > distance - 200);
   rings = rings.filter((r) => r.x > distance - 200);
   obstacles = obstacles.filter((o) => o.x > distance - 200);
+  portals = portals.filter((p) => p.x > distance - 300);
+}
+
+// pick a destination among the OTHER maps you own; preload it while it approaches
+function spawnPortal(seg) {
+  const pool = MAPS.map((m, i) => i).filter((i) => i !== selMap && mapUnlocked(MAPS[i]));
+  if (!pool.length) return false;
+  const dest = pool[randi(0, pool.length - 1)];
+  mapUrls(MAPS[dest]).forEach(loadImg);
+  portals.push({ x: seg.x + seg.w * 0.5, y: seg.top - 200, r: 72, dest, got: false, spin: 0 });
+  return true;
+}
+const WARP_SWITCH = 0.18, WARP_END = 0.75; // flash peaks (map swaps) at 0.18s
+function startWarp(dest) {
+  warp = { t: 0, dest, switched: false };
+  mapUrls(MAPS[dest]).forEach(loadImg); // normally already preloaded at spawn
+  runWarps++;
+  combo += 3; comboTimer = COMBO_WINDOW;
+  const bonus = 250 * comboMult();
+  score += bonus;
+  player.boostT = BOOST_TIME; screenShake = 8;
+  Sound.boost();
+  spawnPopup(PLAYER_X, player.y + PLAYER_H * 0.2, `WARP → ${MAPS[dest].name}  +${bonus}`, "#e0b3ff");
+}
+function updateWarp(dt) {
+  warp.t += dt;
+  if (!warp.switched && warp.t >= WARP_SWITCH) {
+    warp.switched = true;
+    selMap = warp.dest;
+    // hazards still ahead become the new map's hazard
+    const hz = MAPS[selMap].hazard, band = HAZARDS[hz] || HAZARDS.crayon;
+    for (const o of obstacles) if (o.x - distance > W * 0.6) { o.kind = hz; o.w = band.w; }
+  }
+  if (warp.t >= WARP_END) warp = null;
 }
 
 function startGame() {
+  if (homeMap !== null) selMap = homeMap; // a portal run always restarts on your picked map
   resetRun();
   state = STATE.PLAY;
   menuCd = 0.25;
@@ -732,8 +816,9 @@ function startGame() {
 // only ride when both the character and the map are unlocked
 function attemptStart() {
   const c = RIDES[selRide], m = MAPS[selMap];
-  if (!(isUnlocked("char:" + c.id, c.cost) && mapUnlocked(m))) { unlockFlash = 0.5; return; }
+  if (!(isUnlocked("char:" + c.id, c.cost) && mapUnlocked(m) && modeUnlocked(selMode))) { unlockFlash = 0.5; return; }
   saveSelection();
+  homeMap = selMap;
   const need = [...rideUrls(c), ...mapUrls(m)];
   need.forEach(loadImg);
   if (allLoaded(need)) { pendingStart = false; startGame(); }
@@ -751,6 +836,13 @@ function cycleTrailStyle(dir) {
     i = (i + dir + TRAIL_DESIGNS.length) % TRAIL_DESIGNS.length;
     if (isUnlocked("ts:" + i, TRAIL_DESIGNS[i].cost)) { selTrailDesign = i; saveTrail(); return; }
   }
+}
+
+// leave a run for the select screen (crash screen / cruise exit), undoing portal warps
+function backToSelect() {
+  if (homeMap !== null) selMap = homeMap;
+  homeMap = null;
+  state = STATE.SELECT; menuCd = 0.3; Sound.ui();
 }
 
 /* ---------- Helpers ---------- */
@@ -775,7 +867,8 @@ function update(dt) {
   }
 
   animT += dt;
-  speed = Math.min(speed + dt * SPEED_RAMP, up.speedMax); // slow, capped ramp
+  if (curMode() !== "cruise") speed = Math.min(speed + dt * SPEED_RAMP, up.speedMax); // slow, capped ramp
+  if (warp) updateWarp(dt);
   const spdMult = Math.max(player.dashT > 0 ? DASH_MULT : 1, player.boostT > 0 ? BOOST_MULT : 1);
   const dx = speed * spdMult * dt;
   distance += dx;
@@ -875,7 +968,10 @@ function update(dt) {
       s.got = true;
       combo++; comboTimer = COMBO_WINDOW;
       score += 25 * comboMult();
-      runStars += up.starValue; addStars(up.starValue);
+      // cruise can't be lost (AFK-able), so it banks stars at a reduced rate
+      starFrac += up.starValue * (curMode() === "cruise" ? CRUISE_STAR_RATE : 1);
+      const whole = Math.floor(starFrac);
+      if (whole) { starFrac -= whole; runStars += whole; addStars(whole); }
       Sound.star(combo);
       for (let i = 0; i < 8; i++) spawnSpark(PLAYER_X, player.y + PLAYER_H * 0.4, "#ffe066");
     }
@@ -898,6 +994,13 @@ function update(dt) {
       Sound.boost();
       for (let i = 0; i < 22; i++) spawnSpark(rx, rg.y, ["#ffd23f","#fff3b0","#ffe066","#fff"][i % 4]);
     }
+  }
+
+  // portals — fly through to warp into another map
+  for (const pt of portals) {
+    if (pt.got) continue;
+    pt.spin += dt * 2.5;
+    if (!warp && Math.hypot(pt.x - distance - pcx, pt.y - pcy) < pt.r * 0.8) { pt.got = true; startWarp(pt.dest); }
   }
 
   // obstacles
@@ -966,7 +1069,7 @@ function kill() {
   screenShake = 18;
   Sound.crash();
   score = Math.floor(score);
-  if (score > best) { best = score; localStorage.setItem("moetorcycles_best", best); }
+  if (curMode() !== "cruise" && score > best) { best = score; localStorage.setItem(bestKey(), best); }
   for (let i = 0; i < 40; i++) {
     spawnSpark(PLAYER_X, player.y + PLAYER_H * 0.5,
       ["#ff5bd0","#5bc8ff","#ffe066","#7dff9b","#c78bff"][i % 5]);
@@ -1097,7 +1200,7 @@ function render(dt) {
   else if (state === STATE.SELECT) drawSelect();
   else if (state === STATE.UPGRADES) drawUpgradeTree();
   else if (state === STATE.RESCUE) drawRescue();
-  else { drawWorld(); drawTrailInGame(); drawPlayer(); drawParticles(); drawPopups(); drawHUD(); if (state === STATE.DEAD) drawDead(); }
+  else { drawWorld(); drawTrailInGame(); drawPlayer(); drawParticles(); drawPopups(); if (warp) drawWarpFx(); drawHUD(); if (state === STATE.DEAD) drawDead(); }
 
   ctx.restore();
   if (isTouch && (state === STATE.PLAY || state === STATE.RESCUE)) drawTouchPads();
@@ -1242,6 +1345,12 @@ function drawWorld() {
     if (x < -60 || x > W + 60) continue;
     drawRing(x, rg.y, rg.r, rg.spin);
   }
+  for (const pt of portals) {
+    if (pt.got) continue;
+    const x = pt.x - distance;
+    if (x < -120 || x > W + 120) continue;
+    drawPortal(x, pt.y, pt.r, pt.dest, pt.spin);
+  }
   for (const s of stars) {
     if (s.got) continue;
     const x = s.x - distance;
@@ -1254,6 +1363,61 @@ function drawWorld() {
     if (x < -60 || x > W + 60) continue;
     drawObstacle(x, o);
   }
+}
+
+// A swirling warp portal: rainbow rim, a window onto the destination map (its
+// thumbnail), rotating swirl arms, and the destination's name above it.
+function drawPortal(x, y, r, dest, spin) {
+  const m = MAPS[dest];
+  ctx.save();
+  // soft outer glow rings, hue-cycling
+  for (let k = 3; k >= 1; k--) {
+    ctx.beginPath(); ctx.arc(x, y, r + k * 7, 0, Math.PI * 2);
+    ctx.strokeStyle = `hsla(${(t * 120 + k * 50) % 360}, 100%, 65%, ${0.18 * (4 - k)})`;
+    ctx.lineWidth = 8; ctx.stroke();
+  }
+  // window onto the destination
+  ctx.save();
+  ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.clip();
+  drawThumb(mapThumb(m), x - r * 1.5, y - r, r * 3, r * 2);
+  // swirl arms spinning toward the centre
+  ctx.lineCap = "round";
+  for (let a = 0; a < 4; a++) {
+    ctx.beginPath();
+    for (let i = 0; i <= 20; i++) {
+      const f = i / 20, ang = spin * 1.6 + a * Math.PI / 2 + f * 3.2, rr = r * (1 - f * 0.9);
+      const px = x + Math.cos(ang) * rr, py = y + Math.sin(ang) * rr;
+      if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+    }
+    ctx.strokeStyle = "rgba(255,255,255,0.45)"; ctx.lineWidth = 5; ctx.stroke();
+  }
+  // bright core
+  const g = ctx.createRadialGradient(x, y, 0, x, y, r * 0.45);
+  g.addColorStop(0, "rgba(255,255,255,0.85)"); g.addColorStop(1, "rgba(255,255,255,0)");
+  ctx.fillStyle = g; ctx.fillRect(x - r, y - r, r * 2, r * 2);
+  ctx.restore();
+  // rim
+  ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2);
+  ctx.strokeStyle = `hsl(${(t * 160) % 360} 100% 70%)`; ctx.lineWidth = 7;
+  ctx.shadowColor = ctx.strokeStyle; ctx.shadowBlur = 22; ctx.stroke();
+  ctx.shadowBlur = 0; ctx.strokeStyle = "#fff"; ctx.lineWidth = 2.5; ctx.stroke();
+  // label
+  ctx.font = "bold 17px Trebuchet MS, sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+  ctx.fillStyle = "#fff"; ctx.shadowColor = "rgba(0,0,0,0.8)"; ctx.shadowBlur = 6;
+  ctx.fillText(`🌀 ${m.name}`, x, y - r - 26);
+  ctx.restore();
+}
+
+// full-screen flash while warping (peaks when the map swaps underneath)
+function drawWarpFx() {
+  const a = warp.t < WARP_SWITCH ? warp.t / WARP_SWITCH
+    : Math.max(0, 1 - (warp.t - WARP_SWITCH) / (WARP_END - WARP_SWITCH));
+  const cy = player.y + PLAYER_H * 0.5;
+  const g = ctx.createRadialGradient(PLAYER_X, cy, 0, PLAYER_X, cy, W);
+  g.addColorStop(0, "rgba(255,255,255,1)");
+  g.addColorStop(0.35, "rgba(230,190,255,0.95)");
+  g.addColorStop(1, "rgba(120,60,220,0.9)");
+  ctx.save(); ctx.globalAlpha = a; ctx.fillStyle = g; ctx.fillRect(0, 0, W, H); ctx.restore();
 }
 
 // How far down a road segment should be painted. Short/low roads fill to the
@@ -2779,19 +2943,22 @@ function drawHUD() {
   ctx.textBaseline = "top";
   ctx.fillStyle = "#fff";
   ctx.shadowColor = "#ff5bd0"; ctx.shadowBlur = 12;
-  ctx.fillText(`${Math.floor(score)}`, 28, 22);
+  const cruise = curMode() === "cruise";
+  ctx.fillText(cruise ? `${Math.floor(distance / 100)} m` : `${Math.floor(score)}`, 28, 22); // cruise: distance, no score
   ctx.font = "bold 18px Trebuchet MS, sans-serif";
   ctx.shadowBlur = 0;
   ctx.fillStyle = "rgba(255,255,255,0.7)";
-  ctx.fillText(`BEST ${best}`, 30, 62);
+  ctx.fillText(cruise ? "CRUISE" : `BEST ${best}`, 30, 62);
   // stars collected this run (banked)
   ctx.fillStyle = "#ffe066";
   ctx.fillText(`🌟 ${runStars}`, 30, 86);
   // shields (dustoff rescues) remaining
-  if (player.shieldsLeft > 0) {
+  let hy = 110;
+  if (player.shieldsLeft > 0 && !cruise) {
     ctx.fillStyle = "#5bc8ff";
-    ctx.fillText(`🛡 ${player.shieldsLeft}`, 30, 110);
+    ctx.fillText(`🛡 ${player.shieldsLeft}`, 30, hy); hy += 24;
   }
+  if (curMode() === "portal") { ctx.fillStyle = "#e0b3ff"; ctx.fillText(`🌀 ${runWarps}`, 30, hy); }
 
   // dash charges
   ctx.textAlign = "right";
@@ -2800,6 +2967,20 @@ function drawHUD() {
   const label = up.dashMax > 1 ? `DASH ${player.dashStock}/${up.dashMax}` : (ready ? "DASH READY" : "dash…");
   ctx.fillText(label, W - 28, 26);
   ctx.restore();
+
+  // cruise has no ending — a tappable EXIT (or Esc) goes back to the select screen
+  uiHits.exitBtn = null;
+  if (cruise && state === STATE.PLAY) {
+    const b = { x: W - 148, y: 56, w: 120, h: 36 };
+    ctx.save();
+    ctx.fillStyle = "rgba(20,4,40,0.55)"; ctx.strokeStyle = "rgba(255,255,255,0.5)"; ctx.lineWidth = 2;
+    roundRect(b.x, b.y, b.w, b.h, 18, true); ctx.stroke();
+    ctx.fillStyle = "#fff"; ctx.font = "bold 16px Trebuchet MS, sans-serif";
+    ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    ctx.fillText(isTouch ? "‹ EXIT" : "‹ EXIT (Esc)", b.x + b.w / 2, b.y + b.h / 2 + 1);
+    ctx.restore();
+    uiHits.exitBtn = b;
+  }
 
   // combo multiplier (center-top) with a draining timer bar
   if (combo > 0 && comboMult() > 1) {
@@ -2869,7 +3050,7 @@ function drawTitle() {
 
 function drawSelect() {
   menuScrim();
-  centerText("CHOOSE YOUR RIDE", 40, 32, "#fff");
+  centerText("CHOOSE YOUR RIDE", 34, 28, "#fff");
 
   uiHits.tiles.length = 0;
   uiHits.pickClose = uiHits.pickPanel = null;
@@ -2885,14 +3066,21 @@ function drawSelect() {
   ctx.restore();
   uiHits.toUpgrades = ub;
 
+  drawModePills();
   drawCharacterCard();
   drawLoadoutTiles();
+  ctx.save();
+  ctx.font = "bold 15px Trebuchet MS, sans-serif";
+  const dw = ctx.measureText(MODES[selMode].desc).width + 32;
+  ctx.fillStyle = "rgba(10,2,30,0.6)"; roundRect(W / 2 - dw / 2, 531, dw, 24, 12, true);
+  ctx.restore();
+  centerText(MODES[selMode].desc, 543, 15, "rgba(255,255,255,0.85)");
   drawRideButton();
   ctx.save();
   ctx.fillStyle = "rgba(10,2,30,0.55)";
   roundRect(W / 2 - 250, H - 44, 500, 28, 14, true);
   ctx.restore();
-  centerText("←/→ character   ·   1 map   2 color   3 style   ·   SPACE ride", H - 30, 14,
+  centerText("TAB mode  ·  ←/→ character  ·  1 map  2 color  3 style  ·  SPACE ride", H - 30, 14,
     "rgba(255,255,255,0.75)");
 
   if (picker) drawPicker();
@@ -2993,7 +3181,33 @@ function drawUpgradeTree() {
    The character is browsed in place (←/→ or the side arrows). Map, trail color
    and trail style are summarised as three tiles; tapping one opens a popup grid
    (drawPicker) where every option is shown with its lock/cost. */
-const CARD = { cx: W / 2, cy: 238, w: 620, h: 300 };
+const CARD = { cx: W / 2, cy: 252, w: 620, h: 284 };
+
+function cycleMode() {
+  for (let k = 1; k <= MODES.length; k++) {
+    const i = (selMode + k) % MODES.length;
+    if (modeUnlocked(i)) { setMode(i); return; }
+  }
+}
+// NORMAL / CRUISE / PORTAL segmented pills under the title
+function drawModePills() {
+  uiHits.modes.length = 0;
+  const pw = 150, ph = 32, gap = 10, y = 58;
+  const x0 = W / 2 - (MODES.length * pw + (MODES.length - 1) * gap) / 2;
+  for (let i = 0; i < MODES.length; i++) {
+    const m = MODES[i], x = x0 + i * (pw + gap), on = i === selMode, ok = modeUnlocked(i);
+    ctx.save();
+    ctx.fillStyle = on ? "rgba(255,91,208,0.85)" : "rgba(20,6,50,0.7)";
+    ctx.strokeStyle = on ? "#ffd1f1" : "rgba(255,255,255,0.3)"; ctx.lineWidth = on ? 2.5 : 1.5;
+    roundRect(x, y, pw, ph, ph / 2, true); ctx.stroke();
+    ctx.fillStyle = ok ? "#fff" : "rgba(255,255,255,0.5)";
+    ctx.font = `bold ${ok ? 16 : 12}px Trebuchet MS, sans-serif`;
+    ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    ctx.fillText(ok ? m.name : `${m.name} ${m.reqText}`, x + pw / 2, y + ph / 2 + 1);
+    ctx.restore();
+    uiHits.modes.push({ x, y, w: pw, h: ph, i });
+  }
+}
 
 function drawCharacterCard() {
   const char = RIDES[selRide];
