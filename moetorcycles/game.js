@@ -678,7 +678,7 @@ function resetRun() {
   trail = [];
   rings = [];
   popups = [];
-  portals = []; nextPortalAt = 3200; warp = null; runWarps = 0; runPills = 0;
+  portals = []; nextPortalAt = curMode() === "cruise" ? 9600 : 3200; warp = null; runWarps = 0; runPills = 0;
   combo = 0; comboTimer = 0; runStars = 0;
   score = 0;
   distance = 0;
@@ -743,11 +743,12 @@ function generateAhead() {
     // cruise: the odd floating boost ring just for fun
     if (cruise && w > 380 && Math.random() < 0.2)
       rings.push({ x: seg.x + w * 0.5, y: seg.top - 190, r: 58, got: false, spin: Math.random() * 6 });
-    // portal mode: a warp portal floating over a long, hazard-free stretch
+    // portal mode: a warp portal floating over a long, hazard-free stretch.
+    // Cruise gets them too, but only a third as often (PORTAL_GAP × 3).
     let portalHere = false;
-    if (curMode() === "portal" && gap === 0 && w > 380 && seg.x > nextPortalAt) {
+    if ((curMode() === "portal" || cruise) && gap === 0 && w > 380 && seg.x > nextPortalAt) {
       portalHere = spawnPortal(seg);
-      nextPortalAt = seg.x + rand(7000, 10000);
+      nextPortalAt = seg.x + rand(PORTAL_GAP[0], PORTAL_GAP[1]) * (cruise ? 3 : 1);
     }
     // hazard (jump over, or dash/boost to smash) — themed per map
     if (!cruise && !portalHere && gap === 0 && w > 340 && Math.random() < 0.5) {
@@ -778,17 +779,18 @@ function spawnPortal(seg) {
   portals.push({ x: seg.x + seg.w * 0.5, y: seg.top - 200, r: 72, dest, got: false, spin: 0 });
   return true;
 }
+const PORTAL_GAP = [7000, 10000];          // px between portals in Portal mode
 const WARP_SWITCH = 0.18, WARP_END = 0.75; // flash peaks (map swaps) at 0.18s
 function startWarp(dest) {
   warp = { t: 0, dest, switched: false };
   mapUrls(MAPS[dest]).forEach(loadImg); // normally already preloaded at spawn
   runWarps++;
   combo += 3; comboTimer = COMBO_WINDOW;
-  const bonus = 250 * comboMult();
+  const bonus = curMode() === "cruise" ? 0 : 250 * comboMult(); // cruise has no score
   score += bonus;
   player.boostT = BOOST_TIME; screenShake = 8;
   Sound.boost();
-  spawnPopup(PLAYER_X, player.y + PLAYER_H * 0.2, `WARP → ${MAPS[dest].name}  +${bonus}`, "#e0b3ff");
+  spawnPopup(PLAYER_X, player.y + PLAYER_H * 0.2, `WARP → ${MAPS[dest].name}${bonus ? "  +" + bonus : ""}`, "#e0b3ff");
 }
 function updateWarp(dt) {
   warp.t += dt;
@@ -2986,7 +2988,7 @@ function drawHUD() {
     ctx.fillStyle = "#5bc8ff";
     ctx.fillText(`🛡 ${player.shieldsLeft}`, 30, hy); hy += 24;
   }
-  if (curMode() === "portal") { ctx.fillStyle = "#e0b3ff"; ctx.fillText(`🌀 ${runWarps}`, 30, hy); }
+  if (curMode() === "portal" || runWarps > 0) { ctx.fillStyle = "#e0b3ff"; ctx.fillText(`🌀 ${runWarps}`, 30, hy); }
 
   // dash charges
   ctx.textAlign = "right";
