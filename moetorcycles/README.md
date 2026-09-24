@@ -36,9 +36,10 @@ Picked with the pills under the title on the select screen (or `Tab`); saved as
 
 - **Normal** — the classic run (gaps, hazards, high score in `moetorcycles_best`).
 - **Cruise** — no gaps, no hazards, gentle hills (±30px, under the landing
-  tolerance) and a constant relaxed speed; you can't crash. Stars + the odd boost
-  ring still appear, but since it can't be lost it banks stars at
-  `CRUISE_STAR_RATE` (25%). HUD shows metres; `Esc` / the EXIT button leaves.
+  tolerance) and a constant relaxed speed; you can't crash. Instead of stars you
+  collect glowing **chill pills** (`drawChillPill`, counted in `runPills`) that
+  bank nothing — Cruise can't be lost, so it earns no stars / unlock progress.
+  The odd boost ring still appears. HUD shows metres; `Esc` / EXIT leaves.
 - **Portal** — normal rules plus a floating warp portal every ~7–10k px over a
   hazard-free stretch (`spawnPortal`). It shows its destination (one of your
   OTHER owned maps, preloaded on spawn); fly through for a flash (`warp`,

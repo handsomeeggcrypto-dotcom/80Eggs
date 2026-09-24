@@ -339,7 +339,7 @@ function mapUnlocked(m) {
    that warp you into one of your other maps mid-run (needs 2 owned maps). */
 const MODES = [
   { id: "normal", name: "NORMAL", desc: "Classic run: jump the gaps, dodge hazards, chase a high score." },
-  { id: "cruise", name: "CRUISE", desc: "No gaps, no hazards, no crashing. Just cruise around and grab stars." },
+  { id: "cruise", name: "CRUISE", desc: "No gaps, no hazards, no crashing. Just chill and grab chill pills. (Doesn't earn stars or unlock progress.)" },
   { id: "portal", name: "PORTAL", desc: "Fly through portals to warp into your other maps mid-run!",
     req: () => MAPS.filter(mapUnlocked).length >= 2, reqText: "🔒 OWN 2 MAPS" },
 ];
@@ -646,8 +646,7 @@ const BOOST_LIFT = 320;         // upward impulse on entry (soar forward)
 let player, world, particles, stars, obstacles, rings, score, speed, distance, animT, screenShake, deathTimer, trail;
 let popups;                          // floating score/near-miss text
 let portals, nextPortalAt, warp, runWarps; // portal mode
-let starFrac = 0;                    // fractional star carry (cruise banks at a reduced rate)
-const CRUISE_STAR_RATE = 0.25;
+let runPills = 0;                    // cruise pickups (chill pills — worth nothing, just vibes)
 let homeMap = null;                  // the map picked on the select screen (portals change selMap mid-run)
 let combo, comboTimer, runStars;
 const COMBO_WINDOW = 2.6;           // seconds to keep the chain alive
@@ -679,7 +678,7 @@ function resetRun() {
   trail = [];
   rings = [];
   popups = [];
-  portals = []; nextPortalAt = 3200; warp = null; runWarps = 0; starFrac = 0;
+  portals = []; nextPortalAt = 3200; warp = null; runWarps = 0; runPills = 0;
   combo = 0; comboTimer = 0; runStars = 0;
   score = 0;
   distance = 0;
@@ -968,12 +967,13 @@ function update(dt) {
       s.got = true;
       combo++; comboTimer = COMBO_WINDOW;
       score += 25 * comboMult();
-      // cruise can't be lost (AFK-able), so it banks stars at a reduced rate
-      starFrac += up.starValue * (curMode() === "cruise" ? CRUISE_STAR_RATE : 1);
-      const whole = Math.floor(starFrac);
-      if (whole) { starFrac -= whole; runStars += whole; addStars(whole); }
+      // cruise can't be lost (AFK-able), so its pickups are chill pills that
+      // bank nothing — no stars, no unlock progress
+      if (curMode() === "cruise") runPills++;
+      else { runStars += up.starValue; addStars(up.starValue); }
       Sound.star(combo);
-      for (let i = 0; i < 8; i++) spawnSpark(PLAYER_X, player.y + PLAYER_H * 0.4, "#ffe066");
+      const sc = curMode() === "cruise" ? ["#9ff5d8", "#d6b8ff", "#fff"] : ["#ffe066"];
+      for (let i = 0; i < 8; i++) spawnSpark(PLAYER_X, player.y + PLAYER_H * 0.4, sc[i % sc.length]);
     }
   }
 
@@ -1355,7 +1355,7 @@ function drawWorld() {
     if (s.got) continue;
     const x = s.x - distance;
     if (x < -40 || x > W + 40) continue;
-    drawStar(x, s.y, 17, s.spin);
+    if (curMode() === "cruise") drawChillPill(x, s.y, s.spin); else drawStar(x, s.y, 17, s.spin);
   }
   for (const o of obstacles) {
     if (o.dead) continue;
@@ -1405,6 +1405,34 @@ function drawPortal(x, y, r, dest, spin) {
   ctx.font = "bold 17px Trebuchet MS, sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
   ctx.fillStyle = "#fff"; ctx.shadowColor = "rgba(0,0,0,0.8)"; ctx.shadowBlur = 6;
   ctx.fillText(`🌀 ${m.name}`, x, y - r - 26);
+  ctx.restore();
+}
+
+// Cruise pickup: a glowing two-tone capsule with "CHILL" printed on the side,
+// gently bobbing and tilting. Collecting it banks nothing.
+function drawChillPill(x, y, spin) {
+  const w = 50, h = 22, r = h / 2;
+  ctx.save();
+  ctx.translate(x, y + Math.sin(spin * 0.5) * 3);
+  ctx.rotate(-0.35 + Math.sin(spin * 0.35) * 0.18);
+  ctx.shadowColor = "#b9fff0"; ctx.shadowBlur = 18;
+  // left half mint, right half lavender
+  ctx.beginPath(); roundRectPath(-w / 2, -r, w, h, r); ctx.fillStyle = "#d6b8ff"; ctx.fill();
+  ctx.shadowBlur = 0;
+  ctx.save(); ctx.beginPath(); ctx.rect(-w / 2, -r, w / 2, h); ctx.clip();
+  ctx.beginPath(); roundRectPath(-w / 2, -r, w, h, r); ctx.fillStyle = "#9ff5d8"; ctx.fill();
+  ctx.restore();
+  // seam + outline + shine
+  ctx.strokeStyle = "rgba(60,30,90,0.35)"; ctx.lineWidth = 1.2;
+  ctx.beginPath(); ctx.moveTo(0, -r); ctx.lineTo(0, r); ctx.stroke();
+  ctx.strokeStyle = "rgba(255,255,255,0.9)"; ctx.lineWidth = 2;
+  ctx.beginPath(); roundRectPath(-w / 2, -r, w, h, r); ctx.stroke();
+  ctx.fillStyle = "rgba(255,255,255,0.6)";
+  ctx.beginPath(); roundRectPath(-w / 2 + 6, -r + 3, w - 12, 4, 2); ctx.fill();
+  // label
+  ctx.fillStyle = "#4a2a6a"; ctx.font = "bold 11px Trebuchet MS, sans-serif";
+  ctx.textAlign = "center"; ctx.textBaseline = "middle";
+  ctx.fillText("CHILL", 0, 1.5);
   ctx.restore();
 }
 
@@ -2950,8 +2978,8 @@ function drawHUD() {
   ctx.fillStyle = "rgba(255,255,255,0.7)";
   ctx.fillText(cruise ? "CRUISE" : `BEST ${best}`, 30, 62);
   // stars collected this run (banked)
-  ctx.fillStyle = "#ffe066";
-  ctx.fillText(`🌟 ${runStars}`, 30, 86);
+  ctx.fillStyle = cruise ? "#b9fff0" : "#ffe066";
+  ctx.fillText(cruise ? `💊 ${runPills} chill` : `🌟 ${runStars}`, 30, 86);
   // shields (dustoff rescues) remaining
   let hy = 110;
   if (player.shieldsLeft > 0 && !cruise) {
@@ -2983,7 +3011,7 @@ function drawHUD() {
   }
 
   // combo multiplier (center-top) with a draining timer bar
-  if (combo > 0 && comboMult() > 1) {
+  if (combo > 0 && comboMult() > 1 && curMode() !== "cruise") { // cruise has no score to multiply
     ctx.save();
     ctx.textAlign = "center"; ctx.textBaseline = "top";
     const m = comboMult();
