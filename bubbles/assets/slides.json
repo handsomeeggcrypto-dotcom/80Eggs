@@ -1,0 +1,14 @@
+{
+  "good": [
+    "slides/good_slide_01.png",
+    "slides/good_slide_02.png"
+  ],
+  "bad": [
+    "slides/bad_slide_01.png",
+    "slides/bad_slide_02.png"
+  ],
+  "random": [
+    "slides/random_slide_01.png",
+    "slides/random_slide_02.png"
+  ]
+}

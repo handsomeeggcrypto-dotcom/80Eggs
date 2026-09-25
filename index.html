@@ -352,7 +352,7 @@ input.emoji-text{
             </tr>
             <tr>
               <td><a href="#"><span class="ci">💬</span>Instant Message</a></td>
-              <td><a href="#"><span class="ci">🚫</span>Block User</a></td>
+              <td><a href="#" onclick="openBlockUser();return false"><span class="ci">🚫</span>Block User</a></td>
             </tr>
             <tr>
               <td><a href="#"><span class="ci">👥</span>Add to Group</a></td>
@@ -576,6 +576,19 @@ input.emoji-text{
   </div>
 </div>
 
+<!-- ===== BLOCK USER MODAL (secret: "No" opens the hidden bubble game) ===== -->
+<div class="modal-overlay" id="blockOverlay">
+  <div class="modal-box">
+    <div class="mhd">🚫 Block User <span class="x" onclick="closeBlockUser()">✕</span></div>
+    <div class="mbd">
+      <div style="font-weight:bold;color:#33475f;margin-bottom:14px">Are you sure you want to block this user?</div>
+      <button class="modal-btn" onclick="closeBlockUser()">Yes</button>
+      &nbsp;
+      <button class="modal-btn" onclick="window.location.href='bubbles/index.html'">No</button>
+    </div>
+  </div>
+</div>
+
 <!-- ===== ALL FRENS MODAL ===== -->
 <div class="modal-overlay" id="allFrensOverlay">
   <div class="modal-box" id="allFrens" style="width:380px">
@@ -646,6 +659,14 @@ function checkNapPw(){
   }
 }
 
+/* ===== Block User (hidden door to the bubble game) ===== */
+function openBlockUser(){
+  document.getElementById('blockOverlay').classList.add('open');
+}
+function closeBlockUser(){
+  document.getElementById('blockOverlay').classList.remove('open');
+}
+
 /* ===== All Frens modal ===== */
 function openAllFrens(){
   document.getElementById('allFrensOverlay').classList.add('open');
@@ -657,6 +678,9 @@ function closeAllFrens(){
 /* close modals on overlay click */
 document.getElementById('napOverlay').addEventListener('click', function(e){
   if(e.target === this) closeNapGate();
+});
+document.getElementById('blockOverlay').addEventListener('click', function(e){
+  if(e.target === this) closeBlockUser();
 });
 document.getElementById('allFrensOverlay').addEventListener('click', function(e){
   if(e.target === this) closeAllFrens();
