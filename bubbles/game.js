@@ -32,12 +32,36 @@ const BOARD_X = (W - (COLS * D + R)) / 2;
 const TOP = 70;                     // y of the ceiling
 const SHOOTER = { x: W / 2, y: 820 };
 const DEAD_Y = 740;                 // a bubble below this line = game over
-const START_ROWS = 6;
-const SHOTS_PER_DROP = 7;
 const SHOT_SPEED = 1500;
 
-let grid, shift, score, best, shotsLeft, current, next, shot, popping, falling, particles, state, aim;
-try { best = +localStorage.getItem("bubblepop_best") || 0; } catch (e) { best = 0; }
+// ---- modes -----------------------------------------------------------------
+// CLASSIC: clear the board. Every shot ticks the ceiling countdown, and each drop
+//   makes the next one come sooner (shotsPerDrop).
+// RUSH: endless. The ceiling drops on a timer that speeds up after every drop
+//   (dropInterval); clearing the board just refills it for a bonus.
+const MODES = [
+  {
+    id: "classic", name: "CLASSIC", startRows: 6,
+    desc: ["Clear the board.", "The ceiling drops sooner and sooner."],
+    shotsPerDrop: (drops) => Math.max(3, 6 - Math.floor(drops / 2)), // 6,6,5,5,4,4,3…
+  },
+  {
+    id: "rush", name: "RUSH", startRows: 5, endless: true,
+    desc: ["Endless. The ceiling drops on a timer", "that keeps getting faster."],
+    dropInterval: (drops) => Math.max(2.2, 8 - drops * 0.5),          // seconds: 8, 7.5, 7…
+    slideRate: 0.5,      // half the usual slide chances…
+    slideCooldown: 18,   // …and a longer gap between them, so they don't pile onto the pressure
+  },
+];
+let modeIdx = 0;
+try { modeIdx = Math.min(MODES.length - 1, +localStorage.getItem("bubblepop_mode") || 0); } catch (e) {}
+const mode = () => MODES[modeIdx];
+
+let grid, shift, score, best, shotsLeft, drops, dropTimer, ceilAnim, current, next, shot, popping, falling, particles, state, aim, menuT;
+state = "menu"; menuT = 1;
+const bestKey = () => "bubblepop_best_" + mode().id;
+function loadBest() { try { best = +localStorage.getItem(bestKey()) || 0; } catch (e) { best = 0; } }
+loadBest();
 
 // Row r is shifted right by R when (r + shift) is odd; dropping a row flips shift.
 const rowOdd = (r) => (r + shift) % 2 === 1;
@@ -63,12 +87,22 @@ function newRow(r) {
 }
 const randType = () => Math.floor(Math.random() * TYPES.length);
 
+function startGame(i) {
+  modeIdx = i;
+  try { localStorage.setItem("bubblepop_mode", i); } catch (e) {}
+  loadBest();
+  reset();
+}
+
 function reset() {
   shift = 0;
   grid = [];
-  for (let r = 0; r < START_ROWS; r++) grid.push(newRow(r));
+  for (let r = 0; r < mode().startRows; r++) grid.push(newRow(r));
   score = 0;
-  shotsLeft = SHOTS_PER_DROP;
+  drops = 0;
+  ceilAnim = 0;
+  shotsLeft = mode().shotsPerDrop ? mode().shotsPerDrop(0) : 0;
+  dropTimer = mode().dropInterval ? mode().dropInterval(0) : 0;
   popping = []; falling = []; particles = [];
   shot = null;
   slide = null; slideCool = 3; popStreak = 0;
@@ -147,7 +181,12 @@ function land() {
     Sound.land();
     missed = true;
     popStreak = 0;
-    if (--shotsLeft <= 0) { dropCeiling(); shotsLeft = SHOTS_PER_DROP; ceiling = true; }
+  }
+  // classic: every shot ticks the countdown, popped or not
+  if (mode().shotsPerDrop && --shotsLeft <= 0) {
+    dropCeiling();
+    shotsLeft = mode().shotsPerDrop(drops);
+    ceiling = true;
   }
   trimGrid();
   checkEnd();
@@ -201,6 +240,8 @@ function dropFloating() {
 function dropCeiling() {
   shift = 1 - shift;          // row 0 changes parity, so everything below keeps its x
   grid.unshift(newRow(0));
+  drops++;
+  ceilAnim = 1;               // rows slide down into place (render only)
   Sound.thud();
   shakeT = 0.25;
 }
@@ -210,14 +251,26 @@ function trimGrid() {
 }
 
 function checkEnd() {
-  if (!grid.length) { win(); return; }
+  if (!grid.length || !grid.some((row) => row.some((t) => t >= 0))) {
+    if (mode().endless) { refill(); return; }
+    win(); return;
+  }
   for (let r = 0; r < grid.length; r++)
-    if (cellY(r) + R > DEAD_Y && grid[r].some((t) => t >= 0)) { state = "lose"; saveBest(); Sound.lose(); maybeSlide("bad", "lose"); return; }
-  if (!grid.some((row) => row.some((t) => t >= 0))) win();
+    if (cellY(r) + R > DEAD_Y && grid[r].some((t) => t >= 0)) { state = "lose"; menuT = 0; saveBest(); Sound.lose(); maybeSlide("bad", "lose"); return; }
 }
-function win() { state = "win"; score += 500; saveBest(); Sound.win(); maybeSlide("good", "win"); }
+
+// rush: a cleared board is worth a bonus and comes straight back
+function refill() {
+  score += 300;
+  grid = [];
+  for (let r = 0; r < 4; r++) grid.push(newRow(r));
+  current = pickShotType(); next = pickShotType();
+  Sound.win();
+  maybeSlide("good", "bigPop");
+}
+function win() { state = "win"; menuT = 0; score += 500; saveBest(); Sound.win(); maybeSlide("good", "win"); }
 function saveBest() {
-  if (score > best) { best = score; try { localStorage.setItem("bubblepop_best", best); } catch (e) {} }
+  if (score > best) { best = score; try { localStorage.setItem(bestKey(), best); } catch (e) {} }
 }
 
 // ---- peek-in slides --------------------------------------------------------
@@ -260,13 +313,15 @@ function maybeSlide(kind, reason) {
   if (!pool.length || slide) return false;
   // win/lose always get through; everything else respects the cooldown
   const force = SLIDE_CHANCE[reason] >= 1;
-  if (!force && (slideCool > 0 || Math.random() > SLIDE_CHANCE[reason])) return false;
+  const chance = SLIDE_CHANCE[reason] * (mode().slideRate ?? 1);
+  if (!force && (slideCool > 0 || Math.random() > chance)) return false;
   const img = pool[Math.floor(Math.random() * pool.length)];
   if (!img.naturalWidth) return false;
   const edge = ["bottom", "top", "left", "right"][Math.floor(Math.random() * 4)];
   const speed = pickSpeed();
-  slide = { img, edge, t: 0, along: 0.25 + Math.random() * 0.5, kind, speed };
-  slideCool = SLIDE_COOLDOWN;
+  // dodge: which side of the launcher a bottom slide sits on
+  slide = { img, edge, t: 0, along: 0.25 + Math.random() * 0.5, dodge: Math.random() < 0.5 ? -1 : 1, kind, speed };
+  slideCool = mode().slideCooldown ?? SLIDE_COOLDOWN;
   if (speed.pop) Sound.whoosh();
   return true;
 }
@@ -278,7 +333,7 @@ function updateSlide(dt) {
 
 function drawSlide() {
   if (!slide) return;
-  const { img, edge, t, along, speed: sp } = slide;
+  const { img, edge, t, along, dodge, speed: sp } = slide;
   // reveal 0..1 with an overshoot on the way in
   let p;
   if (t < sp.in) {
@@ -288,10 +343,14 @@ function drawSlide() {
   } else if (t < sp.in + sp.hold) p = 1;
   else { const k = (t - sp.in - sp.hold) / sp.out; p = 1 - k * k; }
   const side = edge === "left" || edge === "right";
-  const h = side ? W * 0.45 : H * 0.34;      // how far it pokes into the screen
+  const h = side ? W * 0.36 : H * 0.26;      // how far it pokes into the screen
   const w = h * (img.naturalWidth / img.naturalHeight);
+  // Bottom slides never cover the launcher: they sit beside it, pushed toward a
+  // corner (hanging off-screen is fine, it reads as peeking round the edge).
+  // Side slides only reach ~W*0.36 in, so they already clear the centred launcher.
+  const bottomX = SHOOTER.x + dodge * (w / 2 + R + 30);
   const anchor = {
-    bottom: [W * along, H, 0],
+    bottom: [bottomX, H, 0],
     top:    [W * along, 0, Math.PI],
     left:   [0, H * along, Math.PI / 2],
     right:  [W, H * along, -Math.PI / 2],
@@ -442,9 +501,20 @@ function drawShooter() {
   // ceiling countdown
   ctx.textAlign = "left";
   ctx.fillText("CEILING DROPS IN", 24, SHOOTER.y - 10);
-  for (let i = 0; i < SHOTS_PER_DROP; i++) {
-    ctx.fillStyle = i < shotsLeft ? "#6b4fc4" : "rgba(107,79,196,0.2)";
-    ctx.beginPath(); ctx.arc(32 + i * 18, SHOOTER.y + 12, 6, 0, Math.PI * 2); ctx.fill();
+  if (mode().shotsPerDrop) {
+    const total = mode().shotsPerDrop(drops);
+    for (let i = 0; i < total; i++) {
+      ctx.fillStyle = i < shotsLeft ? (shotsLeft <= 1 ? "#e63c6e" : "#6b4fc4") : "rgba(107,79,196,0.2)";
+      ctx.beginPath(); ctx.arc(32 + i * 18, SHOOTER.y + 12, 6, 0, Math.PI * 2); ctx.fill();
+    }
+  } else {
+    const k = dropTimer / mode().dropInterval(drops);
+    ctx.fillStyle = "rgba(107,79,196,0.2)";
+    roundRect(24, SHOOTER.y + 4, 150, 14, 7); ctx.fill();
+    ctx.fillStyle = k < 0.25 ? "#e63c6e" : "#6b4fc4";
+    roundRect(24, SHOOTER.y + 4, Math.max(14, 150 * k), 14, 7); ctx.fill();
+    ctx.fillStyle = "#4b3a8a";
+    ctx.fillText(`${dropTimer.toFixed(1)}s`, 180, SHOOTER.y + 16);
   }
 }
 const NEXT_POS = { x: W - 70, y: SHOOTER.y + 10 };
@@ -456,7 +526,7 @@ function drawHud() {
   ctx.textAlign = "left";
   ctx.fillText(`${score}`, 20, 44);
   ctx.font = "bold 13px system-ui, sans-serif";
-  ctx.fillText(`BEST ${best}`, 20, 60);
+  ctx.fillText(`${mode().name} · BEST ${best}`, 20, 60);
   // style toggle
   ctx.fillStyle = "#6b4fc4";
   roundRect(STYLE_BTN.x, STYLE_BTN.y, STYLE_BTN.w, STYLE_BTN.h, 18); ctx.fill();
@@ -466,22 +536,49 @@ function drawHud() {
   ctx.fillText(`STYLE: ${STYLES[styleIdx]}`, STYLE_BTN.x + STYLE_BTN.w / 2, STYLE_BTN.y + 23);
 }
 
+// menu = title screen and game-over screen, both with the mode buttons
+const modeBtn = (i) => ({ x: 60, y: 430 + i * 130, w: W - 120, h: 110 });
+
 function drawOverlay() {
   if (state === "play") return;
-  ctx.fillStyle = "rgba(42,31,74,0.6)";
+  ctx.fillStyle = "rgba(42,31,74,0.72)";
   ctx.fillRect(0, 0, W, H);
   ctx.fillStyle = "#fff";
   ctx.textAlign = "center";
+  const title = state === "win" ? "CLEARED!" : state === "lose" ? "GAME OVER" : "BUBBLE POP";
   ctx.font = "bold 56px system-ui, sans-serif";
-  ctx.fillText(state === "win" ? "CLEARED!" : "GAME OVER", W / 2, H / 2 - 30);
-  ctx.font = "bold 24px system-ui, sans-serif";
-  ctx.fillText(`Score ${score}   ·   Best ${best}`, W / 2, H / 2 + 16);
-  ctx.font = "18px system-ui, sans-serif";
-  ctx.fillText("tap to play again", W / 2, H / 2 + 60);
+  ctx.fillText(title, W / 2, 250);
+  ctx.font = "bold 22px system-ui, sans-serif";
+  if (state === "menu") ctx.fillText("pick a mode", W / 2, 300);
+  else ctx.fillText(`${mode().name}   ·   Score ${score}   ·   Best ${best}`, W / 2, 300);
+  MODES.forEach((m, i) => {
+    const b = modeBtn(i);
+    const sel = i === modeIdx;
+    ctx.fillStyle = sel ? "#8f75e6" : "#6b4fc4";
+    roundRect(b.x, b.y, b.w, b.h, 22); ctx.fill();
+    if (sel) { ctx.strokeStyle = "#fff"; ctx.lineWidth = 3; ctx.stroke(); }
+    ctx.fillStyle = "#fff";
+    ctx.font = "bold 30px system-ui, sans-serif";
+    ctx.fillText(m.name, W / 2, b.y + 42);
+    ctx.font = "16px system-ui, sans-serif";
+    m.desc.forEach((line, j) => ctx.fillText(line, W / 2, b.y + 68 + j * 20));
+  });
+  ctx.font = "14px system-ui, sans-serif";
+  ctx.fillStyle = "rgba(255,255,255,0.7)";
+  ctx.fillText("tap a mode to play  ·  ↑/↓ + Enter", W / 2, modeBtn(MODES.length).y + 10);
 }
 
 // ---- update / loop ---------------------------------------------------------
 function update(dt) {
+  if (state !== "play") menuT += dt;
+  if (state === "play" && mode().dropInterval && (dropTimer -= dt) <= 0) {
+    dropCeiling();
+    dropTimer = mode().dropInterval(drops);
+    trimGrid();
+    checkEnd();
+    if (state === "play") maybeSlide("bad", "ceiling");
+  }
+  ceilAnim = Math.max(0, ceilAnim - dt / 0.18);
   if (shot) updateShot(dt);
   for (const p of popping) p.age += dt;
   for (const p of popping) if (p.age >= 0 && !p.burst) { p.burst = true; burst(p.x, p.y, TYPES[p.t].tint); }
@@ -507,7 +604,7 @@ function render() {
   drawBackground();
   for (let r = 0; r < grid.length; r++)
     for (let c = 0; c < colsIn(r); c++)
-      if (grid[r][c] >= 0) drawBubble(grid[r][c], cellX(r, c), cellY(r));
+      if (grid[r][c] >= 0) drawBubble(grid[r][c], cellX(r, c), cellY(r) - ceilAnim * ROW_H);
   for (const p of popping) {
     const k = Math.max(0, p.age) / 0.22;
     drawBubble(p.t, p.x, p.y, 1 + k * 0.4, 1 - k);
@@ -570,7 +667,11 @@ canvas.addEventListener("pointerdown", (e) => {
   Sound.unlock();
   const p = toGame(e);
   if (inRect(p, STYLE_BTN)) return cycleStyle();
-  if (state !== "play") return reset();
+  if (state !== "play") {
+    if (menuT < 0.6) return; // don't eat the tap that ended the game
+    MODES.forEach((m, i) => { if (inRect(p, modeBtn(i))) startGame(i); });
+    return;
+  }
   if (Math.hypot(p.x - NEXT_POS.x, p.y - NEXT_POS.y) < 44) return swap();
   if (p.y > SHOOTER.y - 20) return; // taps down by the launcher don't fire
   aiming = true;
@@ -588,7 +689,12 @@ canvas.addEventListener("pointerup", (e) => {
 window.addEventListener("keydown", (e) => {
   Sound.unlock();
   if (e.key === "s" || e.key === "S") cycleStyle();
-  else if (e.key === " " || e.key === "Enter") { if (state !== "play") reset(); else fire(); }
+  else if (state !== "play") {
+    if (e.key === "ArrowUp") modeIdx = (modeIdx + MODES.length - 1) % MODES.length;
+    else if (e.key === "ArrowDown") modeIdx = (modeIdx + 1) % MODES.length;
+    else if ((e.key === " " || e.key === "Enter") && menuT > 0.6) startGame(modeIdx);
+  }
+  else if (e.key === " " || e.key === "Enter") fire();
   else if (e.key === "Shift" || e.key === "x" || e.key === "X") swap();
   else if (e.key === "ArrowLeft") aim = Math.max(-Math.PI + 0.12, aim - 0.05);
   else if (e.key === "ArrowRight") aim = Math.min(-0.12, aim + 0.05);
@@ -623,5 +729,6 @@ const Sound = {
 };
 
 resize();
-reset();
+reset();          // a board to show behind the title screen
+state = "menu";
 requestAnimationFrame(frame);
