@@ -84,7 +84,7 @@
   .side { display: flex; flex-direction: column; gap: 4%; min-width: 0; }
   .side .box { border: .3cqw solid var(--cyan); border-radius: .9cqw; padding: 4% 7%; box-shadow: inset 0 0 1cqw rgba(62,240,255,.35); }
   .side .lbl { font-size: 2.2cqw; color: var(--cyan-dim); letter-spacing: .1em; }
-  .side .big { font-family: "Press Start 2P"; font-size: 3.2cqw; line-height: 1.25; color: var(--yellow); text-shadow: 0 0 1cqw rgba(255,212,0,.6); }
+  .side .big { font-family: "Press Start 2P"; font-size: 2.5cqw; white-space: nowrap; line-height: 1.25; color: var(--yellow); text-shadow: 0 0 1cqw rgba(255,212,0,.6); }
   .side .mid { font-size: 3.6cqw; line-height: 1; }
   .wave { flex: 1; display: flex; align-items: center; gap: 5%; padding: 0 8%; }
   .wave i { flex: 1; background: var(--cyan); height: 12%; border-radius: 1px; box-shadow: 0 0 .8cqw var(--cyan); transition: height .1s; }
@@ -178,7 +178,7 @@
       </div>
     </div>
 
-    <button class="at" id="bVoice" title="Voice: read entry aloud (V)" style="--x:155;--y:770;--w:80;--h:80;border-radius:50%"></button>
+    <button class="at" id="bVoice" title="Voice: read entry aloud, press again to stop (V)" style="--x:155;--y:770;--w:80;--h:80;border-radius:50%"></button>
     <button class="at" id="bSound" title="Sound on/off (M)" style="--x:265;--y:775;--w:80;--h:28;border-radius:99px"></button>
     <span class="at pillglow" id="soundGlow" style="--x:268;--y:778;--w:74;--h:22;--c:#ff3fd0"></span>
     <span class="at pillglow" id="scanGlow" style="--x:378;--y:778;--w:74;--h:22;--c:#3ef0ff"></span>
@@ -211,7 +211,7 @@
 
 <section class="panel" id="panel"><h2 id="panelName">MOE #----</h2><ul class="traits" id="traits2"></ul></section>
 
-<p class="help">Type a number on the blue pads or your keyboard, then <kbd>GO</kbd> / <kbd>Enter</kbd> · <kbd>◀ ▶</kbd> browse · d-pad <kbd>▲▼</kbd> jumps 10 · big yellow button = random · black button = voice · tap a trait to find another Moe with it</p>
+<p class="help">Type a number on the blue pads or your keyboard, then <kbd>GO</kbd> / <kbd>Enter</kbd> · <kbd>◀ ▶</kbd> browse · d-pad <kbd>▲▼</kbd> jumps 10 · big yellow button = random · black button = voice (press again to stop) · tap a trait to find another Moe with it</p>
 
 <script src="data.js"></script>
 <script>
@@ -284,6 +284,7 @@
   function show(n, fromHash) {
     n = Math.round(n);
     if (!(n >= 1 && n <= N)) { buzz(); message("NONE"); return; }
+    stopSpeaking();
     cur = n;
     const rank = D.rank[n - 1];
     $("num").textContent = String(n).padStart(4, "0");
@@ -334,15 +335,25 @@
     show(list[Math.floor(Math.random() * list.length)]);
   }
 
+  const live = on => { $("wave").classList.toggle("live", on); $("topGlow").classList.toggle("pulse", on); };
+  let speaking = null; // the utterance currently being read
+  function stopSpeaking() {
+    if (!speaking) return;
+    speaking = null; live(false);
+    speechSynthesis.cancel();
+  }
+  // press once to read the entry, press again to stop
   function speak() {
     if (!cur || !("speechSynthesis" in window)) return;
+    if (speaking) { stopSpeaking(); return; }
     speechSynthesis.cancel();
     const t = traitsOf(cur), rank = D.rank[cur - 1];
     const txt = `Moe number ${cur}. A ${tier(rank).toLowerCase()} Moe, rarity rank ${rank} of ${N}. ` + t.map(x => `${x.type}: ${x.value}.`).join(" ");
     const u = new SpeechSynthesisUtterance(txt);
     u.rate = 1.05; u.pitch = 1.3;
-    const live = on => { $("wave").classList.toggle("live", on); $("topGlow").classList.toggle("pulse", on); };
-    u.onstart = () => live(true); u.onend = u.onerror = () => live(false);
+    u.onstart = () => live(true);
+    u.onend = u.onerror = () => { if (speaking === u) { speaking = null; live(false); } };
+    speaking = u;
     speechSynthesis.speak(u);
   }
 
