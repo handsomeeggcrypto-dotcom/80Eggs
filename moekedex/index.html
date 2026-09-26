@@ -102,9 +102,33 @@
   .rhead { display: flex; justify-content: space-between; align-items: baseline; gap: 2cqw; border-bottom: .3cqw dashed var(--cyan-dim); padding-bottom: .6cqw; margin-bottom: .6cqw; }
   .rhead b { font-family: "Press Start 2P"; font-weight: normal; font-size: 2.9cqw; color: var(--yellow); text-shadow: 0 0 1cqw rgba(255,212,0,.5); }
   .rhead span { font-size: 3.2cqw; color: var(--magenta); text-shadow: 0 0 1cqw rgba(255,63,208,.6); white-space: nowrap; }
-  .readout .traits { grid-template-columns: 1fr 1fr; column-gap: 3cqw; font-size: 2.85cqw; flex: 1; align-content: start; overflow-y: auto; scrollbar-width: none; }
+  .readout .traits { grid-template-columns: 1fr 1fr; column-gap: 3cqw; font-size: 2.85cqw; height: 100%; align-content: start; overflow-y: auto; scrollbar-width: none; }
   .readout .traits::-webkit-scrollbar { display: none; }
+  .readout .traits .v { text-decoration: none; }
   .readout .mobile-note { display: none; }
+  .pages { flex: 1; min-height: 0; position: relative; cursor: pointer; user-select: none; }
+  .page { position: absolute; inset: 0; display: none; }
+  .page.on { display: block; animation: pagein .18s ease-out; }
+  @keyframes pagein { from { opacity: 0; transform: translateX(3%); } to { opacity: 1; transform: none; } }
+  .readout.carding .rhead { display: none; }
+  .card { display: none; flex-direction: column; justify-content: center; padding: 0 1cqw; }
+  .card.on { display: flex; }
+  .ctype { font-family: "Press Start 2P"; font-size: 2.6cqw; letter-spacing: .12em; color: var(--magenta); text-shadow: 0 0 1cqw rgba(255,63,208,.6); text-transform: uppercase; }
+  .cval { font-size: 8cqw; line-height: .95; color: #eaffff; text-shadow: 0 0 1.4cqw var(--cyan); margin: .8cqw 0 1.2cqw; overflow-wrap: anywhere; }
+  .cfoot { display: flex; align-items: center; gap: 2.4cqw; font-size: 3.6cqw; color: var(--cyan); }
+  .cfoot .tag { font-family: "Press Start 2P"; font-size: 2cqw; padding: .6cqw 1cqw; border: .3cqw solid currentColor; border-radius: .6cqw; white-space: nowrap; }
+  .cfoot .tag.hot { color: var(--magenta); text-shadow: 0 0 1cqw rgba(255,63,208,.6); }
+  .cfoot .tag.warm { color: var(--yellow); }
+  .cfoot .cbar { flex: 1; height: 1.2cqw; background: rgba(62,240,255,.15); border-radius: 1cqw; overflow: hidden; }
+  .cfoot .cbar i { display: block; height: 100%; background: var(--cyan); box-shadow: 0 0 1cqw var(--cyan); }
+  .cfind { font-family: "Press Start 2P"; font-size: 1.9cqw; color: var(--glass); background: var(--cyan); border: 0; border-radius: .6cqw; padding: .9cqw 1.2cqw; cursor: pointer; white-space: nowrap; }
+  .cfind:hover { background: #fff; }
+  .pager { display: flex; align-items: center; gap: 1.6cqw; padding-top: .8cqw; border-top: .3cqw dashed var(--cyan-deep); margin-top: .6cqw; }
+  .dots { display: flex; gap: .9cqw; flex: 1; flex-wrap: wrap; }
+  .dots i { width: 1.3cqw; height: 1.3cqw; border-radius: 50%; background: var(--cyan-deep); cursor: pointer; }
+  .dots i:first-child { border-radius: .2cqw; }
+  .dots i.on { background: var(--yellow); box-shadow: 0 0 1cqw var(--yellow); }
+  .pager span { font-size: 3cqw; color: var(--cyan-dim); white-space: nowrap; }
 
   .traits { display: grid; list-style: none; margin: 0; padding: 0; }
   .traits li { display: grid; grid-template-columns: auto 1fr auto; gap: .6em; align-items: baseline; line-height: 1.12; min-width: 0; }
@@ -140,7 +164,7 @@
     .piece.l { width: 100%; }
     .piece.r { width: 88%; margin-top: -9%; }
     .readout .traits { display: none; }
-    .readout .mobile-note { display: grid; flex: 1; place-items: center; font-size: 5cqw; color: var(--cyan-dim); text-align: center; line-height: 1.1; }
+    .readout .mobile-note { display: grid; height: 100%; place-items: center; font-size: 5cqw; color: var(--cyan-dim); text-align: center; line-height: 1.1; }
     .rhead b { font-size: 3.6cqw; white-space: nowrap; } .rhead span { font-size: 4.4cqw; }
     .panel { display: block; width: 100%; max-width: 480px; background: var(--glass); border: 2px solid var(--cyan); border-radius: 10px; padding: 10px 12px; box-shadow: 0 0 14px rgba(62,240,255,.35), inset 0 0 20px rgba(62,240,255,.2); }
     .panel h2 { margin: 0 0 6px; font-family: "Press Start 2P"; font-weight: normal; font-size: 12px; color: var(--yellow); }
@@ -196,13 +220,23 @@
 
     <div class="at readout" style="--x:864;--y:304;--w:428;--h:170">
       <div class="rhead"><b id="name">MOE #----</b><span id="rank"></span></div>
-      <ul class="traits" id="traits"></ul>
-      <div class="mobile-note">▼ TRAIT DATA BELOW ▼</div>
+      <div class="pages" id="pages" title="Click, scroll or swipe to flip through traits">
+        <div class="page on" id="sumPage">
+          <ul class="traits" id="traits"></ul>
+          <div class="mobile-note">◀ ▶ FLIP THROUGH TRAITS<br>▼ FULL LIST BELOW ▼</div>
+        </div>
+        <div class="page card" id="card">
+          <div class="ctype" id="ctype"></div>
+          <div class="cval" id="cval"></div>
+          <div class="cfoot"><span id="cpct"></span><span class="cbar"><i id="cbar"></i></span><span class="tag" id="ctag"></span><button class="cfind" id="cfind" title="Jump to another Moe with this trait">FIND ↻</button></div>
+        </div>
+      </div>
+      <div class="pager"><div class="dots" id="dots"></div><span id="pageNo">SUMMARY</span></div>
     </div>
 
     <div class="at keys" id="keys" style="--x:855;--y:500;--w:436;--h:146"></div>
-    <button class="at" data-step="-1" title="Previous (←)" style="--x:855;--y:685;--w:86;--h:80;border-radius:8px"></button>
-    <button class="at" data-step="1" title="Next (→)" style="--x:945;--y:685;--w:86;--h:80;border-radius:8px"></button>
+    <button class="at" data-page="-1" title="Previous trait ([)" style="--x:855;--y:685;--w:86;--h:80;border-radius:8px"></button>
+    <button class="at" data-page="1" title="Next trait (])" style="--x:945;--y:685;--w:86;--h:80;border-radius:8px"></button>
     <button class="at lbl-on" id="go" title="GO (Enter)" style="--x:1226;--y:696;--w:70;--h:70;border-radius:50%">GO</button>
     <div class="at slot typed" id="typed" style="--x:863;--y:822;--w:182;--h:68"></div>
     <button class="at slot clr" id="clr" title="Clear (Esc)" style="--x:1103;--y:822;--w:204;--h:68">CLEAR</button>
@@ -211,7 +245,7 @@
 
 <section class="panel" id="panel"><h2 id="panelName">MOE #----</h2><ul class="traits" id="traits2"></ul></section>
 
-<p class="help">Type a number on the blue pads or your keyboard, then <kbd>GO</kbd> / <kbd>Enter</kbd> · <kbd>◀ ▶</kbd> browse · d-pad <kbd>▲▼</kbd> jumps 10 · big yellow button = random · black button = voice (press again to stop) · tap a trait to find another Moe with it</p>
+<p class="help">Type a number + <kbd>GO</kbd> · d-pad browses Moes · silver <kbd>◀ ▶</kbd> or click/scroll the screen to flip traits · yellow = random · black = voice (again to stop)</p>
 
 <script src="data.js"></script>
 <script>
@@ -259,16 +293,17 @@
     const f = rank / N;
     return f <= .01 ? "MYTHIC" : f <= .05 ? "LEGENDARY" : f <= .15 ? "EPIC" : f <= .4 ? "RARE" : "COMMON";
   }
-  function fillTraits(ul, list) {
+  function fillTraits(ul, list, onPick) {
     ul.innerHTML = "";
-    for (const t of list) {
+    for (const [i, t] of list.entries()) {
       const li = document.createElement("li");
       if (t.count / N < 0.01) li.classList.add("rare");
       li.innerHTML = '<span class="t"></span><button class="v"></button><span class="p"></span>';
       li.querySelector(".t").textContent = t.type;
       const b = li.querySelector(".v");
-      b.textContent = t.value; b.title = `${t.value} — find another Moe with this ${t.type}`;
-      b.onclick = () => findAnother(t.ti, t.vi);
+      b.textContent = t.value;
+      b.title = onPick ? `${t.type}: ${t.value}` : `${t.value} — find another Moe with this ${t.type}`;
+      b.onclick = e => { e.stopPropagation(); onPick ? onPick(i) : findAnother(t.ti, t.vi); };
       li.querySelector(".p").textContent = pct(t.count);
       ul.appendChild(li);
     }
@@ -306,22 +341,63 @@
     pic.alt = `MOE #${n}`;
     pic.src = imgUrl(n);
 
-    const list = traitsOf(n);
-    fillTraits($("traits"), list);
-    fitReadout();
+    list = traitsOf(n);
+    fillTraits($("traits"), list, i => setPage(i + 1));
     fillTraits($("traits2"), list);
+    $("dots").innerHTML = "";
+    for (let i = 0; i <= list.length; i++) {
+      const d = document.createElement("i");
+      d.title = i ? list[i - 1].type : "summary";
+      d.onclick = e => { e.stopPropagation(); setPage(i); };
+      $("dots").appendChild(d);
+    }
+    setPage(0, true);
     flash(); chirp();
     [n + 1, n - 1].forEach(m => { if (m >= 1 && m <= N) new Image().src = imgUrl(m); });
   }
-  // shrink the on-screen list until every trait fits (some Moes have 14)
-  function fitReadout() {
+  // --- right screen pages: 0 = summary list, 1..n = one big trait each ---
+  let list = [], page = 0;
+  function rarityTag(f) { return f < .01 ? ["ULTRA RARE", "hot"] : f < .05 ? ["RARE", "warm"] : f < .15 ? ["UNCOMMON", ""] : ["COMMON", ""]; }
+  function setPage(i, quiet) {
+    const n = list.length + 1;
+    page = ((i % n) + n) % n;
+    $("sumPage").classList.toggle("on", page === 0);
+    $("card").classList.toggle("on", page > 0);
+    $("pages").parentNode.classList.toggle("carding", page > 0);
+    [...$("dots").children].forEach((d, k) => d.classList.toggle("on", k === page));
+    if (page === 0) {
+      $("pageNo").textContent = "SUMMARY ▶";
+      fitSummary();
+    } else {
+      const t = list[page - 1], f = t.count / N, [tag, cls] = rarityTag(f);
+      $("pageNo").textContent = `#${cur} · ${page}/${list.length}`;
+      $("ctype").textContent = t.type;
+      $("cval").textContent = t.value;
+      $("cpct").textContent = `${pct(t.count)} have it`;
+      $("cbar").style.width = Math.max(2, Math.min(100, f * 100 * 3)) + "%";
+      $("ctag").textContent = tag; $("ctag").className = "tag " + cls;
+      $("cfind").onclick = e => { e.stopPropagation(); findAnother(t.ti, t.vi); };
+      fitCard();
+    }
+    if (!quiet) beep(page ? 1500 : 1100, .025);
+  }
+  const flip = d => setPage(page + d);
+  // shrink text until it fits: the summary (some Moes have 14 traits) and long card values
+  function fitSummary() {
     const ul = $("traits");
     for (let f = 2.85; f >= 2.1; f -= 0.15) {
       ul.style.fontSize = f + "cqw";
       if (ul.scrollHeight <= ul.clientHeight + 1) break;
     }
   }
-  window.addEventListener("resize", () => cur && fitReadout());
+  function fitCard() {
+    const c = $("card"), v = $("cval");
+    for (let f = 8; f >= 3.5; f -= 0.5) {
+      v.style.fontSize = f + "cqw";
+      if (c.scrollHeight <= c.clientHeight + 1) break;
+    }
+  }
+  window.addEventListener("resize", () => cur && (page ? fitCard() : fitSummary()));
   const step = d => show(((cur - 1 + d) % N + N) % N + 1);
   const random = () => show(1 + Math.floor(Math.random() * N));
 
@@ -335,26 +411,45 @@
     show(list[Math.floor(Math.random() * list.length)]);
   }
 
+  $("pages").addEventListener("click", () => flip(1));
+  let wheelAt = 0;
+  $("pages").addEventListener("wheel", e => {
+    e.preventDefault();
+    const now = Date.now();
+    if (now - wheelAt < 220 || Math.abs(e.deltaY) + Math.abs(e.deltaX) < 4) return;
+    wheelAt = now; flip((e.deltaY || e.deltaX) > 0 ? 1 : -1);
+  }, { passive: false });
+  let touchX = null;
+  $("pages").addEventListener("touchstart", e => { touchX = e.touches[0].clientX; }, { passive: true });
+  $("pages").addEventListener("touchend", e => {
+    if (touchX === null) return;
+    const dx = e.changedTouches[0].clientX - touchX; touchX = null;
+    if (Math.abs(dx) > 30) { flip(dx < 0 ? 1 : -1); e.preventDefault(); }
+  });
+
   const live = on => { $("wave").classList.toggle("live", on); $("topGlow").classList.toggle("pulse", on); };
-  let speaking = null; // the utterance currently being read
+  let speaking = null; // the current reading session
   function stopSpeaking() {
     if (!speaking) return;
     speaking = null; live(false);
     speechSynthesis.cancel();
   }
-  // press once to read the entry, press again to stop
+  // press once to read the entry, press again to stop; the screen flips to each trait as it's read
   function speak() {
     if (!cur || !("speechSynthesis" in window)) return;
     if (speaking) { stopSpeaking(); return; }
     speechSynthesis.cancel();
-    const t = traitsOf(cur), rank = D.rank[cur - 1];
-    const txt = `Moe number ${cur}. A ${tier(rank).toLowerCase()} Moe, rarity rank ${rank} of ${N}. ` + t.map(x => `${x.type}: ${x.value}.`).join(" ");
-    const u = new SpeechSynthesisUtterance(txt);
-    u.rate = 1.05; u.pitch = 1.3;
-    u.onstart = () => live(true);
-    u.onend = u.onerror = () => { if (speaking === u) { speaking = null; live(false); } };
-    speaking = u;
-    speechSynthesis.speak(u);
+    const session = {}, rank = D.rank[cur - 1];
+    const lines = [`Moe number ${cur}. A ${tier(rank).toLowerCase()} Moe, rarity rank ${rank} of ${N}.`].concat(list.map(x => `${x.type}: ${x.value}.`));
+    speaking = session; live(true);
+    lines.forEach((txt, i) => {
+      const u = new SpeechSynthesisUtterance(txt);
+      u.rate = 1.05; u.pitch = 1.3;
+      u.onstart = () => { if (speaking === session) setPage(i, true); };
+      if (i === lines.length - 1) u.onend = () => { if (speaking === session) { speaking = null; live(false); } };
+      u.onerror = () => { if (speaking === session) { speaking = null; live(false); } };
+      speechSynthesis.speak(u);
+    });
   }
 
   // --- number entry ---
@@ -385,6 +480,7 @@
   $("railPrev").onclick = () => step(-1);
   $("railNext").onclick = () => step(1);
   document.querySelectorAll("[data-step]").forEach(b => b.onclick = () => step(+b.dataset.step));
+  document.querySelectorAll("[data-page]").forEach(b => b.onclick = () => flip(+b.dataset.page));
   function setSound(on) { soundOn = on; store("moekedex_sound", on ? "1" : "0"); $("soundGlow").classList.toggle("lit", on); }
   $("bSound").onclick = () => { setSound(!soundOn); if (soundOn) chirp(); };
   setSound(soundOn);
@@ -400,6 +496,8 @@
     else if (k === "ArrowLeft") step(-1);
     else if (k === "ArrowUp") step(10);
     else if (k === "ArrowDown") step(-10);
+    else if (k === "]" || k === "PageDown") flip(1);
+    else if (k === "[" || k === "PageUp") flip(-1);
     else if (k === "r" || k === "R") random();
     else if (k === "v" || k === "V") speak();
     else if (k === "m" || k === "M") $("bSound").click();
