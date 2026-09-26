@@ -309,11 +309,11 @@ function land() {
 
   // reactions: at most one slide per shot, and rarely (see SLIDE_CHANCE)
   const shown =
-    ((freed > 0 || (group.length >= 3 && (group.length >= 5 || dropped >= 3))) && maybeSlide("good", "bigPop")) ||
-    (popStreak >= 3 && maybeSlide("good", "combo")) ||
-    (ceiling && maybeSlide("bad", "ceiling")) ||
-    (missed && maybeSlide("bad", "miss"));
-  if (!shown) maybeSlide("random", "random");
+    ((freed > 0 || (group.length >= 3 && (group.length >= 5 || dropped >= 3))) && maybeSlide("bigPop")) ||
+    (popStreak >= 3 && maybeSlide("combo")) ||
+    (ceiling && maybeSlide("ceiling")) ||
+    (missed && maybeSlide("miss"));
+  if (!shown) maybeSlide("shot");
 }
 
 function flood(r, c, ok) {
@@ -407,7 +407,7 @@ function refill() {
   for (let r = 0; r < 4; r++) grid.push(newRow(r));
   current = pickShotType(); next = pickShotType();
   Sound.win();
-  maybeSlide("good", "bigPop");
+  maybeSlide("bigPop");
 }
 
 function win() {
@@ -420,14 +420,14 @@ function win() {
   } else score += 500;
   saveBest();
   Sound.win();
-  maybeSlide("good", "win");
+  maybeSlide("win");
 }
 function lose(reason) {
   setState("lose");
   loseReason = reason;
   saveBest();
   Sound.lose();
-  maybeSlide("bad", "lose");
+  maybeSlide("lose");
 }
 function saveBest() {
   if (score > best) { best = score; try { localStorage.setItem(bestKey(), best); } catch (e) {} }
@@ -440,18 +440,37 @@ function saveBest() {
 // Some are also cut on a side ("cut": ["left"] etc.) — those peek round a CORNER,
 // with the side cut pressed against the neighbouring screen edge. One cut on both
 // sides would only fit full-width, so it hangs from the top.
+// Every slide goes in ONE pool (the good/bad/random file names no longer matter)
+// and is dealt like a shuffled deck: all of them show once before any repeats.
 // They're rare on purpose: a global cooldown plus a per-event chance.
-const SLIDES = { good: [], bad: [], random: [] };
+let SLIDES = [];
 fetch("assets/slides.json", { cache: "no-cache" }).then((r) => r.json()).then((j) => {
-  for (const kind in SLIDES)
-    SLIDES[kind] = (j[kind] || []).map((e) => {
-      const { src, cut = [] } = typeof e === "string" ? { src: e } : e;
-      const img = new Image();
-      img.src = "assets/" + src;
-      img.cut = cut;
-      return img;
-    });
+  SLIDES = Object.values(j).flat().map((e) => {
+    const { src, cut = [] } = typeof e === "string" ? { src: e } : e;
+    const img = new Image();
+    img.src = "assets/" + src;
+    img.cut = cut;
+    return img;
+  });
 }).catch(() => {});
+
+let slideDeck = [];
+function nextSlideImage() {
+  const ready = SLIDES.filter((img) => img.naturalWidth);
+  if (!ready.length) return null;
+  slideDeck = slideDeck.filter((img) => ready.includes(img));
+  if (!slideDeck.length) {
+    slideDeck = ready.slice();
+    for (let i = slideDeck.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [slideDeck[i], slideDeck[j]] = [slideDeck[j], slideDeck[i]];
+    }
+    // don't show the same slide twice in a row across a reshuffle
+    if (slideDeck.length > 1 && slideDeck[slideDeck.length - 1] === lastSlideImg) slideDeck.unshift(slideDeck.pop());
+  }
+  return slideDeck.pop();
+}
+let lastSlideImg = null;
 
 // Entrance speeds, picked at random per slide. `pop` = springy overshoot on arrival.
 // `weight` = how often each speed is picked relative to the others.
@@ -466,32 +485,32 @@ function pickSpeed() {
   return SLIDE_SPEEDS[0];
 }
 const SLIDE_COOLDOWN = 10;         // seconds between slides, minimum
-const SLIDE_CHANCE = {             // chance a qualifying event shows a slide
+const SLIDE_CHANCE = {             // chance an event shows a slide (any slide can show for any event)
   bigPop: 0.55,                    // popped 5+ / dropped 3+ in one shot, or freed a friend
   combo: 0.45,                     // popped on 3 shots in a row
   win: 1,
   ceiling: 0.4,                    // the ceiling dropped a row
   miss: 0.3,                       // a shot that didn't pop anything
   lose: 1,
-  random: 0.07,                    // any shot at all
+  shot: 0.07,                      // any other shot
 };
 let slide = null, slideCool = 3, popStreak = 0;
 
-function maybeSlide(kind, reason) {
-  const pool = SLIDES[kind];
-  if (!pool.length || slide) return false;
+function maybeSlide(reason) {
+  if (slide) return false;
   // win/lose always get through; everything else respects the cooldown
   const force = SLIDE_CHANCE[reason] >= 1;
   const chance = SLIDE_CHANCE[reason] * (mode().slideRate ?? 1);
   if (!force && (slideCool > 0 || Math.random() > chance)) return false;
-  const img = pool[Math.floor(Math.random() * pool.length)];
-  if (!img.naturalWidth) return false;
+  const img = nextSlideImage();
+  if (!img) return false;
+  lastSlideImg = img;
   const both = img.cut.includes("left") && img.cut.includes("right");
   const edges = both ? ["top"] : ["bottom", "top", "left", "right"];
   const edge = edges[Math.floor(Math.random() * edges.length)];
   const speed = pickSpeed();
   // dodge: which side of the launcher a bottom slide sits on
-  slide = { img, edge, t: 0, along: 0.25 + Math.random() * 0.5, dodge: Math.random() < 0.5 ? -1 : 1, kind, speed };
+  slide = { img, edge, t: 0, along: 0.25 + Math.random() * 0.5, dodge: Math.random() < 0.5 ? -1 : 1, speed };
   slideCool = mode().slideCooldown ?? SLIDE_COOLDOWN;
   if (speed.pop) Sound.whoosh();
   return true;
@@ -1038,7 +1057,7 @@ function update(dt) {
     dropTimer = mode().dropInterval(drops);
     trimGrid();
     checkEnd();
-    if (state === "play") maybeSlide("bad", "ceiling");
+    if (state === "play") maybeSlide("ceiling");
   }
   ceilAnim = Math.max(0, ceilAnim - dt / 0.18);
   if (shot) updateShot(dt);
