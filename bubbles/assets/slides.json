@@ -1,14 +1,48 @@
 {
   "good": [
-    "slides/good_slide_01.png",
-    "slides/good_slide_02.png"
+    {
+      "src": "slides/good_slide_01.png",
+      "cut": []
+    },
+    {
+      "src": "slides/good_slide_02.png",
+      "cut": []
+    }
   ],
   "bad": [
-    "slides/bad_slide_01.png",
-    "slides/bad_slide_02.png"
+    {
+      "src": "slides/bad_slide_01.png",
+      "cut": []
+    },
+    {
+      "src": "slides/bad_slide_02.png",
+      "cut": []
+    }
   ],
   "random": [
-    "slides/random_slide_01.png",
-    "slides/random_slide_02.png"
+    {
+      "src": "slides/random_slide_01.png",
+      "cut": []
+    },
+    {
+      "src": "slides/random_slide_02.png",
+      "cut": []
+    },
+    {
+      "src": "slides/random_slide_05.png",
+      "cut": []
+    },
+    {
+      "src": "slides/randon_slide_03.png",
+      "cut": [
+        "left"
+      ]
+    },
+    {
+      "src": "slides/randon_slide_04.png",
+      "cut": [
+        "left"
+      ]
+    }
   ]
 }

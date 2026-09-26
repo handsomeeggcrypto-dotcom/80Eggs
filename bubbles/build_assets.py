@@ -10,10 +10,12 @@ true JPEG on a flat WHITE background) we:
   2. feather the cut edge so it doesn't look jaggy,
   3. trim to content, centre on a square canvas, resize to SIZE.
 
-Files named <kind>_slide_<n> (kind = good / bad / random) are SLIDES, not bubbles:
-characters cropped flat along the bottom edge so they can "peek" in from a screen
-edge. They're trimmed (keeping that flat bottom), capped at SLIDE_MAX px, written to
-assets/slides/, and listed in assets/slides.json for the game to load.
+Files named <kind>_slide_<n> (kind = good / bad / random; "randon" is accepted too)
+are SLIDES, not bubbles: characters cut off flat along an edge so they can "peek" in
+from a screen edge. The cut edges are detected automatically; each slide is turned
+so its main cut is along the BOTTOM, trimmed, capped at SLIDE_MAX px, and written to
+assets/slides/. assets/slides.json lists them with any extra cut sides ("left" /
+"right") so the game only places a corner-peeker in a corner, etc.
 
 Re-run any time the source art changes:  python3 build_assets.py
 """
@@ -27,7 +29,8 @@ SRC = os.path.expanduser("~/Desktop/bubbles")
 OUT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets")
 SIZE = 256
 SLIDE_MAX = 600
-SLIDE_RE = re.compile(r"^(good|bad|random)_slide_", re.I)
+SLIDE_RE = re.compile(r"^(good|bad|random|randon)_slide_", re.I)
+CUT_MIN = 0.08  # an edge counts as "cut" if at least this much of it is opaque
 WHITE = 232  # a pixel counts as background if every channel >= this
 
 
@@ -81,13 +84,41 @@ def square(im):
     return canvas.resize((SIZE, SIZE), Image.LANCZOS)
 
 
+def cut_edges(im):
+    """How much of each border (2px deep) is opaque, as a fraction of its length."""
+    a = im.getchannel("A").point(lambda v: 255 if v > 16 else 0)
+    w, h = im.size
+
+    def frac(box, length):
+        hist = a.crop(box).histogram()
+        return hist[255] / (length * 2)
+
+    return {
+        "top": frac((0, 0, w, 2), w),
+        "bottom": frac((0, h - 2, w, h), w),
+        "left": frac((0, 0, 2, h), h),
+        "right": frac((w - 2, 0, w, h), h),
+    }
+
+
 def build_slide(src, dst):
+    """Returns the extra cut sides (besides the bottom) after normalising."""
     im = key_white(Image.open(src))
-    box = im.getchannel("A").point(lambda a: 255 if a > 16 else 0).getbbox()
-    # keep the flat cut edge: extend the crop down to the source's bottom
-    im = im.crop((box[0], box[1], box[2], im.height))
+    # cuts are measured on the ORIGINAL canvas borders (after trimming, every
+    # side touches the art somewhere); turn the image so the biggest is the bottom
+    cuts = cut_edges(im)
+    main = max(cuts, key=cuts.get)
+    im = {
+        "bottom": im,
+        "top": im.transpose(Image.ROTATE_180),
+        "left": im.transpose(Image.ROTATE_90),    # counter-clockwise: left -> bottom
+        "right": im.transpose(Image.ROTATE_270),  # clockwise: right -> bottom
+    }[main]
+    cuts = cut_edges(im)
+    im = im.crop(im.getchannel("A").point(lambda a: 255 if a > 16 else 0).getbbox())
     im.thumbnail((SLIDE_MAX, SLIDE_MAX), Image.LANCZOS)
     im.save(dst, optimize=True)
+    return [side for side in ("left", "right") if cuts[side] >= CUT_MIN]
 
 
 def main():
@@ -98,13 +129,16 @@ def main():
         m = SLIDE_RE.match(f)
         if not m:
             continue
+        kind = {"randon": "random"}.get(m.group(1).lower(), m.group(1).lower())
         out = os.path.splitext(f)[0].lower() + ".png"
-        build_slide(os.path.join(SRC, f), os.path.join(OUT, "slides", out))
-        slides[m.group(1).lower()].append("slides/" + out)
-        print("wrote slide", out)
+        cut = build_slide(os.path.join(SRC, f), os.path.join(OUT, "slides", out))
+        slides[kind].append({"src": "slides/" + out, "cut": cut})
+        print("wrote slide", out, "extra cut:", cut or "-")
     with open(os.path.join(OUT, "slides.json"), "w") as fh:
         json.dump(slides, fh, indent=2)
 
+    # everything else is square art: the bubble characters, plus UI icons like
+    # hamstar (the level rating star), which the game loads by name
     for f in names:
         if SLIDE_RE.match(f):
             continue

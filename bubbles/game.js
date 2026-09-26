@@ -1,6 +1,9 @@
 // Bubble Pop — proof-of-concept bubble shooter with character art bubbles.
 // Aim with mouse/finger, release to shoot. Match 3+ of the same character to pop.
-// Bubbles cut off from the ceiling fall. Every few shots the ceiling drops a row.
+// Bubbles cut off from the ceiling fall.
+//
+// Screens: title → LEVELS (map of hand-made levels from levels.js) or the
+// CLASSIC / RUSH quick-play modes.
 
 const W = 600, H = 900;
 const canvas = document.getElementById("game");
@@ -17,6 +20,33 @@ const TYPES = [
   { id: "rabbit_donut", tint: "#3f8fd1" },
 ];
 for (const t of TYPES) { t.img = new Image(); t.img.src = `assets/${t.id}.png`; }
+const ALL_TYPES = TYPES.map((_, i) => i);
+
+// Level rating icon: 0–3 "hamstars" per level.
+const HAMSTAR = new Image();
+HAMSTAR.src = "assets/hamstar.png";
+let HAMSTAR_DIM = null; // greyed-out copy for hamstars not yet earned
+HAMSTAR.onload = () => {
+  const c = document.createElement("canvas");
+  c.width = HAMSTAR.naturalWidth; c.height = HAMSTAR.naturalHeight;
+  const g = c.getContext("2d");
+  g.drawImage(HAMSTAR, 0, 0);
+  try {
+    const d = g.getImageData(0, 0, c.width, c.height);
+    for (let i = 0; i < d.data.length; i += 4) {
+      const v = 0.3 * d.data[i] + 0.59 * d.data[i + 1] + 0.11 * d.data[i + 2];
+      d.data[i] = d.data[i + 1] = d.data[i + 2] = 150 + v * 0.35;
+    }
+    g.putImageData(d, 0, 0);
+  } catch (e) {}
+  HAMSTAR_DIM = c;
+};
+const hamstarWord = (n) => `${n} hamstar${n === 1 ? "" : "s"}`;
+
+// Optional map background art: drop a tall image at assets/map_bg.png and it's
+// tiled down the level map instead of the drawn pastel background.
+const MAP_BG = new Image();
+MAP_BG.src = "assets/map_bg.png";
 
 // Art styles to compare, cycled with the STYLE button (or S key).
 const STYLES = ["Raw art", "Glass bubble", "Colour ring"];
@@ -34,34 +64,68 @@ const SHOOTER = { x: W / 2, y: 820 };
 const DEAD_Y = 740;                 // a bubble below this line = game over
 const SHOT_SPEED = 1500;
 
+// Cell values: -1 empty · 0..5 a character (TYPES index) · STONE · FRIEND + type
+const STONE = 50;                   // can't be matched; only falls when cut loose
+const FRIEND = 100;                 // trapped friend: can't be matched, drop it to rescue it
+const isColor = (v) => v >= 0 && v < STONE;
+const isFriend = (v) => v >= FRIEND;
+
 // ---- modes -----------------------------------------------------------------
 // CLASSIC: clear the board. Every shot ticks the ceiling countdown, and each drop
 //   makes the next one come sooner (shotsPerDrop).
 // RUSH: endless. The ceiling drops on a timer that speeds up after every drop
 //   (dropInterval); clearing the board just refills it for a bonus.
+// Levels (levels.js) become a mode object too, via levelMode().
 const MODES = [
   {
-    id: "classic", name: "CLASSIC", startRows: 6,
-    desc: ["Clear the board.", "The ceiling drops sooner and sooner."],
+    id: "classic", name: "CLASSIC", startRows: 6, types: ALL_TYPES,
+    desc: "Clear the board. The ceiling drops sooner and sooner.",
     shotsPerDrop: (drops) => Math.max(3, 6 - Math.floor(drops / 2)), // 6,6,5,5,4,4,3…
   },
   {
-    id: "rush", name: "RUSH", startRows: 5, endless: true,
-    desc: ["Endless. The ceiling drops on a timer", "that keeps getting faster."],
+    id: "rush", name: "RUSH", startRows: 5, endless: true, types: ALL_TYPES,
+    desc: "Endless. The ceiling drops on a faster and faster timer.",
     dropInterval: (drops) => Math.max(2.2, 8 - drops * 0.5),          // seconds: 8, 7.5, 7…
     slideRate: 0.5,      // half the usual slide chances…
     slideCooldown: 18,   // …and a longer gap between them, so they don't pile onto the pressure
   },
 ];
-let modeIdx = 0;
-try { modeIdx = Math.min(MODES.length - 1, +localStorage.getItem("bubblepop_mode") || 0); } catch (e) {}
-const mode = () => MODES[modeIdx];
 
-let grid, shift, score, best, shotsLeft, drops, dropTimer, ceilAnim, current, next, shot, popping, falling, particles, state, aim, menuT;
-state = "menu"; menuT = 1;
-const bestKey = () => "bubblepop_best_" + mode().id;
+function levelMode(i) {
+  const L = LEVELS[i];
+  return {
+    id: "level", levelIdx: i, name: `LEVEL ${i + 1}`, title: L.name,
+    types: L.types, goal: L.goal, target: L.target, shots: L.shots, layout: L.layout,
+    shotsPerDrop: L.drop ? () => L.drop : null,
+  };
+}
+
+let cur = MODES[0];
+const mode = () => cur;
+
+let grid, shift, score, best, shotsLeft, dropLeft, drops, dropTimer, ceilAnim, current, next, shot;
+let popping, falling, particles, popups, state, aim, menuT, focus, loseReason, stars;
+let friendsTotal, friendsFreed, banner;
+state = "title"; menuT = 1; focus = 0;
+
+const bestKey = () => "bubblepop_best_" + mode().id + (mode().levelIdx ?? "");
 function loadBest() { try { best = +localStorage.getItem(bestKey()) || 0; } catch (e) { best = 0; } }
-loadBest();
+
+// level progress: { "<levelIdx>": stars }
+let progress = {};
+try { progress = JSON.parse(localStorage.getItem("bubblepop_levels")) || {}; } catch (e) {}
+const levelStars = (i) => progress[i] || 0;
+const levelUnlocked = (i) => i === 0 || levelStars(i - 1) > 0;
+const totalStars = () => LEVELS.reduce((a, _, i) => a + levelStars(i), 0);
+function nextLevelToPlay() {
+  const i = LEVELS.findIndex((_, i) => !levelStars(i));
+  return i < 0 ? LEVELS.length - 1 : i;
+}
+function saveLevelStars(i, n) {
+  if (n <= levelStars(i)) return;
+  progress[i] = n;
+  try { localStorage.setItem("bubblepop_levels", JSON.stringify(progress)); } catch (e) {}
+}
 
 // Row r is shifted right by R when (r + shift) is odd; dropping a row flips shift.
 const rowOdd = (r) => (r + shift) % 2 === 1;
@@ -85,26 +149,68 @@ function newRow(r) {
   for (let c = 0; c < COLS; c++) row.push(c < colsIn(r) ? randType() : -1);
   return row;
 }
-const randType = () => Math.floor(Math.random() * TYPES.length);
+function randType() {
+  const pal = mode().types;
+  return pal[Math.floor(Math.random() * pal.length)];
+}
 
-function startGame(i) {
-  modeIdx = i;
-  try { localStorage.setItem("bubblepop_mode", i); } catch (e) {}
+function buildLevelGrid(m) {
+  grid = [];
+  m.layout.forEach((line, r) => {
+    const cells = line.replace(/ /g, "");
+    const row = new Array(COLS).fill(-1);
+    for (let c = 0; c < colsIn(r) && c < cells.length; c++) row[c] = cellFromChar(cells[c]);
+    grid.push(row);
+  });
+  for (const [r, c] of floatingCells()) grid[r][c] = -1; // safety net for layout typos
+  trimGrid();
+}
+function cellFromChar(ch) {
+  if (ch === ".") return -1;
+  if (ch === "#") return STONE;
+  if (ch === "@") return FRIEND + randType();
+  if (ch >= "1" && ch <= "9") return mode().types[(+ch - 1) % mode().types.length];
+  return randType(); // "*"
+}
+
+// ---- screens ---------------------------------------------------------------
+function setState(s) { state = s; menuT = 0; focus = 0; banner = null; }
+
+function startMode(i) {
+  cur = MODES[i];
   loadBest();
   reset();
+}
+function startLevel(i) {
+  cur = levelMode(i);
+  loadBest();
+  reset();
+  banner = { title: `LEVEL ${i + 1}`, sub: `${cur.title} · ${goalText(true)}`, t: 0 };
+}
+function openMap() {
+  setState("map");
+  mapFocusOn(mode().levelIdx ?? nextLevelToPlay());
+}
+function quitToMenu() {
+  if (mode().id === "level") openMap();
+  else setState("title");
 }
 
 function reset() {
   shift = 0;
-  grid = [];
-  for (let r = 0; r < mode().startRows; r++) grid.push(newRow(r));
+  if (mode().layout) buildLevelGrid(mode());
+  else { grid = []; for (let r = 0; r < mode().startRows; r++) grid.push(newRow(r)); }
   score = 0;
   drops = 0;
   ceilAnim = 0;
-  shotsLeft = mode().shotsPerDrop ? mode().shotsPerDrop(0) : 0;
+  shotsLeft = mode().shots || 0;
+  dropLeft = mode().shotsPerDrop ? mode().shotsPerDrop(0) : 0;
   dropTimer = mode().dropInterval ? mode().dropInterval(0) : 0;
-  popping = []; falling = []; particles = [];
+  friendsTotal = grid.reduce((a, row) => a + row.filter(isFriend).length, 0);
+  friendsFreed = 0;
+  popping = []; falling = []; particles = []; popups = [];
   shot = null;
+  banner = null;
   slide = null; slideCool = 3; popStreak = 0;
   current = pickShotType();
   next = pickShotType();
@@ -112,17 +218,25 @@ function reset() {
   aim = -Math.PI / 2;
 }
 
-// Only hand out types still on the board so the game can always be cleared.
+// Only hand out characters still on the board so the game can always be cleared.
 function pickShotType() {
   const present = new Set();
-  for (const row of grid) for (const t of row) if (t >= 0) present.add(t);
+  for (const row of grid) for (const t of row) if (isColor(t)) present.add(t);
   const list = [...present];
   return list.length ? list[Math.floor(Math.random() * list.length)] : randType();
+}
+
+function goalText(long) {
+  const m = mode();
+  if (m.goal === "rescue") return long ? "Drop the trapped friends!" : `Friends freed ${friendsFreed}/${friendsTotal}`;
+  if (m.goal === "score") return long ? `Score ${m.target} points!` : `Score ${score}/${m.target}`;
+  return "Clear the board";
 }
 
 // ---- shooting --------------------------------------------------------------
 function fire() {
   if (state !== "play" || shot) return;
+  if (mode().shots && shotsLeft <= 0) return;
   shot = { x: SHOOTER.x, y: SHOOTER.y, vx: Math.cos(aim) * SHOT_SPEED, vy: Math.sin(aim) * SHOT_SPEED, t: current };
   current = next;
   next = pickShotType();
@@ -170,10 +284,10 @@ function land() {
   grid[r][c] = t;
 
   const group = flood(r, c, (rr, cc) => get(rr, cc) === t);
-  let dropped = 0, ceiling = false, missed = false;
+  let dropped = 0, freed = 0, ceiling = false, missed = false;
   if (group.length >= 3) {
     for (const [a, b] of group) popBubble(a, b, 0);
-    dropped = dropFloating();
+    [dropped, freed] = dropFloating();
     score += group.length * 10;
     Sound.pop(group.length);
     popStreak++;
@@ -182,10 +296,11 @@ function land() {
     missed = true;
     popStreak = 0;
   }
-  // classic: every shot ticks the countdown, popped or not
-  if (mode().shotsPerDrop && --shotsLeft <= 0) {
+  if (mode().shots) shotsLeft--;
+  // every shot ticks the ceiling countdown, popped or not
+  if (mode().shotsPerDrop && --dropLeft <= 0) {
     dropCeiling();
-    shotsLeft = mode().shotsPerDrop(drops);
+    dropLeft = mode().shotsPerDrop(drops);
     ceiling = true;
   }
   trimGrid();
@@ -194,7 +309,7 @@ function land() {
 
   // reactions: at most one slide per shot, and rarely (see SLIDE_CHANCE)
   const shown =
-    (group.length >= 3 && (group.length >= 5 || dropped >= 3) && maybeSlide("good", "bigPop")) ||
+    ((freed > 0 || (group.length >= 3 && (group.length >= 5 || dropped >= 3))) && maybeSlide("good", "bigPop")) ||
     (popStreak >= 3 && maybeSlide("good", "combo")) ||
     (ceiling && maybeSlide("bad", "ceiling")) ||
     (missed && maybeSlide("bad", "miss"));
@@ -219,22 +334,39 @@ function popBubble(r, c, delay) {
   grid[r][c] = -1;
 }
 
-function dropFloating() {
+// cells no longer connected to the ceiling
+function floatingCells() {
   const anchored = new Set();
   for (let c = 0; c < colsIn(0); c++) {
     if (get(0, c) < 0 || anchored.has("0," + c)) continue;
     for (const [a, b] of flood(0, c, (x, y) => get(x, y) >= 0)) anchored.add(a + "," + b);
   }
-  let n = 0;
+  const out = [];
   for (let r = 0; r < grid.length; r++)
     for (let c = 0; c < colsIn(r); c++)
-      if (grid[r][c] >= 0 && !anchored.has(r + "," + c)) {
-        falling.push({ x: cellX(r, c), y: cellY(r), vx: (Math.random() - 0.5) * 120, vy: -Math.random() * 150, t: grid[r][c], rot: 0, vr: (Math.random() - 0.5) * 6 });
-        grid[r][c] = -1;
-        n++;
-      }
+      if (grid[r][c] >= 0 && !anchored.has(r + "," + c)) out.push([r, c]);
+  return out;
+}
+
+// returns [bubbles dropped, friends freed]
+function dropFloating() {
+  let n = 0, freed = 0;
+  for (const [r, c] of floatingCells()) {
+    const v = grid[r][c];
+    falling.push({ x: cellX(r, c), y: cellY(r), vx: (Math.random() - 0.5) * 120, vy: -Math.random() * 150, t: v, rot: 0, vr: (Math.random() - 0.5) * 6 });
+    grid[r][c] = -1;
+    n++;
+    if (isFriend(v)) {
+      freed++;
+      score += 100;
+      spawnPopup("FREED!", cellX(r, c), cellY(r));
+      burst(cellX(r, c), cellY(r), "#ffc93c");
+    }
+  }
+  friendsFreed += freed;
   if (n) { score += n * 20; Sound.drop(); }
-  return n;
+  if (freed) Sound.win();
+  return [n, freed];
 }
 
 function dropCeiling() {
@@ -250,13 +382,22 @@ function trimGrid() {
   while (grid.length && grid[grid.length - 1].every((t) => t < 0)) grid.pop();
 }
 
+function goalMet() {
+  const g = mode().goal || "clear";
+  if (g === "score") return score >= mode().target;
+  const anyFriend = grid.some((row) => row.some(isFriend));
+  if (g === "rescue") return !anyFriend;
+  return !anyFriend && !grid.some((row) => row.some(isColor)); // stones may stay
+}
+
 function checkEnd() {
-  if (!grid.length || !grid.some((row) => row.some((t) => t >= 0))) {
+  if (goalMet()) {
     if (mode().endless) { refill(); return; }
     win(); return;
   }
   for (let r = 0; r < grid.length; r++)
-    if (cellY(r) + R > DEAD_Y && grid[r].some((t) => t >= 0)) { state = "lose"; menuT = 0; saveBest(); Sound.lose(); maybeSlide("bad", "lose"); return; }
+    if (cellY(r) + R > DEAD_Y && grid[r].some((t) => t >= 0)) return lose("GAME OVER");
+  if (mode().shots && shotsLeft <= 0) lose("OUT OF SHOTS");
 }
 
 // rush: a cleared board is worth a bonus and comes straight back
@@ -268,7 +409,26 @@ function refill() {
   Sound.win();
   maybeSlide("good", "bigPop");
 }
-function win() { state = "win"; menuT = 0; score += 500; saveBest(); Sound.win(); maybeSlide("good", "win"); }
+
+function win() {
+  setState("win");
+  if (mode().id === "level") {
+    const frac = shotsLeft / mode().shots;
+    stars = frac >= 0.4 ? 3 : frac >= 0.2 ? 2 : 1;
+    score += shotsLeft * 50; // leftover shots bonus
+    saveLevelStars(mode().levelIdx, stars);
+  } else score += 500;
+  saveBest();
+  Sound.win();
+  maybeSlide("good", "win");
+}
+function lose(reason) {
+  setState("lose");
+  loseReason = reason;
+  saveBest();
+  Sound.lose();
+  maybeSlide("bad", "lose");
+}
 function saveBest() {
   if (score > best) { best = score; try { localStorage.setItem(bestKey(), best); } catch (e) {} }
 }
@@ -277,11 +437,20 @@ function saveBest() {
 // Reaction art (assets/slides.json, built from ~/Desktop/bubbles/*_slide_*) that
 // peeks in from a random screen edge. Each image has a flat cut edge along its
 // bottom, so it's rotated to sit flush against whichever edge it enters from.
+// Some are also cut on a side ("cut": ["left"] etc.) — those peek round a CORNER,
+// with the side cut pressed against the neighbouring screen edge. One cut on both
+// sides would only fit full-width, so it hangs from the top.
 // They're rare on purpose: a global cooldown plus a per-event chance.
 const SLIDES = { good: [], bad: [], random: [] };
-fetch("assets/slides.json").then((r) => r.json()).then((j) => {
+fetch("assets/slides.json", { cache: "no-cache" }).then((r) => r.json()).then((j) => {
   for (const kind in SLIDES)
-    SLIDES[kind] = (j[kind] || []).map((src) => { const img = new Image(); img.src = "assets/" + src; return img; });
+    SLIDES[kind] = (j[kind] || []).map((e) => {
+      const { src, cut = [] } = typeof e === "string" ? { src: e } : e;
+      const img = new Image();
+      img.src = "assets/" + src;
+      img.cut = cut;
+      return img;
+    });
 }).catch(() => {});
 
 // Entrance speeds, picked at random per slide. `pop` = springy overshoot on arrival.
@@ -298,7 +467,7 @@ function pickSpeed() {
 }
 const SLIDE_COOLDOWN = 10;         // seconds between slides, minimum
 const SLIDE_CHANCE = {             // chance a qualifying event shows a slide
-  bigPop: 0.55,                    // popped 5+ bubbles or dropped 3+ in one shot
+  bigPop: 0.55,                    // popped 5+ / dropped 3+ in one shot, or freed a friend
   combo: 0.45,                     // popped on 3 shots in a row
   win: 1,
   ceiling: 0.4,                    // the ceiling dropped a row
@@ -317,7 +486,9 @@ function maybeSlide(kind, reason) {
   if (!force && (slideCool > 0 || Math.random() > chance)) return false;
   const img = pool[Math.floor(Math.random() * pool.length)];
   if (!img.naturalWidth) return false;
-  const edge = ["bottom", "top", "left", "right"][Math.floor(Math.random() * 4)];
+  const both = img.cut.includes("left") && img.cut.includes("right");
+  const edges = both ? ["top"] : ["bottom", "top", "left", "right"];
+  const edge = edges[Math.floor(Math.random() * edges.length)];
   const speed = pickSpeed();
   // dodge: which side of the launcher a bottom slide sits on
   slide = { img, edge, t: 0, along: 0.25 + Math.random() * 0.5, dodge: Math.random() < 0.5 ? -1 : 1, kind, speed };
@@ -343,42 +514,60 @@ function drawSlide() {
   } else if (t < sp.in + sp.hold) p = 1;
   else { const k = (t - sp.in - sp.hold) / sp.out; p = 1 - k * k; }
   const side = edge === "left" || edge === "right";
-  const h = side ? W * 0.36 : H * 0.26;      // how far it pokes into the screen
-  const w = h * (img.naturalWidth / img.naturalHeight);
-  // Bottom slides never cover the launcher: they sit beside it, pushed toward a
-  // corner (hanging off-screen is fine, it reads as peeking round the edge).
-  // Side slides only reach ~W*0.36 in, so they already clear the centred launcher.
-  const bottomX = SHOOTER.x + dodge * (w / 2 + R + 30);
+  const peek = side ? W * 0.36 : H * 0.26;   // how far it pokes into the screen
+  const aspect = img.naturalWidth / img.naturalHeight;
+  const cutL = img.cut.includes("left"), cutR = img.cut.includes("right");
+  let w = peek * aspect, h = peek;
+  if (cutL && cutR) { w = W; h = W / aspect; } // full-width: only its top `peek` shows
+  const span = side ? H : W;                   // length of the edge it sits on
+  // position along the edge, in the image's own left→right direction. Corner
+  // peekers press their cut side against the end of the edge.
+  let u;
+  if (cutL && !cutR) u = w / 2;
+  else if (cutR && !cutL) u = span - w / 2;
+  else if (cutL && cutR) u = span / 2;
+  else if (edge === "bottom") u = SHOOTER.x + dodge * (w / 2 + R + 30); // beside the launcher
+  else u = span * along;
+  // the image's left→right runs: bottom → screen right, top → screen left,
+  // left edge → screen down, right edge → screen up
   const anchor = {
-    bottom: [bottomX, H, 0],
-    top:    [W * along, 0, Math.PI],
-    left:   [0, H * along, Math.PI / 2],
-    right:  [W, H * along, -Math.PI / 2],
+    bottom: [u, H, 0],
+    top:    [W - u, 0, Math.PI],
+    left:   [0, u, Math.PI / 2],
+    right:  [W, H - u, -Math.PI / 2],
   }[edge];
   ctx.save();
   ctx.translate(anchor[0], anchor[1]);
   ctx.rotate(anchor[2]);
   // local space: the cut edge sits on y=0, the character extends toward -y
-  ctx.drawImage(img, -w / 2, -h * p, w, h);
+  ctx.drawImage(img, -w / 2, -Math.min(h, peek) * p, w, h);
   ctx.restore();
 }
 
 // ---- drawing ---------------------------------------------------------------
 let shakeT = 0;
+const FONT = "system-ui, sans-serif";
 
-function drawBubble(t, x, y, scale = 1, alpha = 1, rot = 0) {
-  const type = TYPES[t];
-  const img = type.img;
+function drawBubble(v, x, y, scale = 1, alpha = 1, rot = 0) {
   ctx.save();
   ctx.globalAlpha = alpha;
   ctx.translate(x, y);
   ctx.rotate(rot);
   ctx.scale(scale, scale);
-  const style = STYLES[styleIdx];
+  if (v === STONE) drawStone();
+  else if (isFriend(v)) drawFriend(v - FRIEND);
+  else drawCharacter(v);
+  ctx.restore();
+}
 
+function drawCharacter(t) {
+  const type = TYPES[t];
+  const img = type.img;
+  const ready = img.complete && img.naturalWidth;
+  const style = STYLES[styleIdx];
   if (style === "Raw art") {
     const s = D * 1.12; // donuts are lumpy, let them overlap a hair so the board reads full
-    if (img.complete && img.naturalWidth) ctx.drawImage(img, -s / 2, -s / 2, s, s);
+    if (ready) ctx.drawImage(img, -s / 2, -s / 2, s, s);
   } else if (style === "Glass bubble") {
     // tinted soap-bubble shell with the art inside
     const g = ctx.createRadialGradient(-R * 0.3, -R * 0.35, R * 0.1, 0, 0, R);
@@ -388,7 +577,7 @@ function drawBubble(t, x, y, scale = 1, alpha = 1, rot = 0) {
     ctx.fillStyle = g;
     ctx.beginPath(); ctx.arc(0, 0, R - 1, 0, Math.PI * 2); ctx.fill();
     const s = D * 0.86;
-    if (img.complete && img.naturalWidth) ctx.drawImage(img, -s / 2, -s / 2, s, s);
+    if (ready) ctx.drawImage(img, -s / 2, -s / 2, s, s);
     ctx.lineWidth = 2.5;
     ctx.strokeStyle = hexA(type.tint, 0.95);
     ctx.beginPath(); ctx.arc(0, 0, R - 1.5, 0, Math.PI * 2); ctx.stroke();
@@ -406,17 +595,65 @@ function drawBubble(t, x, y, scale = 1, alpha = 1, rot = 0) {
     ctx.fillStyle = "rgba(255,255,255,0.35)";
     ctx.beginPath(); ctx.arc(0, 0, R - 5, 0, Math.PI * 2); ctx.fill();
     const s = D * 0.92;
-    if (img.complete && img.naturalWidth) ctx.drawImage(img, -s / 2, -s / 2, s, s);
+    if (ready) ctx.drawImage(img, -s / 2, -s / 2, s, s);
     ctx.lineWidth = 3;
     ctx.strokeStyle = "#2a1f4a";
     ctx.beginPath(); ctx.arc(0, 0, R - 1.5, 0, Math.PI * 2); ctx.stroke();
   }
+}
+
+// grey rock with a couple of cracks
+function drawStone() {
+  const g = ctx.createRadialGradient(-R * 0.3, -R * 0.35, R * 0.1, 0, 0, R);
+  g.addColorStop(0, "#c9c4d6");
+  g.addColorStop(1, "#7a7390");
+  ctx.fillStyle = g;
+  ctx.beginPath(); ctx.arc(0, 0, R - 1, 0, Math.PI * 2); ctx.fill();
+  ctx.strokeStyle = "#4a4460";
+  ctx.lineWidth = 3;
+  ctx.stroke();
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(-R * 0.5, -R * 0.2); ctx.lineTo(-R * 0.1, R * 0.05); ctx.lineTo(-R * 0.2, R * 0.45);
+  ctx.moveTo(R * 0.15, -R * 0.55); ctx.lineTo(R * 0.35, -R * 0.15);
+  ctx.stroke();
+}
+
+// trapped friend: the character behind golden cage bars
+function drawFriend(t) {
+  const img = TYPES[t].img;
+  const pulse = 0.5 + 0.5 * Math.sin(performance.now() / 250);
+  ctx.fillStyle = `rgba(255,214,90,${0.25 + pulse * 0.25})`;
+  ctx.beginPath(); ctx.arc(0, 0, R + 3, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = "#fff6d8";
+  ctx.beginPath(); ctx.arc(0, 0, R - 1, 0, Math.PI * 2); ctx.fill();
+  const s = D * 0.84;
+  if (img.complete && img.naturalWidth) ctx.drawImage(img, -s / 2, -s / 2, s, s);
+  ctx.save();
+  ctx.beginPath(); ctx.arc(0, 0, R - 1, 0, Math.PI * 2); ctx.clip();
+  ctx.strokeStyle = "rgba(201,143,20,0.85)";
+  ctx.lineWidth = 3;
+  for (const bx of [-R * 0.5, 0, R * 0.5]) { ctx.beginPath(); ctx.moveTo(bx, -R); ctx.lineTo(bx, R); ctx.stroke(); }
   ctx.restore();
+  ctx.strokeStyle = "#e0a820";
+  ctx.lineWidth = 4;
+  ctx.beginPath(); ctx.arc(0, 0, R - 2, 0, Math.PI * 2); ctx.stroke();
 }
 
 function hexA(hex, a) {
   const n = parseInt(hex.slice(1), 16);
   return `rgba(${n >> 16},${(n >> 8) & 255},${n & 255},${a})`;
+}
+
+// a hamstar icon centred on x,y; `size` = its width/height. Unearned ones are
+// a faded grey copy.
+function drawHamstar(x, y, size, earned) {
+  const img = earned ? HAMSTAR : HAMSTAR_DIM;
+  if (!img || (earned && !HAMSTAR.naturalWidth)) return;
+  ctx.save();
+  if (!earned) ctx.globalAlpha *= 0.55;
+  ctx.drawImage(img, x - size / 2, y - size / 2, size, size);
+  ctx.restore();
 }
 
 function drawBackground() {
@@ -460,7 +697,7 @@ function roundRect(x, y, w, h, r) {
   ctx.closePath();
 }
 
-// dotted aim line with up to two wall bounces
+// dotted aim line with wall bounces
 function drawAim() {
   if (state !== "play" || shot) return;
   let x = SHOOTER.x, y = SHOOTER.y, vx = Math.cos(aim), vy = Math.sin(aim);
@@ -490,24 +727,34 @@ function drawShooter() {
   ctx.fillStyle = "#8f75e6";
   roundRect(-10, -58, 20, 40, 8); ctx.fill();
   ctx.restore();
-  if (state === "play" && !shot) drawBubble(current, SHOOTER.x, SHOOTER.y);
+  const outOfShots = mode().shots && shotsLeft <= 0;
+  if (state === "play" && !shot && !outOfShots) drawBubble(current, SHOOTER.x, SHOOTER.y);
   // next bubble
   ctx.fillStyle = "#4b3a8a";
-  ctx.font = "bold 14px system-ui, sans-serif";
+  ctx.font = `bold 14px ${FONT}`;
   ctx.textAlign = "center";
   ctx.fillText("NEXT", NEXT_POS.x, NEXT_POS.y - 36);
   drawBubble(next, NEXT_POS.x, NEXT_POS.y, 0.75);
   ctx.fillText("tap to swap", NEXT_POS.x, NEXT_POS.y + 38);
-  // ceiling countdown
   ctx.textAlign = "left";
-  ctx.fillText("CEILING DROPS IN", 24, SHOOTER.y - 10);
-  if (mode().shotsPerDrop) {
-    const total = mode().shotsPerDrop(drops);
-    for (let i = 0; i < total; i++) {
-      ctx.fillStyle = i < shotsLeft ? (shotsLeft <= 1 ? "#e63c6e" : "#6b4fc4") : "rgba(107,79,196,0.2)";
-      ctx.beginPath(); ctx.arc(32 + i * 18, SHOOTER.y + 12, 6, 0, Math.PI * 2); ctx.fill();
+
+  if (mode().shots) {
+    // levels: shots left, plus a small ceiling countdown if the level has one
+    ctx.fillText("SHOTS LEFT", 24, SHOOTER.y - 26);
+    ctx.font = `bold 34px ${FONT}`;
+    ctx.fillStyle = shotsLeft <= 3 ? "#e63c6e" : "#4b3a8a";
+    ctx.fillText(shotsLeft, 24, SHOOTER.y + 10);
+    if (mode().shotsPerDrop) {
+      ctx.font = `bold 11px ${FONT}`;
+      ctx.fillStyle = "#4b3a8a";
+      ctx.fillText("CEILING", 24, SHOOTER.y + 34);
+      drawDropDots(28, SHOOTER.y + 46, 5, 14);
     }
+  } else if (mode().shotsPerDrop) {
+    ctx.fillText("CEILING DROPS IN", 24, SHOOTER.y - 10);
+    drawDropDots(32, SHOOTER.y + 12, 6, 18);
   } else {
+    ctx.fillText("CEILING DROPS IN", 24, SHOOTER.y - 10);
     const k = dropTimer / mode().dropInterval(drops);
     ctx.fillStyle = "rgba(107,79,196,0.2)";
     roundRect(24, SHOOTER.y + 4, 150, 14, 7); ctx.fill();
@@ -517,60 +764,275 @@ function drawShooter() {
     ctx.fillText(`${dropTimer.toFixed(1)}s`, 180, SHOOTER.y + 16);
   }
 }
+function drawDropDots(x, y, r, gap) {
+  const total = mode().shotsPerDrop(drops);
+  for (let i = 0; i < total; i++) {
+    ctx.fillStyle = i < dropLeft ? (dropLeft <= 1 ? "#e63c6e" : "#6b4fc4") : "rgba(107,79,196,0.2)";
+    ctx.beginPath(); ctx.arc(x + i * gap, y, r, 0, Math.PI * 2); ctx.fill();
+  }
+}
 const NEXT_POS = { x: W - 70, y: SHOOTER.y + 10 };
 const STYLE_BTN = { x: W - 170, y: 16, w: 154, h: 36 };
+const QUIT_BTN = { x: W - 240, y: 16, w: 60, h: 36 };
+
+function drawPill(b, label, fill = "#6b4fc4") {
+  ctx.fillStyle = fill;
+  roundRect(b.x, b.y, b.w, b.h, b.h / 2); ctx.fill();
+  ctx.fillStyle = "#fff";
+  ctx.textAlign = "center";
+  ctx.font = `bold 14px ${FONT}`;
+  ctx.fillText(label, b.x + b.w / 2, b.y + b.h / 2 + 5);
+}
 
 function drawHud() {
   ctx.fillStyle = "#4b3a8a";
-  ctx.font = "bold 24px system-ui, sans-serif";
+  ctx.font = `bold 24px ${FONT}`;
   ctx.textAlign = "left";
-  ctx.fillText(`${score}`, 20, 44);
-  ctx.font = "bold 13px system-ui, sans-serif";
-  ctx.fillText(`${mode().name} · BEST ${best}`, 20, 60);
-  // style toggle
-  ctx.fillStyle = "#6b4fc4";
-  roundRect(STYLE_BTN.x, STYLE_BTN.y, STYLE_BTN.w, STYLE_BTN.h, 18); ctx.fill();
-  ctx.fillStyle = "#fff";
-  ctx.textAlign = "center";
-  ctx.font = "bold 14px system-ui, sans-serif";
-  ctx.fillText(`STYLE: ${STYLES[styleIdx]}`, STYLE_BTN.x + STYLE_BTN.w / 2, STYLE_BTN.y + 23);
+  ctx.fillText(`${score}`, 20, 30);
+  ctx.font = `bold 13px ${FONT}`;
+  const sub = mode().id === "level" ? `${mode().name} · ${goalText(false)}` : `${mode().name} · BEST ${best}`;
+  ctx.fillText(sub, 20, 49);
+  drawPill(STYLE_BTN, `STYLE: ${STYLES[styleIdx]}`);
+  if (state === "play") drawPill(QUIT_BTN, "QUIT", "#8f75e6");
 }
 
-// menu = title screen and game-over screen, both with the mode buttons
-const modeBtn = (i) => ({ x: 60, y: 430 + i * 130, w: W - 120, h: 110 });
+// ---- menus (title + end screens) -------------------------------------------
+// Each screen is a title plus a column of buttons; tap one or use ↑/↓ + Enter.
+function menuButtons() {
+  if (state === "title") return [
+    { label: "LEVELS", sub: `${totalStars()} / ${LEVELS.length * 3} hamstars  ·  hand-made puzzles`, act: openMap },
+    { label: MODES[0].name, sub: MODES[0].desc, act: () => startMode(0) },
+    { label: MODES[1].name, sub: MODES[1].desc, act: () => startMode(1) },
+  ];
+  if (mode().id === "level") {
+    const i = mode().levelIdx;
+    if (state === "win") return [
+      ...(i + 1 < LEVELS.length ? [{ label: "NEXT LEVEL", act: () => startLevel(i + 1) }] : []),
+      { label: "REPLAY", act: () => startLevel(i) },
+      { label: "MAP", act: openMap },
+    ];
+    return [
+      { label: "RETRY", act: () => startLevel(i) },
+      { label: "MAP", act: openMap },
+    ];
+  }
+  return [
+    { label: "PLAY AGAIN", act: () => startMode(MODES.indexOf(mode())) },
+    { label: "MENU", act: () => setState("title") },
+  ];
+}
+function buttonRects(list) {
+  const y0 = state === "title" ? 380 : mode().id === "level" && state === "win" ? 480 : 420;
+  let y = y0;
+  return list.map((b) => {
+    const h = b.sub ? 96 : 70;
+    const r = { x: 70, y, w: W - 140, h };
+    y += h + 18;
+    return r;
+  });
+}
 
 function drawOverlay() {
-  if (state === "play") return;
   ctx.fillStyle = "rgba(42,31,74,0.72)";
   ctx.fillRect(0, 0, W, H);
+  drawSlide(); // on menus the reaction art sits behind the text and buttons
   ctx.fillStyle = "#fff";
   ctx.textAlign = "center";
-  const title = state === "win" ? "CLEARED!" : state === "lose" ? "GAME OVER" : "BUBBLE POP";
-  ctx.font = "bold 56px system-ui, sans-serif";
-  ctx.fillText(title, W / 2, 250);
-  ctx.font = "bold 22px system-ui, sans-serif";
-  if (state === "menu") ctx.fillText("pick a mode", W / 2, 300);
-  else ctx.fillText(`${mode().name}   ·   Score ${score}   ·   Best ${best}`, W / 2, 300);
-  MODES.forEach((m, i) => {
-    const b = modeBtn(i);
-    const sel = i === modeIdx;
+  const lvl = mode().id === "level";
+  let title = "BUBBLE POP";
+  if (state === "win") title = lvl ? "LEVEL CLEAR!" : "CLEARED!";
+  if (state === "lose") title = loseReason || "GAME OVER";
+  ctx.font = `bold 52px ${FONT}`;
+  ctx.fillText(title, W / 2, 230);
+  ctx.font = `bold 22px ${FONT}`;
+  if (state === "title") ctx.fillText("pick how to play", W / 2, 285);
+  else if (lvl && state === "lose") ctx.fillText(`${mode().name} · ${mode().title}   ·   ${hamstarWord(0)}`, W / 2, 285);
+  else if (lvl) ctx.fillText(`${mode().name} · ${mode().title}   ·   Score ${score}`, W / 2, 285);
+  else ctx.fillText(`${mode().name}   ·   Score ${score}   ·   Best ${best}`, W / 2, 285);
+  if (state === "win" && lvl) {
+    // hamstars pop in one after another
+    for (let i = 0; i < 3; i++) {
+      const k = Math.min(1, Math.max(0, (menuT - 0.2 - i * 0.25) / 0.25));
+      const s = k < 1 ? 0.6 + k * 0.6 : 1;
+      drawHamstar(W / 2 + (i - 1) * 100, 360 - (i === 1 ? 14 : 0), 96 * s, i < stars && k > 0);
+    }
+    ctx.fillStyle = "#fff";
+    ctx.font = `bold 22px ${FONT}`;
+    ctx.fillText(`You earned ${hamstarWord(stars)}!`, W / 2, 448);
+  }
+  const list = menuButtons();
+  buttonRects(list).forEach((b, i) => {
+    const sel = i === focus;
     ctx.fillStyle = sel ? "#8f75e6" : "#6b4fc4";
     roundRect(b.x, b.y, b.w, b.h, 22); ctx.fill();
     if (sel) { ctx.strokeStyle = "#fff"; ctx.lineWidth = 3; ctx.stroke(); }
     ctx.fillStyle = "#fff";
-    ctx.font = "bold 30px system-ui, sans-serif";
-    ctx.fillText(m.name, W / 2, b.y + 42);
-    ctx.font = "16px system-ui, sans-serif";
-    m.desc.forEach((line, j) => ctx.fillText(line, W / 2, b.y + 68 + j * 20));
+    ctx.font = `bold 28px ${FONT}`;
+    ctx.fillText(list[i].label, W / 2, b.y + (list[i].sub ? 42 : 45));
+    if (list[i].sub) { ctx.font = `15px ${FONT}`; ctx.fillText(list[i].sub, W / 2, b.y + 72); }
   });
-  ctx.font = "14px system-ui, sans-serif";
-  ctx.fillStyle = "rgba(255,255,255,0.7)";
-  ctx.fillText("tap a mode to play  ·  ↑/↓ + Enter", W / 2, modeBtn(MODES.length).y + 10);
+}
+
+// level intro banner
+function drawBanner() {
+  if (!banner) return;
+  const a = Math.min(1, banner.t / 0.2, (2.4 - banner.t) / 0.4);
+  if (a <= 0) return;
+  ctx.globalAlpha = a;
+  ctx.fillStyle = "rgba(42,31,74,0.78)";
+  ctx.fillRect(0, H * 0.42, W, 110);
+  ctx.fillStyle = "#fff";
+  ctx.textAlign = "center";
+  ctx.font = `bold 38px ${FONT}`;
+  ctx.fillText(banner.title, W / 2, H * 0.42 + 50);
+  ctx.font = `bold 18px ${FONT}`;
+  ctx.fillText(banner.sub, W / 2, H * 0.42 + 84);
+  ctx.globalAlpha = 1;
+}
+
+// floating score text ("FREED!")
+function spawnPopup(text, x, y) { popups.push({ text, x, y, t: 0 }); }
+function drawPopups() {
+  ctx.textAlign = "center";
+  ctx.font = `bold 22px ${FONT}`;
+  ctx.lineWidth = 4;
+  for (const p of popups) {
+    ctx.globalAlpha = Math.max(0, 1 - p.t / 1.2);
+    const y = p.y - p.t * 60;
+    ctx.strokeStyle = "#6b4fc4";
+    ctx.strokeText(p.text, p.x, y);
+    ctx.fillStyle = "#fff";
+    ctx.fillText(p.text, p.x, y);
+  }
+  ctx.globalAlpha = 1;
+}
+
+// ---- level map -------------------------------------------------------------
+// A winding path of level nodes, level 1 at the bottom. Drag or scroll to move.
+const MAP_SPACING = 120, MAP_PAD_TOP = 190, MAP_PAD_BOTTOM = 170, NODE_R = 34;
+const MAP_BACK = { x: 14, y: 16, w: 90, h: 38 };
+let mapScroll = 0;                                  // world y at the top of the screen
+const mapH = () => MAP_PAD_TOP + (LEVELS.length - 1) * MAP_SPACING + MAP_PAD_BOTTOM;
+const pathAt = (t) => ({ x: W / 2 + Math.sin(t * 1.05) * 170, y: mapH() - MAP_PAD_BOTTOM - t * MAP_SPACING });
+const clampScroll = (s) => Math.max(0, Math.min(mapH() - H, s));
+function mapFocusOn(i) { mapScroll = clampScroll(pathAt(i).y - H * 0.55); }
+
+function drawMap() {
+  const now = performance.now() / 1000;
+  ctx.save();
+  ctx.translate(0, -mapScroll);
+
+  // background: optional art, else a drawn pastel sky with floating character bubbles
+  if (MAP_BG.complete && MAP_BG.naturalWidth) {
+    const th = (W * MAP_BG.naturalHeight) / MAP_BG.naturalWidth;
+    for (let y = 0; y < mapH(); y += th) ctx.drawImage(MAP_BG, 0, y, W, th);
+  } else {
+    const g = ctx.createLinearGradient(0, 0, 0, mapH());
+    g.addColorStop(0, "#bfe6ff");
+    g.addColorStop(0.5, "#d9ccff");
+    g.addColorStop(1, "#ffd9ec");
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, W, mapH());
+    let seed = 7;
+    const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+    for (let i = 0; i < 60; i++) {
+      const x = rnd() * W, y = rnd() * mapH(), r = 6 + rnd() * 26;
+      ctx.fillStyle = `rgba(255,255,255,${0.2 + rnd() * 0.3})`;
+      ctx.beginPath(); ctx.arc(x, y + Math.sin(now + i) * 4, r, 0, Math.PI * 2); ctx.fill();
+    }
+    for (let i = 0; i < 16; i++) {
+      const x = rnd() * W, y = rnd() * mapH();
+      drawBubble(i % TYPES.length, x, y + Math.sin(now * 0.8 + i) * 6, 0.7, 0.35);
+    }
+  }
+
+  // the road: a soft white band with dots, coloured up to the furthest unlocked level
+  const reached = nextLevelToPlay();
+  ctx.lineCap = "round";
+  ctx.strokeStyle = "rgba(255,255,255,0.65)";
+  ctx.lineWidth = 30;
+  ctx.beginPath();
+  for (let t = 0; t <= LEVELS.length - 1 + 1e-6; t += 0.05) { const p = pathAt(t); ctx.lineTo(p.x, p.y); }
+  ctx.stroke();
+  for (let t = 0; t < LEVELS.length - 1; t += 0.12) {
+    const p = pathAt(t);
+    ctx.fillStyle = t < reached ? "#ff7fb0" : "rgba(107,79,196,0.3)";
+    ctx.beginPath(); ctx.arc(p.x, p.y, 4.5, 0, Math.PI * 2); ctx.fill();
+  }
+
+  // nodes
+  LEVELS.forEach((L, i) => {
+    const { x, y } = pathAt(i);
+    if (y - mapScroll < -80 || y - mapScroll > H + 80) return;
+    const open = levelUnlocked(i);
+    const isNext = open && i === reached && !levelStars(i);
+    if (isNext) {
+      const pr = NODE_R + 8 + Math.sin(now * 4) * 4;
+      ctx.fillStyle = "rgba(255,127,176,0.35)";
+      ctx.beginPath(); ctx.arc(x, y, pr, 0, Math.PI * 2); ctx.fill();
+    }
+    const g = ctx.createRadialGradient(x - 10, y - 12, 4, x, y, NODE_R);
+    g.addColorStop(0, open ? "#a48cf0" : "#ddd8ea");
+    g.addColorStop(1, open ? "#5e43b8" : "#aaa3bf");
+    ctx.fillStyle = g;
+    ctx.beginPath(); ctx.arc(x, y, NODE_R, 0, Math.PI * 2); ctx.fill();
+    ctx.lineWidth = 4;
+    ctx.strokeStyle = "#fff";
+    ctx.stroke();
+    ctx.textAlign = "center";
+    ctx.fillStyle = "#fff";
+    if (open) {
+      ctx.font = `bold 26px ${FONT}`;
+      ctx.fillText(i + 1, x, y + 9);
+      for (let s = 0; s < 3; s++) drawHamstar(x + (s - 1) * 24, y + NODE_R + 14 - (s === 1 ? 4 : 0), 26, s < levelStars(i));
+      // tiny goal badge
+      const badge = L.goal === "rescue" ? "♥" : L.goal === "score" ? "⚡" : null; // not ★: that reads as a rating
+      if (badge) {
+        ctx.fillStyle = "#ff7fb0";
+        ctx.beginPath(); ctx.arc(x + NODE_R * 0.75, y - NODE_R * 0.75, 12, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = "#fff";
+        ctx.font = `bold 14px ${FONT}`;
+        ctx.fillText(badge, x + NODE_R * 0.75, y - NODE_R * 0.75 + 5);
+      }
+    } else {
+      ctx.font = `22px ${FONT}`;
+      ctx.fillText("🔒", x, y + 8);
+    }
+    // the player's marker bobs above the next level to play
+    if (isNext) drawBubble(2, x, y - NODE_R - 34 + Math.sin(now * 3) * 5, 0.85);
+  });
+  ctx.restore();
+
+  // header
+  ctx.fillStyle = "rgba(107,79,196,0.92)";
+  ctx.fillRect(0, 0, W, 70);
+  drawPill(MAP_BACK, "‹ BACK", "#8f75e6");
+  ctx.fillStyle = "#fff";
+  ctx.textAlign = "center";
+  ctx.font = `bold 24px ${FONT}`;
+  ctx.fillText("LEVELS", W / 2, 44);
+  ctx.textAlign = "right";
+  ctx.font = `bold 18px ${FONT}`;
+  ctx.fillText(`${totalStars()}/${LEVELS.length * 3}`, W - 20, 42);
+  drawHamstar(W - 34 - ctx.measureText(`${totalStars()}/${LEVELS.length * 3}`).width, 35, 34, true);
+}
+
+function mapTap(p) {
+  if (inRect(p, MAP_BACK)) return setState("title");
+  for (let i = 0; i < LEVELS.length; i++) {
+    const { x, y } = pathAt(i);
+    if (Math.hypot(p.x - x, p.y + mapScroll - y) < NODE_R + 10) {
+      if (levelUnlocked(i)) startLevel(i);
+      else Sound.bounce();
+      return;
+    }
+  }
 }
 
 // ---- update / loop ---------------------------------------------------------
 function update(dt) {
-  if (state !== "play") menuT += dt;
+  menuT += dt;
+  if (banner && (banner.t += dt) > 2.4) banner = null;
   if (state === "play" && mode().dropInterval && (dropTimer -= dt) <= 0) {
     dropCeiling();
     dropTimer = mode().dropInterval(drops);
@@ -587,6 +1049,8 @@ function update(dt) {
   falling = falling.filter((f) => f.y < H + R);
   for (const p of particles) { p.vy += 900 * dt; p.x += p.vx * dt; p.y += p.vy * dt; p.life -= dt; }
   particles = particles.filter((p) => p.life > 0);
+  for (const p of popups) p.t += dt;
+  popups = popups.filter((p) => p.t < 1.2);
   shakeT = Math.max(0, shakeT - dt);
   updateSlide(dt);
 }
@@ -599,6 +1063,7 @@ function burst(x, y, color) {
 }
 
 function render() {
+  if (state === "map") { drawMap(); drawSlide(); return; }
   ctx.save();
   if (shakeT > 0) ctx.translate((Math.random() - 0.5) * 10 * shakeT * 4, (Math.random() - 0.5) * 10 * shakeT * 4);
   drawBackground();
@@ -619,10 +1084,12 @@ function render() {
   drawAim();
   if (shot) drawBubble(shot.t, shot.x, shot.y);
   drawShooter();
+  drawPopups();
   drawHud();
   ctx.restore();
-  drawOverlay();
-  drawSlide();
+  drawBanner();
+  if (state === "play") drawSlide();
+  else drawOverlay();
 }
 
 let last = performance.now();
@@ -662,16 +1129,19 @@ function cycleStyle() {
   try { localStorage.setItem("bubblepop_style", styleIdx); } catch (e) {}
 }
 
-let aiming = false;
+let aiming = false, drag = null;
 canvas.addEventListener("pointerdown", (e) => {
   Sound.unlock();
   const p = toGame(e);
+  if (state === "map") { drag = { y0: p.y, s0: mapScroll, moved: false }; return; }
   if (inRect(p, STYLE_BTN)) return cycleStyle();
   if (state !== "play") {
     if (menuT < 0.6) return; // don't eat the tap that ended the game
-    MODES.forEach((m, i) => { if (inRect(p, modeBtn(i))) startGame(i); });
+    const list = menuButtons();
+    buttonRects(list).forEach((b, i) => { if (inRect(p, b)) list[i].act(); });
     return;
   }
+  if (inRect(p, QUIT_BTN)) return quitToMenu();
   if (Math.hypot(p.x - NEXT_POS.x, p.y - NEXT_POS.y) < 44) return swap();
   if (p.y > SHOOTER.y - 20) return; // taps down by the launcher don't fire
   aiming = true;
@@ -679,26 +1149,54 @@ canvas.addEventListener("pointerdown", (e) => {
 });
 canvas.addEventListener("pointermove", (e) => {
   const p = toGame(e);
+  if (state === "map") {
+    if (!drag) return;
+    if (Math.abs(p.y - drag.y0) > 8) drag.moved = true;
+    if (drag.moved) mapScroll = clampScroll(drag.s0 - (p.y - drag.y0));
+    return;
+  }
   if (aiming || e.pointerType === "mouse") if (p.y < SHOOTER.y - 20) setAim(p);
 });
 canvas.addEventListener("pointerup", (e) => {
+  if (state === "map") {
+    if (drag && !drag.moved) mapTap(toGame(e));
+    drag = null;
+    return;
+  }
   if (!aiming) return;
   aiming = false;
   fire();
 });
+canvas.addEventListener("wheel", (e) => {
+  if (state !== "map") return;
+  e.preventDefault();
+  mapScroll = clampScroll(mapScroll + e.deltaY);
+}, { passive: false });
+
 window.addEventListener("keydown", (e) => {
   Sound.unlock();
-  if (e.key === "s" || e.key === "S") cycleStyle();
-  else if (state !== "play") {
-    if (e.key === "ArrowUp") modeIdx = (modeIdx + MODES.length - 1) % MODES.length;
-    else if (e.key === "ArrowDown") modeIdx = (modeIdx + 1) % MODES.length;
-    else if ((e.key === " " || e.key === "Enter") && menuT > 0.6) startGame(modeIdx);
+  const k = e.key;
+  if (k === "s" || k === "S") return cycleStyle();
+  if (k === "m" || k === "M") { Sound.muted = !Sound.muted; return; }
+  if (state === "map") {
+    if (k === "Escape") setState("title");
+    else if (k === "ArrowUp") mapScroll = clampScroll(mapScroll - MAP_SPACING);
+    else if (k === "ArrowDown") mapScroll = clampScroll(mapScroll + MAP_SPACING);
+    else if (k === "Enter" || k === " ") startLevel(nextLevelToPlay());
+    return;
   }
-  else if (e.key === " " || e.key === "Enter") fire();
-  else if (e.key === "Shift" || e.key === "x" || e.key === "X") swap();
-  else if (e.key === "ArrowLeft") aim = Math.max(-Math.PI + 0.12, aim - 0.05);
-  else if (e.key === "ArrowRight") aim = Math.min(-0.12, aim + 0.05);
-  else if (e.key === "m" || e.key === "M") Sound.muted = !Sound.muted;
+  if (state !== "play") {
+    const n = menuButtons().length;
+    if (k === "ArrowUp") focus = (focus + n - 1) % n;
+    else if (k === "ArrowDown") focus = (focus + 1) % n;
+    else if ((k === " " || k === "Enter") && menuT > 0.6) menuButtons()[focus].act();
+    return;
+  }
+  if (k === "Escape") quitToMenu();
+  else if (k === " " || k === "Enter") fire();
+  else if (k === "Shift" || k === "x" || k === "X") swap();
+  else if (k === "ArrowLeft") aim = Math.max(-Math.PI + 0.12, aim - 0.05);
+  else if (k === "ArrowRight") aim = Math.min(-0.12, aim + 0.05);
 });
 document.addEventListener("gesturestart", (e) => e.preventDefault());
 
@@ -729,6 +1227,8 @@ const Sound = {
 };
 
 resize();
+loadBest();
 reset();          // a board to show behind the title screen
-state = "menu";
+setState("title");
+menuT = 1;
 requestAnimationFrame(frame);
