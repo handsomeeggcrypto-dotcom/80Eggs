@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Moekedex</title>
+<link rel="icon" href="icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=VT323&family=Press+Start+2P&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --cyan: #3ef0ff; --cyan-dim: #1b9fb0; --cyan-deep: #0a4a55;
+    --glass: #03232a; --magenta: #ff3fd0; --yellow: #ffd400; --ink: #0a0d1a;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body {
+    min-height: 100vh; background: #120b1f; color: var(--cyan);
+    background-image:
+      radial-gradient(circle at 15% 10%, rgba(255,63,208,.18) 0, transparent 45%),
+      radial-gradient(circle at 85% 90%, rgba(62,240,255,.14) 0, transparent 45%),
+      repeating-linear-gradient(0deg, rgba(255,255,255,.025) 0 1px, transparent 1px 4px);
+    font-family: "VT323", monospace;
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px;
+    padding: 16px; -webkit-tap-highlight-color: transparent;
+  }
+
+  /* ---- device: two art halves, controls placed in art-pixel coordinates ---- */
+  .dex {
+    display: flex; width: min(100%, 1400px, calc((100vh - 70px) * 1433 / 1088));
+    filter: drop-shadow(0 24px 40px rgba(0,0,0,.6));
+  }
+  .piece { position: relative; container-type: inline-size; }
+  .piece > img.art { display: block; width: 100%; height: auto; pointer-events: none; user-select: none; }
+  .piece.l { width: 56.245%; --ox: 0;   --W: 806; }
+  .piece.r { width: 43.755%; --ox: 806; --W: 627; }
+  .piece { --oy: 8; --H: 1088; }
+  .at {
+    position: absolute;
+    left: calc((var(--x) - var(--ox)) / var(--W) * 100%);
+    top: calc((var(--y) - var(--oy)) / var(--H) * 100%);
+    width: calc(var(--w) / var(--W) * 100%);
+    height: calc(var(--h) / var(--H) * 100%);
+  }
+  button.at { background: transparent; border: 0; padding: 0; cursor: pointer; color: inherit; font: inherit; }
+  button.at::after { content: ""; position: absolute; inset: 0; border-radius: inherit; background: rgba(255,255,255,0); transition: background .08s; }
+  button.at:hover::after { background: rgba(255,255,255,.12); }
+  button.at:active::after { background: rgba(0,0,0,.28); }
+  button.at:focus-visible { outline: 2px solid var(--magenta); outline-offset: 2px; }
+  .debug .at { outline: 3px solid lime; background: rgba(0,255,0,.25); }
+
+  /* lights */
+  .glow { border-radius: 50%; pointer-events: none; opacity: 0; mix-blend-mode: screen; }
+  .glow.lens { background: radial-gradient(circle, rgba(170,240,255,.95) 0, rgba(62,200,255,.6) 40%, transparent 70%); }
+  .glow.led { background: radial-gradient(circle, var(--c) 0, transparent 70%); transform: scale(1.8); }
+  .glow.on { animation: flash .45s ease-out; }
+  @keyframes flash { 0% { opacity: 1; } 100% { opacity: 0; } }
+  .pillglow { border-radius: 99px; pointer-events: none; mix-blend-mode: screen; background: var(--c); filter: blur(5px); opacity: 0; transition: opacity .2s; }
+  .pillglow.lit { opacity: .75; }
+  .pillglow.pulse { animation: pulse .5s ease-in-out infinite alternate; }
+  @keyframes pulse { from { opacity: .15; } to { opacity: .85; } }
+
+  /* ---- left screen HUD ---- */
+  .hud {
+    border-radius: 2.2cqw; overflow: hidden; background: var(--glass);
+    background-image: linear-gradient(rgba(62,240,255,.07) 1px, transparent 1px), linear-gradient(90deg, rgba(62,240,255,.07) 1px, transparent 1px);
+    background-size: 2.4cqw 2.4cqw;
+    box-shadow: inset 0 0 3cqw rgba(62,240,255,.35), 0 0 1.2cqw rgba(62,240,255,.4);
+    display: grid; grid-template-columns: 11% 1fr 26%; gap: 2.2%; padding: 2.6%;
+  }
+  .hud::after { content: ""; position: absolute; inset: 0; pointer-events: none; background: repeating-linear-gradient(0deg, rgba(0,0,0,.18) 0 1px, transparent 1px 3px); }
+  .rail { display: flex; flex-direction: column; gap: 6%; }
+  .rail > * { flex: 1; border: .3cqw solid var(--cyan); border-radius: .9cqw; display: grid; place-items: center; font-size: 3cqw; color: var(--cyan); box-shadow: inset 0 0 1cqw rgba(62,240,255,.4); text-decoration: none; background: rgba(62,240,255,.06); }
+  .rail > .hot { background: var(--cyan); color: var(--glass); }
+  .rail > button, .rail > a { cursor: pointer; padding: 0; font-family: inherit; }
+  .rail > button:hover, .rail > a:hover { background: rgba(62,240,255,.25); }
+  .view { position: relative; border: .3cqw solid var(--cyan); border-radius: .6cqw; overflow: hidden; background: #000; box-shadow: 0 0 1.4cqw rgba(62,240,255,.5); }
+  .view img { width: 100%; height: 100%; object-fit: cover; display: block; opacity: 0; transition: opacity .35s; }
+  .view img.ready { opacity: 1; }
+  .scan { position: absolute; inset: 0; display: grid; place-items: center; font-size: 3.6cqw; letter-spacing: .2em; color: var(--cyan); background: var(--glass); }
+  .scan::before { content: ""; position: absolute; left: 0; right: 0; height: 12%; background: linear-gradient(transparent, rgba(62,240,255,.45), transparent); animation: sweep 1s linear infinite; }
+  .scan.hide { display: none; }
+  @keyframes sweep { from { top: -12%; } to { top: 100%; } }
+  .side { display: flex; flex-direction: column; gap: 4%; min-width: 0; }
+  .side .box { border: .3cqw solid var(--cyan); border-radius: .9cqw; padding: 4% 7%; box-shadow: inset 0 0 1cqw rgba(62,240,255,.35); }
+  .side .lbl { font-size: 2.2cqw; color: var(--cyan-dim); letter-spacing: .1em; }
+  .side .big { font-family: "Press Start 2P"; font-size: 3.2cqw; line-height: 1.25; color: var(--yellow); text-shadow: 0 0 1cqw rgba(255,212,0,.6); }
+  .side .mid { font-size: 3.6cqw; line-height: 1; }
+  .wave { flex: 1; display: flex; align-items: center; gap: 5%; padding: 0 8%; }
+  .wave i { flex: 1; background: var(--cyan); height: 12%; border-radius: 1px; box-shadow: 0 0 .8cqw var(--cyan); transition: height .1s; }
+  .wave.live i { animation: eq .35s ease-in-out infinite alternate; }
+  .wave.live i:nth-child(2n) { animation-duration: .27s; } .wave.live i:nth-child(3n) { animation-duration: .41s; }
+  @keyframes eq { from { height: 10%; } to { height: 85%; } }
+
+  /* ---- right screen: data readout ---- */
+  .readout {
+    border-radius: 1.8cqw; overflow: hidden; background: var(--glass);
+    box-shadow: inset 0 0 3cqw rgba(62,240,255,.35), 0 0 1.4cqw rgba(62,240,255,.4);
+    display: flex; flex-direction: column; padding: 1.6% 2.4%;
+  }
+  .readout::after { content: ""; position: absolute; inset: 0; pointer-events: none; background: repeating-linear-gradient(0deg, rgba(0,0,0,.16) 0 1px, transparent 1px 3px); }
+  .rhead { display: flex; justify-content: space-between; align-items: baseline; gap: 2cqw; border-bottom: .3cqw dashed var(--cyan-dim); padding-bottom: .6cqw; margin-bottom: .6cqw; }
+  .rhead b { font-family: "Press Start 2P"; font-weight: normal; font-size: 2.9cqw; color: var(--yellow); text-shadow: 0 0 1cqw rgba(255,212,0,.5); }
+  .rhead span { font-size: 3.2cqw; color: var(--magenta); text-shadow: 0 0 1cqw rgba(255,63,208,.6); white-space: nowrap; }
+  .readout .traits { grid-template-columns: 1fr 1fr; column-gap: 3cqw; font-size: 2.85cqw; flex: 1; align-content: start; overflow-y: auto; scrollbar-width: none; }
+  .readout .traits::-webkit-scrollbar { display: none; }
+  .readout .mobile-note { display: none; }
+
+  .traits { display: grid; list-style: none; margin: 0; padding: 0; }
+  .traits li { display: grid; grid-template-columns: auto 1fr auto; gap: .6em; align-items: baseline; line-height: 1.12; min-width: 0; }
+  .traits .t { color: var(--cyan-dim); text-transform: uppercase; font-size: .8em; }
+  .traits .v { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--cyan); cursor: pointer; background: none; border: 0; padding: 0; font: inherit; text-align: left; text-decoration: underline dotted rgba(62,240,255,.4); text-underline-offset: 3px; }
+  .traits .v:hover { color: #fff; text-shadow: 0 0 6px var(--cyan); }
+  .traits .p { color: var(--cyan-dim); font-size: .85em; }
+  .traits li.rare .p { color: var(--magenta); }
+  .traits li.rare .p::before { content: "★"; margin-right: .2em; }
+
+  /* ---- keypad + slots on the art ---- */
+  .keys { display: grid; grid-template-columns: repeat(5, 1fr); grid-template-rows: 1fr 1fr; column-gap: 1.1%; row-gap: 4%; }
+  .keys button { position: relative; background: transparent; border: 0; border-radius: 1.4cqw; font-family: "Press Start 2P"; font-size: 3.4cqw; color: #04345a; text-shadow: 0 1px 0 rgba(255,255,255,.45); cursor: pointer; padding: 0; }
+  .keys button::after { content: ""; position: absolute; inset: 0; border-radius: inherit; transition: background .08s; }
+  .keys button:hover::after { background: rgba(255,255,255,.18); }
+  .keys button:active::after, .keys button.hit::after { background: rgba(255,255,255,.5); box-shadow: 0 0 2cqw #7fe6ff; }
+  .slot { border-radius: 1.4cqw; display: flex; align-items: center; justify-content: center; font-size: 5.2cqw; letter-spacing: .15em; }
+  .slot.typed { color: var(--cyan); text-shadow: 0 0 1.2cqw var(--cyan); justify-content: flex-start; padding-left: 4%; }
+  .slot.typed .cur { animation: blink 1s steps(2) infinite; }
+  @keyframes blink { 50% { opacity: 0; } }
+  .slot.clr { font-family: "Press Start 2P"; font-size: 2.6cqw; color: var(--yellow); letter-spacing: .1em; }
+  button.lbl-on { font-family: "Press Start 2P"; font-size: 2.1cqw; color: var(--ink); display: grid; place-items: center; opacity: .75; }
+  button.lbl-rand { font-size: 2.2cqw; letter-spacing: .12em; color: rgba(40,25,0,.8); text-shadow: 0 1px 0 rgba(255,240,150,.5); font-family: "Press Start 2P"; display: grid; place-items: center; }
+
+  .help { font-size: 18px; color: rgba(62,240,255,.7); text-align: center; max-width: 900px; }
+  .help kbd { font-family: inherit; color: var(--yellow); }
+  .panel { display: none; }
+
+  /* ---- phones: stack the halves, move the trait list below ---- */
+  @media (max-width: 720px) {
+    body { justify-content: flex-start; padding: 12px 8px 24px; }
+    .dex { flex-direction: column; width: 100%; max-width: 480px; align-items: center; }
+    .piece.l { width: 100%; }
+    .piece.r { width: 88%; margin-top: -9%; }
+    .readout .traits { display: none; }
+    .readout .mobile-note { display: grid; flex: 1; place-items: center; font-size: 5cqw; color: var(--cyan-dim); text-align: center; line-height: 1.1; }
+    .rhead b { font-size: 3.6cqw; white-space: nowrap; } .rhead span { font-size: 4.4cqw; }
+    .panel { display: block; width: 100%; max-width: 480px; background: var(--glass); border: 2px solid var(--cyan); border-radius: 10px; padding: 10px 12px; box-shadow: 0 0 14px rgba(62,240,255,.35), inset 0 0 20px rgba(62,240,255,.2); }
+    .panel h2 { margin: 0 0 6px; font-family: "Press Start 2P"; font-weight: normal; font-size: 12px; color: var(--yellow); }
+    .panel .traits { font-size: 20px; row-gap: 4px; }
+    .help { font-size: 16px; }
+  }
+</style>
+</head>
+<body>
+<main class="dex" id="dex">
+  <!-- LEFT HALF -->
+  <section class="piece l">
+    <img class="art" src="dex_left.webp" alt="Moekedex device, left half">
+    <span class="at glow lens" id="lensGlow" style="--x:140;--y:65;--w:120;--h:120"></span>
+    <span class="at glow led" data-led style="--x:300;--y:64;--w:36;--h:36;--c:#ff4040"></span>
+    <span class="at glow led" data-led style="--x:352;--y:64;--w:36;--h:36;--c:#ffe040"></span>
+    <span class="at glow led" data-led style="--x:407;--y:62;--w:36;--h:36;--c:#40ff70"></span>
+
+    <div class="at hud" style="--x:222;--y:383;--w:418;--h:282">
+      <div class="rail">
+        <button class="hot" id="railRand" title="Random Moe (R)">♥</button>
+        <button id="railVoice" title="Read entry aloud (V)">◉</button>
+        <a id="osLink" target="_blank" rel="noopener" title="View on OpenSea">OS</a>
+        <button id="railPrev" title="Previous">◀</button>
+        <button id="railNext" title="Next">▶</button>
+      </div>
+      <div class="view">
+        <img id="pic" alt="">
+        <div class="scan" id="scan"><span>SCANNING</span></div>
+      </div>
+      <div class="side">
+        <div class="box"><div class="lbl">MOE NO.</div><div class="big" id="num">----</div></div>
+        <div class="box"><div class="lbl">RARITY</div><div class="mid" id="rankSide">#----</div><div class="lbl" id="tierSide">&nbsp;</div></div>
+        <div class="box wave" id="wave"><i></i><i></i><i></i><i></i><i></i><i></i></div>
+      </div>
+    </div>
+
+    <button class="at" id="bVoice" title="Voice: read entry aloud (V)" style="--x:155;--y:770;--w:80;--h:80;border-radius:50%"></button>
+    <button class="at" id="bSound" title="Sound on/off (M)" style="--x:265;--y:775;--w:80;--h:28;border-radius:99px"></button>
+    <span class="at pillglow" id="soundGlow" style="--x:268;--y:778;--w:74;--h:22;--c:#ff3fd0"></span>
+    <span class="at pillglow" id="scanGlow" style="--x:378;--y:778;--w:74;--h:22;--c:#3ef0ff"></span>
+    <button class="at lbl-rand" id="bRand" title="Random Moe (R)" style="--x:272;--y:820;--w:180;--h:122;border-radius:10px">RANDOM</button>
+    <button class="at" data-step="10" title="+10 (↑)" style="--x:545;--y:768;--w:62;--h:58;border-radius:6px"></button>
+    <button class="at" data-step="-10" title="−10 (↓)" style="--x:545;--y:884;--w:62;--h:58;border-radius:6px"></button>
+    <button class="at" data-step="-1" title="Previous (←)" style="--x:488;--y:826;--w:58;--h:58;border-radius:6px"></button>
+    <button class="at" data-step="1" title="Next (→)" style="--x:606;--y:826;--w:58;--h:58;border-radius:6px"></button>
+  </section>
+
+  <!-- RIGHT HALF -->
+  <section class="piece r">
+    <img class="art" src="dex_right.webp" alt="Moekedex device, right half">
+    <span class="at pillglow" id="topGlow" style="--x:1108;--y:252;--w:96;--h:22;--c:#ff3fd0"></span>
+
+    <div class="at readout" style="--x:864;--y:304;--w:428;--h:170">
+      <div class="rhead"><b id="name">MOE #----</b><span id="rank"></span></div>
+      <ul class="traits" id="traits"></ul>
+      <div class="mobile-note">▼ TRAIT DATA BELOW ▼</div>
+    </div>
+
+    <div class="at keys" id="keys" style="--x:855;--y:500;--w:436;--h:146"></div>
+    <button class="at" data-step="-1" title="Previous (←)" style="--x:855;--y:685;--w:86;--h:80;border-radius:8px"></button>
+    <button class="at" data-step="1" title="Next (→)" style="--x:945;--y:685;--w:86;--h:80;border-radius:8px"></button>
+    <button class="at lbl-on" id="go" title="GO (Enter)" style="--x:1226;--y:696;--w:70;--h:70;border-radius:50%">GO</button>
+    <div class="at slot typed" id="typed" style="--x:863;--y:822;--w:182;--h:68"></div>
+    <button class="at slot clr" id="clr" title="Clear (Esc)" style="--x:1103;--y:822;--w:204;--h:68">CLEAR</button>
+  </section>
+</main>
+
+<section class="panel" id="panel"><h2 id="panelName">MOE #----</h2><ul class="traits" id="traits2"></ul></section>
+
+<p class="help">Type a number on the blue pads or your keyboard, then <kbd>GO</kbd> / <kbd>Enter</kbd> · <kbd>◀ ▶</kbd> browse · d-pad <kbd>▲▼</kbd> jumps 10 · big yellow button = random · black button = voice · tap a trait to find another Moe with it</p>
+
+<script src="data.js"></script>
+<script>
+(() => {
+  const D = window.MOEDEX, N = D.tokens.length;
+  const COLL = "wptfgy1wqkagfmd05vz3zult";
+  const CONTRACT = "0x06f97E756f5c7aC0db75411101Bd09e17F63ABa7";
+  const $ = id => document.getElementById(id);
+  const imgUrl = n => `https://www.scatter.art/api/instareveal/media?collectionId=${COLL}&tokenId=${n}&v=${D.v[n-1]}&mimeType=image%2Fpng&filename=${n}.png`;
+  const store = (k, v) => { try { if (v === undefined) return localStorage.getItem(k); localStorage.setItem(k, v); } catch (e) {} return null; };
+  if (/[?&]debug/.test(location.search)) document.body.classList.add("debug");
+
+  let cur = 0, typed = "", soundOn = store("moekedex_sound") !== "0", holders = null;
+
+  // --- audio ---
+  let ac = null;
+  function beep(freq = 880, dur = 0.06, type = "square", vol = 0.05) {
+    if (!soundOn) return;
+    try {
+      ac = ac || new (window.AudioContext || window.webkitAudioContext)();
+      const o = ac.createOscillator(), g = ac.createGain();
+      o.type = type; o.frequency.value = freq;
+      g.gain.setValueAtTime(vol, ac.currentTime);
+      g.gain.exponentialRampToValueAtTime(0.0001, ac.currentTime + dur);
+      o.connect(g).connect(ac.destination); o.start(); o.stop(ac.currentTime + dur);
+    } catch (e) {}
+  }
+  const chirp = () => { beep(660, .07); setTimeout(() => beep(990, .09), 80); };
+  const buzz = () => beep(140, .25, "sawtooth", .06);
+
+  function flash() {
+    const lens = $("lensGlow");
+    lens.classList.remove("on"); void lens.offsetWidth; lens.classList.add("on");
+    document.querySelectorAll("[data-led]").forEach((e, i) => setTimeout(() => { e.classList.remove("on"); void e.offsetWidth; e.classList.add("on"); }, 120 + i * 110));
+  }
+
+  // --- data helpers ---
+  const pct = c => { const p = c / N * 100; return p < 1 ? p.toFixed(2) + "%" : p.toFixed(1) + "%"; };
+  function traitsOf(n) {
+    const p = D.tokens[n - 1], out = [];
+    for (let i = 0; i < p.length; i += 2) out.push({ ti: p[i], vi: p[i + 1], type: D.types[p[i]], value: D.values[p[i]][p[i + 1]], count: D.counts[p[i]][p[i + 1]] });
+    return out;
+  }
+  function tier(rank) {
+    const f = rank / N;
+    return f <= .01 ? "MYTHIC" : f <= .05 ? "LEGENDARY" : f <= .15 ? "EPIC" : f <= .4 ? "RARE" : "COMMON";
+  }
+  function fillTraits(ul, list) {
+    ul.innerHTML = "";
+    for (const t of list) {
+      const li = document.createElement("li");
+      if (t.count / N < 0.01) li.classList.add("rare");
+      li.innerHTML = '<span class="t"></span><button class="v"></button><span class="p"></span>';
+      li.querySelector(".t").textContent = t.type;
+      const b = li.querySelector(".v");
+      b.textContent = t.value; b.title = `${t.value} — find another Moe with this ${t.type}`;
+      b.onclick = () => findAnother(t.ti, t.vi);
+      li.querySelector(".p").textContent = pct(t.count);
+      ul.appendChild(li);
+    }
+    ul.scrollTop = 0;
+  }
+  function message(text, ms = 1000) {
+    const el = $("num"), prev = el.textContent;
+    el.textContent = text;
+    setTimeout(() => { if (el.textContent === text) el.textContent = cur ? String(cur).padStart(4, "0") : "----"; }, ms);
+  }
+
+  // --- show a Moe ---
+  function show(n, fromHash) {
+    n = Math.round(n);
+    if (!(n >= 1 && n <= N)) { buzz(); message("NONE"); return; }
+    cur = n;
+    const rank = D.rank[n - 1];
+    $("num").textContent = String(n).padStart(4, "0");
+    $("name").textContent = $("panelName").textContent = `MOE #${n}`;
+    $("rank").textContent = `RANK ${rank.toLocaleString()}/${N.toLocaleString()}`;
+    $("rankSide").textContent = "#" + rank.toLocaleString();
+    $("tierSide").textContent = tier(rank);
+    $("osLink").href = `https://opensea.io/assets/ethereum/${CONTRACT}/${n}`;
+    document.title = `Moekedex · #${n}`;
+    if (!fromHash) history.replaceState(null, "", "#" + n);
+
+    const pic = $("pic");
+    pic.classList.remove("ready");
+    $("scan").classList.remove("hide");
+    $("scan").firstElementChild.textContent = "SCANNING";
+    $("scanGlow").classList.add("pulse");
+    pic.onload = () => { if (cur === n) { pic.classList.add("ready"); $("scan").classList.add("hide"); $("scanGlow").classList.remove("pulse"); } };
+    pic.onerror = () => { if (cur === n) { $("scan").firstElementChild.textContent = "NO SIGNAL"; $("scanGlow").classList.remove("pulse"); } };
+    pic.alt = `MOE #${n}`;
+    pic.src = imgUrl(n);
+
+    const list = traitsOf(n);
+    fillTraits($("traits"), list);
+    fitReadout();
+    fillTraits($("traits2"), list);
+    flash(); chirp();
+    [n + 1, n - 1].forEach(m => { if (m >= 1 && m <= N) new Image().src = imgUrl(m); });
+  }
+  // shrink the on-screen list until every trait fits (some Moes have 14)
+  function fitReadout() {
+    const ul = $("traits");
+    for (let f = 2.85; f >= 2.1; f -= 0.15) {
+      ul.style.fontSize = f + "cqw";
+      if (ul.scrollHeight <= ul.clientHeight + 1) break;
+    }
+  }
+  window.addEventListener("resize", () => cur && fitReadout());
+  const step = d => show(((cur - 1 + d) % N + N) % N + 1);
+  const random = () => show(1 + Math.floor(Math.random() * N));
+
+  function findAnother(ti, vi) {
+    if (!holders) {
+      holders = D.types.map((_, i) => D.values[i].map(() => []));
+      D.tokens.forEach((p, k) => { for (let i = 0; i < p.length; i += 2) holders[p[i]][p[i + 1]].push(k + 1); });
+    }
+    const list = holders[ti][vi].filter(m => m !== cur);
+    if (!list.length) { buzz(); message("1 OF 1", 1400); return; }
+    show(list[Math.floor(Math.random() * list.length)]);
+  }
+
+  function speak() {
+    if (!cur || !("speechSynthesis" in window)) return;
+    speechSynthesis.cancel();
+    const t = traitsOf(cur), rank = D.rank[cur - 1];
+    const txt = `Moe number ${cur}. A ${tier(rank).toLowerCase()} Moe, rarity rank ${rank} of ${N}. ` + t.map(x => `${x.type}: ${x.value}.`).join(" ");
+    const u = new SpeechSynthesisUtterance(txt);
+    u.rate = 1.05; u.pitch = 1.3;
+    const live = on => { $("wave").classList.toggle("live", on); $("topGlow").classList.toggle("pulse", on); };
+    u.onstart = () => live(true); u.onend = u.onerror = () => live(false);
+    speechSynthesis.speak(u);
+  }
+
+  // --- number entry ---
+  const keyEls = {};
+  function renderTyped() { $("typed").innerHTML = "#" + typed + '<span class="cur">_</span>'; }
+  function press(k) {
+    if (/^\d$/.test(k)) {
+      if (typed.length < 4) { typed = (typed + k).replace(/^0+/, ""); beep(1200, .03); } else buzz();
+      const el = keyEls[k]; if (el) { el.classList.add("hit"); setTimeout(() => el.classList.remove("hit"), 120); }
+    }
+    else if (k === "del") { typed = typed.slice(0, -1); beep(500, .03); }
+    else if (k === "clr") { typed = ""; beep(400, .05); }
+    else if (k === "go") { if (typed) { show(+typed); typed = ""; } else buzz(); }
+    renderTyped();
+  }
+  ["1","2","3","4","5","6","7","8","9","0"].forEach(d => {
+    const b = document.createElement("button");
+    b.textContent = d; b.title = d; b.onclick = () => press(d);
+    keyEls[d] = b; $("keys").appendChild(b);
+  });
+  renderTyped();
+
+  // --- wiring ---
+  $("go").onclick = () => press("go");
+  $("clr").onclick = () => press("clr");
+  $("bRand").onclick = $("railRand").onclick = random;
+  $("bVoice").onclick = $("railVoice").onclick = speak;
+  $("railPrev").onclick = () => step(-1);
+  $("railNext").onclick = () => step(1);
+  document.querySelectorAll("[data-step]").forEach(b => b.onclick = () => step(+b.dataset.step));
+  function setSound(on) { soundOn = on; store("moekedex_sound", on ? "1" : "0"); $("soundGlow").classList.toggle("lit", on); }
+  $("bSound").onclick = () => { setSound(!soundOn); if (soundOn) chirp(); };
+  setSound(soundOn);
+
+  document.addEventListener("keydown", e => {
+    if (e.metaKey || e.ctrlKey || e.altKey) return;
+    const k = e.key;
+    if (/^\d$/.test(k)) press(k);
+    else if (k === "Enter") press("go");
+    else if (k === "Backspace") press("del");
+    else if (k === "Escape") press("clr");
+    else if (k === "ArrowRight") step(1);
+    else if (k === "ArrowLeft") step(-1);
+    else if (k === "ArrowUp") step(10);
+    else if (k === "ArrowDown") step(-10);
+    else if (k === "r" || k === "R") random();
+    else if (k === "v" || k === "V") speak();
+    else if (k === "m" || k === "M") $("bSound").click();
+    else return;
+    e.preventDefault();
+  });
+
+  const fromHash = () => { const n = parseInt(location.hash.replace(/\D/g, ""), 10); return n >= 1 && n <= N ? n : 0; };
+  window.addEventListener("hashchange", () => { const n = fromHash(); if (n && n !== cur) show(n, true); });
+  show(fromHash() || 4389, true);
+})();
+</script>
+</body>
+</html>
