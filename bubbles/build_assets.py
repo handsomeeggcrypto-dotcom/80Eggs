@@ -20,7 +20,8 @@ assets/slides/. assets/slides.json lists them with any extra cut sides ("left" /
 Files named win_<n> / lose_<n> are end-of-game STICKERS and hamster_projectile* /
 summon* / ghost* are special-move FX art. Both are trimmed to their content (not
 squared), capped at FX_MAX px, and written to assets/stickers/ and assets/fx/;
-the stickers are listed in assets/stickers.json.
+the stickers are listed in assets/stickers.json. menu_<n> is a full-screen title-screen
+BACKGROUND, saved as-is (no trimming) as a JPEG in assets/menu/.
 
 Re-run any time the source art changes:  python3 build_assets.py
 """
@@ -37,6 +38,7 @@ SLIDE_MAX = 600
 FX_MAX = 512
 STICKER_RE = re.compile(r"^(win|lose)_", re.I)
 FX_RE = re.compile(r"^(hamster_projectile|summon|ghost)", re.I)
+MENU_RE = re.compile(r"^menu_", re.I)
 SLIDE_RE = re.compile(r"^(good|bad|random|randon)_slide_", re.I)
 CUT_MIN = 0.08  # an edge counts as "cut" if at least this much of it is opaque
 WHITE = 232  # a pixel counts as background if every channel >= this
@@ -165,10 +167,21 @@ def main():
     with open(os.path.join(OUT, "stickers.json"), "w") as fh:
         json.dump(stickers, fh, indent=2)
 
+    # title-screen backgrounds: full image, JPEG to keep it small
+    os.makedirs(os.path.join(OUT, "menu"), exist_ok=True)
+    for f in names:
+        if not MENU_RE.match(f):
+            continue
+        im = Image.open(os.path.join(SRC, f)).convert("RGB")
+        im.thumbnail((1200, 2000), Image.LANCZOS)
+        dst = os.path.join(OUT, "menu", os.path.splitext(f)[0].lower() + ".jpg")
+        im.save(dst, quality=85, optimize=True)
+        print("wrote", os.path.relpath(dst), im.size)
+
     # everything else is square art: the bubble characters, plus UI icons like
     # hamstar (the level rating star), which the game loads by name
     for f in names:
-        if SLIDE_RE.match(f) or STICKER_RE.match(f) or FX_RE.match(f):
+        if SLIDE_RE.match(f) or STICKER_RE.match(f) or FX_RE.match(f) or MENU_RE.match(f):
             continue
         out = square(key_white(Image.open(os.path.join(SRC, f))))
         dst = os.path.join(OUT, os.path.splitext(f)[0].replace("_bubble", "") + ".png")

@@ -43,6 +43,12 @@ HAMSTAR.onload = () => {
 };
 const hamstarWord = (n) => `${n} hamstar${n === 1 ? "" : "s"}`;
 
+// Title-screen background (built from ~/Desktop/bubbles/menu_01). It fills the
+// screen anchored to the BOTTOM, so the big hamster peeking up stays in view; the
+// title sits in the empty top area and the buttons over its belly.
+const MENU_BG = new Image();
+MENU_BG.src = "assets/menu/menu_01.jpg";
+
 // Optional map background art: drop a tall image at assets/map_bg.png and it's
 // tiled down the level map instead of the drawn pastel background.
 const MAP_BG = new Image();
@@ -1094,15 +1100,56 @@ function menuButtons() {
     { label: "MENU", act: () => setState("title") },
   ];
 }
+const menuArt = () => state === "title" && MENU_BG.complete && MENU_BG.naturalWidth;
 function buttonRects(list) {
-  const y0 = state === "title" ? 380 : mode().id === "level" && state === "win" ? 480 : 420;
+  const art = menuArt();
+  const y0 = state === "title" ? (art ? 548 : 380) : mode().id === "level" && state === "win" ? 480 : 420;
   let y = y0;
   return list.map((b) => {
-    const h = b.sub ? 96 : 70;
+    const h = b.sub ? (art ? 84 : 96) : 70;
     const r = { x: 70, y, w: W - 140, h };
-    y += h + 18;
+    y += h + (art ? 12 : 18);
     return r;
   });
+}
+
+function drawButtons() {
+  const list = menuButtons();
+  const art = menuArt();
+  buttonRects(list).forEach((b, i) => {
+    const sel = i === focus;
+    ctx.fillStyle = sel ? "#8f75e6" : art ? "rgba(107,79,196,0.94)" : "#6b4fc4";
+    roundRect(b.x, b.y, b.w, b.h, 22); ctx.fill();
+    if (sel || art) { ctx.strokeStyle = sel ? "#fff" : "rgba(255,255,255,0.55)"; ctx.lineWidth = 3; ctx.stroke(); }
+    ctx.fillStyle = "#fff";
+    ctx.textAlign = "center";
+    ctx.font = `bold 28px ${FONT}`;
+    ctx.fillText(list[i].label, W / 2, b.y + (list[i].sub ? (art ? 38 : 42) : 45));
+    if (list[i].sub) { ctx.font = `15px ${FONT}`; ctx.fillText(list[i].sub, W / 2, b.y + (art ? 64 : 72)); }
+  });
+}
+
+// title screen over the menu art
+function drawMenu() {
+  const img = MENU_BG;
+  const k = Math.max(W / img.naturalWidth, H / img.naturalHeight); // cover
+  const w = img.naturalWidth * k, h = img.naturalHeight * k;
+  ctx.drawImage(img, (W - w) / 2, H - h, w, h); // bottom-anchored
+  ctx.textAlign = "center";
+  ctx.lineJoin = "round";
+  const bob = Math.sin(menuT * 2) * 4;
+  ctx.font = `bold 64px ${FONT}`;
+  ctx.lineWidth = 12;
+  ctx.strokeStyle = "#4b3a8a";
+  ctx.strokeText("BUBBLE POP", W / 2, 118 + bob);
+  ctx.fillStyle = "#fff";
+  ctx.fillText("BUBBLE POP", W / 2, 118 + bob);
+  ctx.font = `bold 20px ${FONT}`;
+  ctx.lineWidth = 6;
+  ctx.strokeText("pick how to play", W / 2, 160);
+  ctx.fillText("pick how to play", W / 2, 160);
+  drawButtons();
+  drawPill(STYLE_BTN, `STYLE: ${STYLES[styleIdx]}`);
 }
 
 function drawOverlay() {
@@ -1135,17 +1182,7 @@ function drawOverlay() {
     ctx.font = `bold 22px ${FONT}`;
     ctx.fillText(`You earned ${hamstarWord(stars)}!`, W / 2, 448);
   }
-  const list = menuButtons();
-  buttonRects(list).forEach((b, i) => {
-    const sel = i === focus;
-    ctx.fillStyle = sel ? "#8f75e6" : "#6b4fc4";
-    roundRect(b.x, b.y, b.w, b.h, 22); ctx.fill();
-    if (sel) { ctx.strokeStyle = "#fff"; ctx.lineWidth = 3; ctx.stroke(); }
-    ctx.fillStyle = "#fff";
-    ctx.font = `bold 28px ${FONT}`;
-    ctx.fillText(list[i].label, W / 2, b.y + (list[i].sub ? 42 : 45));
-    if (list[i].sub) { ctx.font = `15px ${FONT}`; ctx.fillText(list[i].sub, W / 2, b.y + 72); }
-  });
+  drawButtons();
 }
 
 // level intro banner
@@ -1340,6 +1377,7 @@ function burst(x, y, color) {
 
 function render() {
   if (state === "map") { drawMap(); drawSlide(); return; }
+  if (menuArt()) { drawMenu(); return; }
   ctx.save();
   if (shakeT > 0) ctx.translate((Math.random() - 0.5) * 10 * shakeT * 4, (Math.random() - 0.5) * 10 * shakeT * 4);
   drawBackground();
@@ -1414,7 +1452,7 @@ canvas.addEventListener("pointerdown", (e) => {
   if (state === "map") { drag = { y0: p.y, s0: mapScroll, moved: false }; return; }
   if (inRect(p, STYLE_BTN)) return cycleStyle();
   if (state !== "play") {
-    if (menuT < 0.6) return; // don't eat the tap that ended the game
+    if (state !== "title" && menuT < 0.6) return; // don't eat the tap that ended the game
     const list = menuButtons();
     buttonRects(list).forEach((b, i) => { if (inRect(p, b)) list[i].act(); });
     return;
@@ -1471,7 +1509,7 @@ window.addEventListener("keydown", (e) => {
     const n = menuButtons().length;
     if (k === "ArrowUp") focus = (focus + n - 1) % n;
     else if (k === "ArrowDown") focus = (focus + 1) % n;
-    else if ((k === " " || k === "Enter") && menuT > 0.6) menuButtons()[focus].act();
+    else if ((k === " " || k === "Enter") && (state === "title" || menuT > 0.6)) menuButtons()[focus].act();
     return;
   }
   if (k === "Escape") quitToMenu();
