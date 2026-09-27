@@ -106,6 +106,7 @@ const mode = () => cur;
 let grid, shift, score, best, shotsLeft, dropLeft, drops, dropTimer, ceilAnim, current, next, shot;
 let popping, falling, particles, popups, state, aim, menuT, focus, loseReason, stars;
 let friendsTotal, friendsFreed, banner;
+let specials, armed, summon, ghosts, endSticker;
 state = "title"; menuT = 1; focus = 0;
 
 const bestKey = () => "bubblepop_best_" + mode().id + (mode().levelIdx ?? "");
@@ -212,6 +213,8 @@ function reset() {
   shot = null;
   banner = null;
   slide = null; slideCool = 3; popStreak = 0;
+  specials = { ...SPECIALS_PER_GAME };
+  armed = null; summon = null; ghosts = []; endSticker = null;
   current = pickShotType();
   next = pickShotType();
   state = "play";
@@ -235,8 +238,9 @@ function goalText(long) {
 
 // ---- shooting --------------------------------------------------------------
 function fire() {
-  if (state !== "play" || shot) return;
+  if (state !== "play" || busy()) return;
   if (mode().shots && shotsLeft <= 0) return;
+  if (armed === "torpedo") return fireTorpedo();
   shot = { x: SHOOTER.x, y: SHOOTER.y, vx: Math.cos(aim) * SHOT_SPEED, vy: Math.sin(aim) * SHOT_SPEED, t: current };
   current = next;
   next = pickShotType();
@@ -244,11 +248,12 @@ function fire() {
 }
 
 function swap() {
-  if (state !== "play" || shot) return;
+  if (state !== "play" || busy()) return;
   [current, next] = [next, current];
 }
 
 function updateShot(dt) {
+  if (shot.torpedo) return updateTorpedo(dt);
   const steps = 8;
   for (let i = 0; i < steps && shot; i++) {
     shot.x += (shot.vx * dt) / steps;
@@ -412,6 +417,7 @@ function refill() {
 
 function win() {
   setState("win");
+  endSticker = pickSticker("win");
   if (mode().id === "level") {
     const frac = shotsLeft / mode().shots;
     stars = frac >= 0.4 ? 3 : frac >= 0.2 ? 2 : 1;
@@ -424,6 +430,7 @@ function win() {
 }
 function lose(reason) {
   setState("lose");
+  endSticker = pickSticker("lose");
   loseReason = reason;
   saveBest();
   Sound.lose();
@@ -431,6 +438,249 @@ function lose(reason) {
 }
 function saveBest() {
   if (score > best) { best = score; try { localStorage.setItem(bestKey(), best); } catch (e) {} }
+}
+
+// ---- special moves ---------------------------------------------------------
+// TORPEDO: arm it, then shoot — a hamster rockets along the aim line (bouncing off
+//   the walls) and pops every bubble and stone it passes through. Friends are safe:
+//   it flies over them, and they fall free if it cuts what they hang from.
+// GHOSTS: a summoning circle opens and GHOST_COUNT ghosts float up out of it; each
+//   flies to a random character bubble, pops it, and keeps floating away.
+// Neither uses up a shot. Everyone gets SPECIALS_PER_GAME of each per game.
+const SPECIALS_PER_GAME = { torpedo: 1, ghosts: 1 };
+const TORPEDO_SPEED = 1100;
+const TORPEDO_REACH = R * 1.35;     // how wide a path it cuts
+const GHOST_COUNT = 6;
+const GHOST_SIZE = D * 1.15;        // ghosts are drawn about one bubble big, whatever the art size
+const SUMMON = { x: W / 2, y: 610, size: 230 };
+const FX = {};
+for (const n of ["hamster_projectile_01", "summon_01", "ghost_01", "ghost_02"]) {
+  FX[n] = new Image();
+  FX[n].src = `assets/fx/${n}.png`;
+}
+const GHOST_ART = ["ghost_01", "ghost_02"];
+const SPECIAL_BTNS = {
+  torpedo: { x: 386, y: SHOOTER.y + 14, r: 25, key: "1" },
+  ghosts:  { x: 444, y: SHOOTER.y + 14, r: 25, key: "2" },
+};
+const busy = () => !!shot || !!summon || ghosts.length > 0;
+const fxReady = (img) => img && img.complete && img.naturalWidth;
+
+function useSpecial(kind) {
+  if (state !== "play" || busy() || !specials[kind]) return;
+  if (kind === "torpedo") { armed = armed === "torpedo" ? null : "torpedo"; Sound.bounce(); return; }
+  specials.ghosts--;
+  armed = null;
+  summon = { t: 0, spawned: 0 };
+  Sound.whoosh();
+}
+
+function fireTorpedo() {
+  specials.torpedo--;
+  armed = null;
+  shot = { torpedo: true, x: SHOOTER.x, y: SHOOTER.y, vx: Math.cos(aim) * TORPEDO_SPEED, vy: Math.sin(aim) * TORPEDO_SPEED, hits: 0 };
+  Sound.whoosh();
+  shakeT = 0.12;
+}
+
+function updateTorpedo(dt) {
+  const steps = 10;
+  for (let i = 0; i < steps; i++) {
+    shot.x += (shot.vx * dt) / steps;
+    shot.y += (shot.vy * dt) / steps;
+    const minX = BOARD_X + R, maxX = BOARD_X + COLS * D;
+    if (shot.x < minX) { shot.x = minX; shot.vx = Math.abs(shot.vx); Sound.bounce(); }
+    if (shot.x > maxX) { shot.x = maxX; shot.vx = -Math.abs(shot.vx); Sound.bounce(); }
+    for (let r = 0; r < grid.length; r++)
+      for (let c = 0; c < colsIn(r); c++) {
+        const v = grid[r][c];
+        if (v < 0 || isFriend(v)) continue;
+        if (Math.hypot(shot.x - cellX(r, c), shot.y - cellY(r)) < TORPEDO_REACH) {
+          popBubble(r, c, 0);
+          shot.hits++;
+          score += 10;
+          Sound.tone(500 + Math.min(shot.hits, 12) * 60, 0.07, "sine", 0.1, 300);
+        }
+      }
+    if (shot.y < TOP - R * 2) return endTorpedo();
+  }
+  // sparkle trail
+  if (Math.random() < 0.8) particles.push({ x: shot.x, y: shot.y, vx: (Math.random() - 0.5) * 60, vy: 40, life: 0.35, color: "#ffe27a", r: 2 + Math.random() * 3 });
+}
+
+function endTorpedo() {
+  const hits = shot.hits;
+  shot = null;
+  const [dropped, freed] = dropFloating();
+  trimGrid();
+  checkEnd();
+  if (state === "play" && (hits >= 5 || dropped >= 3 || freed)) maybeSlide("bigPop");
+}
+
+function pickGhostTarget() {
+  const taken = new Set(ghosts.filter((g) => g.target).map((g) => g.target.join()));
+  const cells = [];
+  for (let r = 0; r < grid.length; r++)
+    for (let c = 0; c < colsIn(r); c++)
+      if (isColor(grid[r][c]) && !taken.has(r + "," + c)) cells.push([r, c]);
+  return cells.length ? cells[Math.floor(Math.random() * cells.length)] : null;
+}
+
+function updateSpecials(dt) {
+  if (summon) {
+    summon.t += dt;
+    // ghosts start rising once the circle has opened, one every 0.22s
+    while (summon.spawned < GHOST_COUNT && summon.t > 0.45 + summon.spawned * 0.22) {
+      summon.spawned++;
+      ghosts.push({
+        x: SUMMON.x + (Math.random() - 0.5) * 90, y: SUMMON.y, t: 0, wob: Math.random() * 6,
+        img: FX[GHOST_ART[Math.floor(Math.random() * GHOST_ART.length)]], target: pickGhostTarget(),
+      });
+    }
+    if (summon.t > 0.45 + GHOST_COUNT * 0.22 + 0.6) summon = null;
+  }
+  for (const g of ghosts) {
+    g.t += dt;
+    const sway = Math.sin(g.t * 5 + g.wob) * 70 * dt;
+    if (g.target && !isColor(get(g.target[0], g.target[1]))) g.target = state === "play" ? pickGhostTarget() : null;
+    if (g.target && state === "play") {
+      const [r, c] = g.target;
+      const tx = cellX(r, c), ty = cellY(r);
+      const dx = tx - g.x, dy = ty - g.y, d = Math.hypot(dx, dy);
+      if (d < 14) {
+        popBubble(r, c, 0);
+        score += 10;
+        Sound.tone(880, 0.12, "triangle", 0.1, -300);
+        g.target = null;
+        dropFloating();
+        trimGrid();
+        checkEnd();
+      } else {
+        const sp = Math.min(d, 380 * dt);
+        g.x += (dx / d) * sp + sway;
+        g.y += (dy / d) * sp;
+      }
+    } else {
+      g.x += sway;
+      g.y -= 300 * dt; // drift up and away
+    }
+  }
+  ghosts = ghosts.filter((g) => g.y > -GHOST_SIZE);
+}
+
+function drawSpecials() {
+  // summoning circle: opens, turns slowly, then fades
+  if (summon && fxReady(FX.summon_01)) {
+    const img = FX.summon_01, t = summon.t, end = 0.45 + GHOST_COUNT * 0.22 + 0.6;
+    const open = Math.min(1, t / 0.35), fade = Math.min(1, (end - t) / 0.4);
+    const sc = (0.3 + 0.7 * (1 - Math.pow(1 - open, 3))) * (SUMMON.size / Math.max(img.naturalWidth, img.naturalHeight));
+    ctx.save();
+    ctx.globalAlpha = Math.max(0, Math.min(open, fade));
+    ctx.translate(SUMMON.x, SUMMON.y);
+    ctx.rotate(Math.sin(t * 1.5) * 0.08);
+    ctx.fillStyle = "rgba(200,40,70,0.18)";
+    ctx.beginPath(); ctx.ellipse(0, 10, SUMMON.size * 0.5, SUMMON.size * 0.3, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.drawImage(img, (-img.naturalWidth * sc) / 2, (-img.naturalHeight * sc) / 2, img.naturalWidth * sc, img.naturalHeight * sc);
+    ctx.restore();
+  }
+  for (const g of ghosts) {
+    if (!fxReady(g.img)) continue;
+    const k = GHOST_SIZE / Math.max(g.img.naturalWidth, g.img.naturalHeight);
+    const w = g.img.naturalWidth * k, h = g.img.naturalHeight * k;
+    ctx.save();
+    ctx.globalAlpha = Math.min(1, g.t / 0.25) * 0.95;
+    ctx.translate(g.x, g.y);
+    ctx.rotate(Math.sin(g.t * 4 + g.wob) * 0.15);
+    ctx.drawImage(g.img, -w / 2, -h / 2, w, h);
+    ctx.restore();
+  }
+  if (shot && shot.torpedo) drawTorpedo(shot.x, shot.y, Math.atan2(shot.vy, shot.vx), 1);
+}
+
+// Only the hamster + its dust puff are drawn (a crop of the art — the long speed
+// lines are left out). Coordinates are in the built 512px-wide asset.
+const TORPEDO_CROP = { x: 50, y: 62, w: 320, h: 88, cx: 242, cy: 44, hamsterH: 63 };
+function drawTorpedo(x, y, angle, size) {
+  const img = FX.hamster_projectile_01;
+  if (!fxReady(img)) return;
+  const f = img.naturalWidth / 512; // in case the art is rebuilt at another size
+  const c = TORPEDO_CROP;
+  const k = (D * 1.1 * size) / c.hamsterH; // hamster ≈ one bubble tall
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.rotate(angle);
+  if (Math.cos(angle) < 0) ctx.scale(1, -1); // flying left: keep the hamster the right way up
+  ctx.drawImage(img, c.x * f, c.y * f, c.w * f, c.h * f, -c.cx * k, -c.cy * k, c.w * k, c.h * k);
+  ctx.restore();
+}
+
+function drawSpecialButtons() {
+  for (const kind of Object.keys(SPECIAL_BTNS)) {
+    const b = SPECIAL_BTNS[kind], n = specials[kind];
+    const isArmed = armed === kind;
+    const usable = state === "play" && n > 0 && !busy();
+    ctx.save();
+    ctx.globalAlpha = usable || isArmed ? 1 : 0.4;
+    if (isArmed) {
+      ctx.fillStyle = `rgba(255,201,60,${0.5 + 0.3 * Math.sin(performance.now() / 120)})`;
+      ctx.beginPath(); ctx.arc(b.x, b.y, b.r + 7, 0, Math.PI * 2); ctx.fill();
+    }
+    ctx.fillStyle = "#fff";
+    ctx.beginPath(); ctx.arc(b.x, b.y, b.r, 0, Math.PI * 2); ctx.fill();
+    ctx.lineWidth = 3;
+    ctx.strokeStyle = "#6b4fc4";
+    ctx.stroke();
+    ctx.beginPath(); ctx.arc(b.x, b.y, b.r - 2, 0, Math.PI * 2); ctx.clip();
+    if (kind === "torpedo") drawTorpedo(b.x, b.y, 0, 0.62);
+    else if (fxReady(FX.ghost_01)) {
+      const img = FX.ghost_01, k = (b.r * 1.6) / Math.max(img.naturalWidth, img.naturalHeight);
+      ctx.drawImage(img, b.x - (img.naturalWidth * k) / 2, b.y - (img.naturalHeight * k) / 2, img.naturalWidth * k, img.naturalHeight * k);
+    }
+    ctx.restore();
+    // count badge
+    ctx.fillStyle = n > 0 ? "#ff7fb0" : "#b8b0cc";
+    ctx.beginPath(); ctx.arc(b.x + b.r * 0.72, b.y - b.r * 0.72, 10, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = "#fff";
+    ctx.font = `bold 12px ${FONT}`;
+    ctx.textAlign = "center";
+    ctx.fillText(n, b.x + b.r * 0.72, b.y - b.r * 0.72 + 4);
+  }
+}
+
+// ---- win / lose stickers ---------------------------------------------------
+// One sticker (assets/stickers.json, from ~/Desktop/bubbles/win_* and lose_*)
+// pops onto every end screen. STICKER_WEIGHT makes some come up more often.
+const STICKER_WEIGHT = { win_03: 3, lose_03: 3 }; // everything else counts 1
+const STICKERS = { win: [], lose: [] };
+fetch("assets/stickers.json", { cache: "no-cache" }).then((r) => r.json()).then((j) => {
+  for (const kind in STICKERS)
+    STICKERS[kind] = (j[kind] || []).map((src) => {
+      const img = new Image();
+      img.src = "assets/" + src;
+      img.weight = STICKER_WEIGHT[src.split("/").pop().replace(/\.png$/, "")] || 1;
+      return img;
+    });
+}).catch(() => {});
+
+function pickSticker(kind) {
+  const pool = STICKERS[kind].filter((img) => img.naturalWidth);
+  let r = Math.random() * pool.reduce((a, img) => a + img.weight, 0);
+  for (const img of pool) if ((r -= img.weight) < 0) return img;
+  return pool[0] || null;
+}
+
+function drawSticker() {
+  const img = endSticker;
+  if (!img || !img.naturalWidth) return;
+  const k0 = Math.min(1, menuT / 0.35);
+  const pop = k0 < 1 ? 1 + 2.2 * Math.pow(k0 - 1, 3) + 1.2 * Math.pow(k0 - 1, 2) : 1; // springy pop-in
+  const fit = Math.min(185 / img.naturalWidth, 145 / img.naturalHeight);
+  const w = img.naturalWidth * fit * pop, h = img.naturalHeight * fit * pop;
+  ctx.save();
+  ctx.translate(W / 2, 104);
+  ctx.rotate(-0.08 + Math.sin(menuT * 2.2) * 0.04);
+  ctx.drawImage(img, -w / 2, -h / 2, w, h);
+  ctx.restore();
 }
 
 // ---- peek-in slides --------------------------------------------------------
@@ -718,17 +968,18 @@ function roundRect(x, y, w, h, r) {
 
 // dotted aim line with wall bounces
 function drawAim() {
-  if (state !== "play" || shot) return;
+  if (state !== "play" || busy()) return;
   let x = SHOOTER.x, y = SHOOTER.y, vx = Math.cos(aim), vy = Math.sin(aim);
   const minX = BOARD_X + R, maxX = BOARD_X + COLS * D;
-  ctx.fillStyle = "rgba(107,79,196,0.55)";
+  const torpedo = armed === "torpedo"; // the torpedo's line runs straight through bubbles
+  ctx.fillStyle = torpedo ? "rgba(230,160,20,0.8)" : "rgba(107,79,196,0.55)";
   let dist = 0;
   for (let i = 0; i < 700; i++) {
     x += vx * 2; y += vy * 2; dist += 2;
     if (x < minX || x > maxX) vx = -vx;
     if (y < TOP + R) break;
     let hit = false;
-    for (let r = 0; r < grid.length && !hit; r++)
+    for (let r = 0; r < grid.length && !hit && !torpedo; r++)
       for (let c = 0; c < colsIn(r); c++)
         if (grid[r][c] >= 0 && Math.hypot(x - cellX(r, c), y - cellY(r)) < D * 0.82) { hit = true; break; }
     if (hit) break;
@@ -747,7 +998,10 @@ function drawShooter() {
   roundRect(-10, -58, 20, 40, 8); ctx.fill();
   ctx.restore();
   const outOfShots = mode().shots && shotsLeft <= 0;
-  if (state === "play" && !shot && !outOfShots) drawBubble(current, SHOOTER.x, SHOOTER.y);
+  if (state === "play" && !shot && !outOfShots) {
+    if (armed === "torpedo") drawTorpedo(SHOOTER.x, SHOOTER.y, aim, 0.9);
+    else drawBubble(current, SHOOTER.x, SHOOTER.y);
+  }
   // next bubble
   ctx.fillStyle = "#4b3a8a";
   ctx.font = `bold 14px ${FONT}`;
@@ -861,6 +1115,8 @@ function drawOverlay() {
   let title = "BUBBLE POP";
   if (state === "win") title = lvl ? "LEVEL CLEAR!" : "CLEARED!";
   if (state === "lose") title = loseReason || "GAME OVER";
+  if (state === "win" || state === "lose") drawSticker();
+  ctx.fillStyle = "#fff";
   ctx.font = `bold 52px ${FONT}`;
   ctx.fillText(title, W / 2, 230);
   ctx.font = `bold 22px ${FONT}`;
@@ -1061,8 +1317,9 @@ function update(dt) {
   }
   ceilAnim = Math.max(0, ceilAnim - dt / 0.18);
   if (shot) updateShot(dt);
+  updateSpecials(dt);
   for (const p of popping) p.age += dt;
-  for (const p of popping) if (p.age >= 0 && !p.burst) { p.burst = true; burst(p.x, p.y, TYPES[p.t].tint); }
+  for (const p of popping) if (p.age >= 0 && !p.burst) { p.burst = true; burst(p.x, p.y, isColor(p.t) ? TYPES[p.t].tint : "#9a94ad"); }
   popping = popping.filter((p) => p.age < 0.22);
   for (const f of falling) { f.vy += 1800 * dt; f.x += f.vx * dt; f.y += f.vy * dt; f.rot += f.vr * dt; }
   falling = falling.filter((f) => f.y < H + R);
@@ -1101,8 +1358,10 @@ function render() {
   }
   ctx.globalAlpha = 1;
   drawAim();
-  if (shot) drawBubble(shot.t, shot.x, shot.y);
+  if (shot && !shot.torpedo) drawBubble(shot.t, shot.x, shot.y);
+  drawSpecials();
   drawShooter();
+  drawSpecialButtons();
   drawPopups();
   drawHud();
   ctx.restore();
@@ -1161,6 +1420,10 @@ canvas.addEventListener("pointerdown", (e) => {
     return;
   }
   if (inRect(p, QUIT_BTN)) return quitToMenu();
+  for (const kind of Object.keys(SPECIAL_BTNS)) {
+    const b = SPECIAL_BTNS[kind];
+    if (Math.hypot(p.x - b.x, p.y - b.y) < b.r + 6) return useSpecial(kind);
+  }
   if (Math.hypot(p.x - NEXT_POS.x, p.y - NEXT_POS.y) < 44) return swap();
   if (p.y > SHOOTER.y - 20) return; // taps down by the launcher don't fire
   aiming = true;
@@ -1212,6 +1475,8 @@ window.addEventListener("keydown", (e) => {
     return;
   }
   if (k === "Escape") quitToMenu();
+  else if (k === "1") useSpecial("torpedo");
+  else if (k === "2") useSpecial("ghosts");
   else if (k === " " || k === "Enter") fire();
   else if (k === "Shift" || k === "x" || k === "X") swap();
   else if (k === "ArrowLeft") aim = Math.max(-Math.PI + 0.12, aim - 0.05);

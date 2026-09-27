@@ -1,0 +1,13 @@
+{
+  "win": [
+    "stickers/win_01.png",
+    "stickers/win_02.png",
+    "stickers/win_03.png",
+    "stickers/win_04.png"
+  ],
+  "lose": [
+    "stickers/lose_01.png",
+    "stickers/lose_02.png",
+    "stickers/lose_03.png"
+  ]
+}

@@ -17,6 +17,11 @@ so its main cut is along the BOTTOM, trimmed, capped at SLIDE_MAX px, and writte
 assets/slides/. assets/slides.json lists them with any extra cut sides ("left" /
 "right") so the game only places a corner-peeker in a corner, etc.
 
+Files named win_<n> / lose_<n> are end-of-game STICKERS and hamster_projectile* /
+summon* / ghost* are special-move FX art. Both are trimmed to their content (not
+squared), capped at FX_MAX px, and written to assets/stickers/ and assets/fx/;
+the stickers are listed in assets/stickers.json.
+
 Re-run any time the source art changes:  python3 build_assets.py
 """
 import json
@@ -29,6 +34,9 @@ SRC = os.path.expanduser("~/Desktop/bubbles")
 OUT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets")
 SIZE = 256
 SLIDE_MAX = 600
+FX_MAX = 512
+STICKER_RE = re.compile(r"^(win|lose)_", re.I)
+FX_RE = re.compile(r"^(hamster_projectile|summon|ghost)", re.I)
 SLIDE_RE = re.compile(r"^(good|bad|random|randon)_slide_", re.I)
 CUT_MIN = 0.08  # an edge counts as "cut" if at least this much of it is opaque
 WHITE = 232  # a pixel counts as background if every channel >= this
@@ -137,10 +145,30 @@ def main():
     with open(os.path.join(OUT, "slides.json"), "w") as fh:
         json.dump(slides, fh, indent=2)
 
+    # stickers + special-move FX: trimmed, not squared
+    os.makedirs(os.path.join(OUT, "stickers"), exist_ok=True)
+    os.makedirs(os.path.join(OUT, "fx"), exist_ok=True)
+    stickers = {"win": [], "lose": []}
+    for f in names:
+        m, fx = STICKER_RE.match(f), FX_RE.match(f)
+        if not (m or fx):
+            continue
+        im = key_white(Image.open(os.path.join(SRC, f)))
+        im = im.crop(im.getchannel("A").point(lambda a: 255 if a > 16 else 0).getbbox())
+        im.thumbnail((FX_MAX, FX_MAX), Image.LANCZOS)
+        name = os.path.splitext(f)[0].lower() + ".png"
+        folder = "stickers" if m else "fx"
+        im.save(os.path.join(OUT, folder, name), optimize=True)
+        if m:
+            stickers[m.group(1).lower()].append(folder + "/" + name)
+        print("wrote", folder + "/" + name)
+    with open(os.path.join(OUT, "stickers.json"), "w") as fh:
+        json.dump(stickers, fh, indent=2)
+
     # everything else is square art: the bubble characters, plus UI icons like
     # hamstar (the level rating star), which the game loads by name
     for f in names:
-        if SLIDE_RE.match(f):
+        if SLIDE_RE.match(f) or STICKER_RE.match(f) or FX_RE.match(f):
             continue
         out = square(key_white(Image.open(os.path.join(SRC, f))))
         dst = os.path.join(OUT, os.path.splitext(f)[0].replace("_bubble", "") + ".png")
