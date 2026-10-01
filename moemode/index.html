@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="theme-color" content="#07080d">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="MoeMode">
+<title>MoeMode</title>
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon.png">
+<link rel="apple-touch-icon" href="icon.png">
+<link rel="stylesheet" href="style.css?v=1">
+</head>
+<body>
+<main id="app"></main>
+<nav id="nav">
+  <button data-a="go" data-v="home">HOME</button>
+  <button data-a="go" data-v="quests">QUESTS</button>
+  <button data-a="go" data-v="dump">DUMP</button>
+  <button data-a="go" data-v="insights">INSIGHTS</button>
+</nav>
+<div id="sheet"></div>
+<div id="fx"></div>
+<input type="file" id="importFile" accept="application/json,.json" hidden>
+<script src="app.js?v=1"></script>
+</body>
+</html>
