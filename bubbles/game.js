@@ -49,6 +49,12 @@ const hamstarWord = (n) => `${n} hamstar${n === 1 ? "" : "s"}`;
 const MENU_BG = new Image();
 MENU_BG.src = "assets/menu/menu_01.jpg";
 
+// Level backgrounds, one per world (WORLDS in levels.js).
+const LEVEL_BGS = {};
+for (const wld of WORLDS) if (!LEVEL_BGS[wld.bg]) { LEVEL_BGS[wld.bg] = new Image(); LEVEL_BGS[wld.bg].src = `assets/bg/${wld.bg}.jpg`; }
+const worldOf = (i) => WORLDS.filter((wld) => wld.from <= i + 1).pop() || WORLDS[0];
+let gameBg = null; // background image for the current game
+
 // Optional map background art: drop a tall image at assets/map_bg.png and it's
 // tiled down the level map instead of the drawn pastel background.
 const MAP_BG = new Image();
@@ -100,7 +106,7 @@ const MODES = [
 function levelMode(i) {
   const L = LEVELS[i];
   return {
-    id: "level", levelIdx: i, name: `LEVEL ${i + 1}`, title: L.name,
+    id: "level", levelIdx: i, name: `LEVEL ${i + 1}`, title: L.name, world: worldOf(i),
     types: L.types, goal: L.goal, target: L.target, shots: L.shots, layout: L.layout,
     shotsPerDrop: L.drop ? () => L.drop : null,
   };
@@ -193,6 +199,8 @@ function startLevel(i) {
   loadBest();
   reset();
   banner = { title: `LEVEL ${i + 1}`, sub: `${cur.title} · ${goalText(true)}`, t: 0 };
+  // first level of a world: welcome the player to the new area
+  if (cur.world.from === i + 1 && i > 0) banner = { title: cur.world.name.toUpperCase(), sub: `Level ${i + 1} · ${cur.title} · ${goalText(true)}`, t: 0 };
 }
 function openMap() {
   setState("map");
@@ -205,6 +213,8 @@ function quitToMenu() {
 
 function reset() {
   shift = 0;
+  const bgs = Object.values(LEVEL_BGS);
+  gameBg = mode().world ? LEVEL_BGS[mode().world.bg] : bgs[Math.floor(Math.random() * bgs.length)];
   if (mode().layout) buildLevelGrid(mode());
   else { grid = []; for (let r = 0; r < mode().startRows; r++) grid.push(newRow(r)); }
   score = 0;
@@ -932,22 +942,41 @@ function drawHamstar(x, y, size, earned) {
 }
 
 function drawBackground() {
-  const g = ctx.createLinearGradient(0, 0, 0, H);
-  g.addColorStop(0, "#ffd9ec");
-  g.addColorStop(0.55, "#d9ccff");
-  g.addColorStop(1, "#bfe6ff");
-  ctx.fillStyle = g;
-  ctx.fillRect(0, 0, W, H);
-  // soft floating dots
-  const t = performance.now() / 1000;
-  ctx.fillStyle = "rgba(255,255,255,0.35)";
-  for (let i = 0; i < 18; i++) {
-    const x = (i * 97 + t * (8 + (i % 5) * 3)) % (W + 40) - 20;
-    const y = (i * 151) % H;
-    ctx.beginPath(); ctx.arc(x, y, 4 + (i % 4) * 3, 0, Math.PI * 2); ctx.fill();
+  const art = gameBg && gameBg.complete && gameBg.naturalWidth;
+  if (art) {
+    // world art, cover-fitted, with soft white washes so bubbles and HUD text read
+    const k = Math.max(W / gameBg.naturalWidth, H / gameBg.naturalHeight);
+    const w = gameBg.naturalWidth * k, h = gameBg.naturalHeight * k;
+    ctx.drawImage(gameBg, (W - w) / 2, H - h, w, h);
+    let g = ctx.createLinearGradient(0, 0, 0, TOP);
+    g.addColorStop(0, "rgba(255,255,255,0.55)");
+    g.addColorStop(1, "rgba(255,255,255,0)");
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, W, TOP);
+    g = ctx.createLinearGradient(0, DEAD_Y - 10, 0, H);
+    g.addColorStop(0, "rgba(255,255,255,0)");
+    g.addColorStop(0.35, "rgba(255,255,255,0.6)");
+    g.addColorStop(1, "rgba(255,255,255,0.75)");
+    ctx.fillStyle = g;
+    ctx.fillRect(0, DEAD_Y - 10, W, H - DEAD_Y + 10);
+  } else {
+    const g = ctx.createLinearGradient(0, 0, 0, H);
+    g.addColorStop(0, "#ffd9ec");
+    g.addColorStop(0.55, "#d9ccff");
+    g.addColorStop(1, "#bfe6ff");
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, W, H);
+    // soft floating dots
+    const t = performance.now() / 1000;
+    ctx.fillStyle = "rgba(255,255,255,0.35)";
+    for (let i = 0; i < 18; i++) {
+      const x = (i * 97 + t * (8 + (i % 5) * 3)) % (W + 40) - 20;
+      const y = (i * 151) % H;
+      ctx.beginPath(); ctx.arc(x, y, 4 + (i % 4) * 3, 0, Math.PI * 2); ctx.fill();
+    }
   }
   // board well
-  ctx.fillStyle = "rgba(255,255,255,0.28)";
+  ctx.fillStyle = art ? "rgba(255,255,255,0.38)" : "rgba(255,255,255,0.28)";
   roundRect(BOARD_X - 6, TOP - 6, COLS * D + R + 12, DEAD_Y - TOP + 12, 18);
   ctx.fill();
   // ceiling bar
@@ -1309,6 +1338,19 @@ function drawMap() {
     } else {
       ctx.font = `22px ${FONT}`;
       ctx.fillText("🔒", x, y + 8);
+    }
+    // world name tag beside the first level of each world
+    const wld = WORLDS.find((w2) => w2.from === i + 1);
+    if (wld) {
+      ctx.font = `bold 14px ${FONT}`;
+      const tw = ctx.measureText(wld.name).width + 24;
+      const side = x > W / 2 ? -1 : 1;
+      const tx = x + side * (NODE_R + 14 + tw / 2);
+      ctx.fillStyle = "rgba(255,127,176,0.95)";
+      roundRect(tx - tw / 2, y - 15, tw, 30, 15); ctx.fill();
+      ctx.fillStyle = "#fff";
+      ctx.textAlign = "center";
+      ctx.fillText(wld.name, tx, y + 5);
     }
     // the player's marker bobs above the next level to play
     if (isNext) drawBubble(2, x, y - NODE_R - 34 + Math.sin(now * 3) * 5, 0.85);

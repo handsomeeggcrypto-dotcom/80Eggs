@@ -21,7 +21,8 @@ Files named win_<n> / lose_<n> are end-of-game STICKERS and hamster_projectile* 
 summon* / ghost* are special-move FX art. Both are trimmed to their content (not
 squared), capped at FX_MAX px, and written to assets/stickers/ and assets/fx/;
 the stickers are listed in assets/stickers.json. menu_<n> is a full-screen title-screen
-BACKGROUND, saved as-is (no trimming) as a JPEG in assets/menu/.
+BACKGROUND and level_bg_<n> a full-screen LEVEL background (2:3 portrait, like the game
+screen); both are saved as-is (no trimming) as JPEGs in assets/menu/ and assets/bg/.
 
 Re-run any time the source art changes:  python3 build_assets.py
 """
@@ -38,7 +39,7 @@ SLIDE_MAX = 600
 FX_MAX = 512
 STICKER_RE = re.compile(r"^(win|lose)_", re.I)
 FX_RE = re.compile(r"^(hamster_projectile|summon|ghost)", re.I)
-MENU_RE = re.compile(r"^menu_", re.I)
+MENU_RE = re.compile(r"^(menu_|level_bg_)", re.I)
 SLIDE_RE = re.compile(r"^(good|bad|random|randon)_slide_", re.I)
 CUT_MIN = 0.08  # an edge counts as "cut" if at least this much of it is opaque
 WHITE = 232  # a pixel counts as background if every channel >= this
@@ -167,14 +168,16 @@ def main():
     with open(os.path.join(OUT, "stickers.json"), "w") as fh:
         json.dump(stickers, fh, indent=2)
 
-    # title-screen backgrounds: full image, JPEG to keep it small
-    os.makedirs(os.path.join(OUT, "menu"), exist_ok=True)
+    # title-screen + level backgrounds: full image, JPEG to keep it small
     for f in names:
-        if not MENU_RE.match(f):
+        m = MENU_RE.match(f)
+        if not m:
             continue
+        folder = "menu" if m.group(1).lower() == "menu_" else "bg"
+        os.makedirs(os.path.join(OUT, folder), exist_ok=True)
         im = Image.open(os.path.join(SRC, f)).convert("RGB")
         im.thumbnail((1200, 2000), Image.LANCZOS)
-        dst = os.path.join(OUT, "menu", os.path.splitext(f)[0].lower() + ".jpg")
+        dst = os.path.join(OUT, folder, os.path.splitext(f)[0].lower() + ".jpg")
         im.save(dst, quality=85, optimize=True)
         print("wrote", os.path.relpath(dst), im.size)
 

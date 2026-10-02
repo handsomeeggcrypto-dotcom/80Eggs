@@ -536,7 +536,7 @@ const LEVELS = [
     ],
   },
   {
-    name: "Grand Finale", types: [0, 1, 2, 3, 4], goal: "rescue", shots: 50, drop: 9,
+    name: "Big Rescue", types: [0, 1, 2, 3, 4], goal: "rescue", shots: 50, drop: 9,
     layout: [
       "* * * * * * * * * *",
       " * * * * * * * * *",
@@ -547,4 +547,188 @@ const LEVELS = [
       ". . . * @ @ * . . .",
     ],
   },
+  // ---- levels 46–60 ----
+  {
+    name: "Koi Pond", types: [0, 3, 2], goal: "clear", shots: 52,
+    layout: [
+      "* * * * * * * * * *",
+      " * * . . . . . * *",
+      "* * . . . . . . * *",
+      " * * . . . . . * *",
+      "* * * * * * * * * *",
+    ],
+  },
+  {
+    name: "Bamboo Grove", types: [0, 3, 2, 4, 1], goal: "clear", shots: 22,
+    layout: [
+      "* . * . * . * . * .",
+      " * . * . * . * . *",
+      "* . * . * . * . * .",
+      " * . * . * . * . *",
+      "* . * . * . * . * .",
+      " * . * . * . * . *",
+      "* . * . * . * . * .",
+      " * . * . * . * . *",
+    ],
+  },
+  {
+    name: "Lantern Festival", types: [0, 3, 2, 4], goal: "rescue", shots: 10,
+    layout: [
+      ". * . . * . . * . .",
+      " . * . . * . . * .",
+      ". * . . * . . * . .",
+      " . * . . * . . * .",
+      ". * . . * . . * . .",
+      " . * . . * . . * .",
+      ". @ . . @ . . @ . .",
+    ],
+  },
+  {
+    name: "Rock Garden", types: [0, 3, 2, 4], goal: "clear", shots: 46,
+    layout: [
+      "* * * * * * * * * *",
+      " * * * * * * * * *",
+      "* * * * * * * * * *",
+      " * * * * * * * * *",
+      "* * * # * * # * * *",
+      " * # * * * * * # *",
+    ],
+  },
+  {
+    name: "Blossom Score", types: [0, 3, 2, 4], goal: "score", target: 1200, shots: 26, drop: 6,
+    layout: [
+      "* * * * * * * * * *",
+      " * * * * * * * * *",
+      "* * * * * * * * * *",
+      " * * * * * * * * *",
+      "* * * * * * * * * *",
+      " * * * * * * * * *",
+    ],
+  },
+  {
+    name: "Torii Gate", types: [0, 1, 2, 3, 4], goal: "clear", shots: 40,
+    layout: [
+      "* * * * * * * * * *",
+      " * * * * * * * * *",
+      ". * . . . . . . * .",
+      " * * * * * * * * *",
+      ". * . . . . . . * .",
+      " * . . . . . . * .",
+      ". * . . . . . . * .",
+    ],
+  },
+  {
+    name: "Mount Fuji", types: [4, 0, 3, 2], goal: "clear", shots: 18,
+    layout: [
+      ". . . . * * . . . .",
+      " . . . * * * . . .",
+      ". . . * * * * . . .",
+      " . . * * * * * . .",
+      ". . * * * * * * . .",
+      " . * * * * * * * .",
+      ". * * * * * * * * .",
+      " * * * * * * * * *",
+    ],
+  },
+  {
+    name: "Sakura Rescue", types: [0, 1, 2, 3, 4], goal: "rescue", shots: 18,
+    layout: [
+      "* * * * * * * * * *",
+      " * * * * * * * * *",
+      "* * * * * * * * * *",
+      " . * * . . . * * .",
+      ". . @ . . . . @ . .",
+      " . * * . . . * * .",
+      ". . @ . . . . @ . .",
+    ],
+  },
+  {
+    name: "Stepping Stones", types: [0, 3, 2, 4], goal: "clear", shots: 52,
+    layout: [
+      "* * * * * * * * * *",
+      " * * * * * * * * *",
+      "* * * # * * # * * *",
+      " * * * * * * * * *",
+      "* # * * * * * * # *",
+      " * * * * * * * * *",
+    ],
+  },
+  {
+    name: "Moon Gate", types: [0, 3, 2, 4, 1], goal: "clear", shots: 34,
+    layout: [
+      ". . * * * * * * . .",
+      " . * * . . . * * .",
+      ". * * . . . . * * .",
+      " * * . . . . . * *",
+      ". * * . . . . * * .",
+      " . * * . . . * * .",
+      ". . * * * * * * . .",
+    ],
+  },
+  {
+    name: "Festival Score", types: [0, 1, 2, 3, 4], goal: "score", target: 1000, shots: 28, drop: 5,
+    layout: [
+      "* * * * * * * * * *",
+      " * * * * * * * * *",
+      "* * * * * * * * * *",
+      " * * * * * * * * *",
+      "* * * * * * * * * *",
+      " * * * * * * * * *",
+    ],
+  },
+  {
+    name: "Waterfall", types: [0, 3, 2, 4, 5], goal: "clear", shots: 52, drop: 12,
+    layout: [
+      "1 1 2 2 3 3 4 4 5 5",
+      " 1 2 2 3 3 4 4 5 5",
+      "1 1 2 2 3 3 4 4 5 5",
+      " 1 2 2 3 3 4 4 5 5",
+      "1 1 2 2 3 3 4 4 5 5",
+      " 1 2 2 3 3 4 4 5 5",
+    ],
+  },
+  {
+    name: "Shrine Guardians", types: [0, 3, 2, 4], goal: "rescue", shots: 22,
+    layout: [
+      "* * * * * * * * * *",
+      " * * * * * * * * *",
+      "* * * * * * * * * *",
+      " . * . . * . . * .",
+      "# @ # . # @ . # @ #",
+    ],
+  },
+  {
+    name: "Garden Maze", types: [0, 3, 2, 4], goal: "clear", shots: 52,
+    layout: [
+      "* * * * * * * * * *",
+      " * * * * * * * * *",
+      "* * * * * * * * * *",
+      " * # * * * * * # *",
+      "* * * # * * # * * *",
+      " * * # * * * # * *",
+    ],
+  },
+  {
+    name: "Grand Finale", types: [0, 1, 2, 3, 4], goal: "rescue", shots: 55, drop: 10,
+    layout: [
+      "* * * * * * * * * *",
+      " * * * * * * * * *",
+      "* # * * * * * * # *",
+      " * * @ * * * @ * *",
+      "* * * * # # * * * *",
+      " * @ * * * * * @ *",
+      ". . * * @ @ * * . .",
+      " . . * * * * * . .",
+    ],
+  },
+];
+
+// Worlds: each covers a run of levels and gives them a background (built from
+// ~/Desktop/bubbles/level_bg_NN into assets/bg/). A world starts at level `from`
+// and lasts until the next world starts. Classic and Rush pick one at random.
+const WORLDS = [
+  { name: "Nature Trail",    bg: "level_bg_01", from: 1 },
+  { name: "Donut Shop",      bg: "level_bg_02", from: 16 },
+  { name: "Strawberry Farm", bg: "level_bg_03", from: 31 },
+  { name: "Japanese Garden", bg: "level_bg_04", from: 46 },
 ];
