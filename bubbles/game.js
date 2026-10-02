@@ -60,10 +60,10 @@ let gameBg = null; // background image for the current game
 const MAP_BG = new Image();
 MAP_BG.src = "assets/map_bg.png";
 
-// Art styles to compare, cycled with the STYLE button (or S key).
+// Bubble art styles that were compared during development.
 const STYLES = ["Raw art", "Glass bubble", "Colour ring"];
+// Everyone plays with "Raw art"; the S key still cycles styles for testing (not saved).
 let styleIdx = 0;
-try { styleIdx = +localStorage.getItem("bubblepop_style") || 0; } catch (e) {}
 
 // ---- grid ------------------------------------------------------------------
 const COLS = 10;
@@ -193,6 +193,7 @@ function startMode(i) {
   cur = MODES[i];
   loadBest();
   reset();
+  queueTips();
 }
 function startLevel(i) {
   cur = levelMode(i);
@@ -201,6 +202,7 @@ function startLevel(i) {
   banner = { title: `LEVEL ${i + 1}`, sub: `${cur.title} · ${goalText(true)}`, t: 0 };
   // first level of a world: welcome the player to the new area
   if (cur.world.from === i + 1 && i > 0) banner = { title: cur.world.name.toUpperCase(), sub: `Level ${i + 1} · ${cur.title} · ${goalText(true)}`, t: 0 };
+  queueTips();
 }
 function openMap() {
   setState("map");
@@ -229,7 +231,9 @@ function reset() {
   shot = null;
   banner = null;
   slide = null; slideCool = 3; popStreak = 0;
-  specials = { ...SPECIALS_PER_GAME };
+  specials = {};
+  for (const kind in SPECIALS_PER_GAME) specials[kind] = specialUnlocked(kind) ? SPECIALS_PER_GAME[kind] : 0;
+  tipQueue = [];
   armed = null; summon = null; ghosts = []; endSticker = null;
   current = pickShotType();
   next = pickShotType();
@@ -464,6 +468,13 @@ function saveBest() {
 //   flies to a random character bubble, pops it, and keeps floating away.
 // Neither uses up a shot. Everyone gets SPECIALS_PER_GAME of each per game.
 const SPECIALS_PER_GAME = { torpedo: 1, ghosts: 1 };
+// Moves unlock as you progress through the map: in a level from this level on, and
+// in Classic/Rush once you've reached it.
+const SPECIAL_UNLOCK_LEVEL = { torpedo: 15, ghosts: 30 };
+function specialUnlocked(kind) {
+  const lvl = SPECIAL_UNLOCK_LEVEL[kind];
+  return mode().id === "level" ? mode().levelIdx + 1 >= lvl : levelUnlocked(lvl - 1);
+}
 const TORPEDO_SPEED = 1100;
 const TORPEDO_REACH = R * 1.35;     // how wide a path it cuts
 const GHOST_COUNT = 6;
@@ -632,6 +643,7 @@ function drawTorpedo(x, y, angle, size) {
 
 function drawSpecialButtons() {
   for (const kind of Object.keys(SPECIAL_BTNS)) {
+    if (!specialUnlocked(kind)) continue; // hidden until unlocked
     const b = SPECIAL_BTNS[kind], n = specials[kind];
     const isArmed = armed === kind;
     const usable = state === "play" && n > 0 && !busy();
@@ -1080,8 +1092,48 @@ function drawDropDots(x, y, r, gap) {
   }
 }
 const NEXT_POS = { x: W - 70, y: SHOOTER.y + 10 };
-const STYLE_BTN = { x: W - 170, y: 16, w: 154, h: 36 };
-const QUIT_BTN = { x: W - 240, y: 16, w: 60, h: 36 };
+const SOUND_BTN = { x: W - 76, y: 32, r: 18 };
+const PAUSE_BTN = { x: W - 32, y: 32, r: 18 };
+const TITLE_SOUND_BTN = { x: 34, y: 34, r: 17 };
+const inCircle = (p, b) => Math.hypot(p.x - b.x, p.y - b.y) < b.r + 6;
+
+function drawRoundButton(b, draw) {
+  ctx.fillStyle = "#8f75e6";
+  ctx.beginPath(); ctx.arc(b.x, b.y, b.r, 0, Math.PI * 2); ctx.fill();
+  ctx.save();
+  ctx.translate(b.x, b.y);
+  ctx.fillStyle = ctx.strokeStyle = "#fff";
+  draw();
+  ctx.restore();
+}
+function drawSoundButton(b) {
+  drawRoundButton(b, () => {
+    // speaker
+    ctx.beginPath();
+    ctx.moveTo(-8, -3); ctx.lineTo(-4, -3); ctx.lineTo(1, -8); ctx.lineTo(1, 8); ctx.lineTo(-4, 3); ctx.lineTo(-8, 3);
+    ctx.closePath(); ctx.fill();
+    ctx.lineWidth = 2;
+    ctx.lineCap = "round";
+    if (Sound.muted) {
+      ctx.beginPath(); ctx.moveTo(4, -4); ctx.lineTo(10, 4); ctx.moveTo(10, -4); ctx.lineTo(4, 4); ctx.stroke();
+    } else {
+      ctx.beginPath(); ctx.arc(2, 0, 5, -0.9, 0.9); ctx.stroke();
+      ctx.beginPath(); ctx.arc(2, 0, 9, -0.9, 0.9); ctx.stroke();
+    }
+  });
+}
+function drawPauseButton(b) {
+  drawRoundButton(b, () => { ctx.fillRect(-6, -7, 4, 14); ctx.fillRect(2, -7, 4, 14); });
+}
+function toggleSound() {
+  Sound.muted = !Sound.muted;
+  try { localStorage.setItem("bubblepop_muted", Sound.muted ? "1" : ""); } catch (e) {}
+}
+function pauseGame() {
+  if (state !== "play") return;
+  aiming = false;
+  setState("pause");
+}
 
 function drawPill(b, label, fill = "#6b4fc4") {
   ctx.fillStyle = fill;
@@ -1100,13 +1152,129 @@ function drawHud() {
   ctx.font = `bold 13px ${FONT}`;
   const sub = mode().id === "level" ? `${mode().name} · ${goalText(false)}` : `${mode().name} · BEST ${best}`;
   ctx.fillText(sub, 20, 49);
-  drawPill(STYLE_BTN, `STYLE: ${STYLES[styleIdx]}`);
-  if (state === "play") drawPill(QUIT_BTN, "QUIT", "#8f75e6");
+  drawSoundButton(SOUND_BTN);
+  drawPauseButton(PAUSE_BTN);
+}
+
+// ---- tutorial tips ---------------------------------------------------------
+// A tip card pauses the game the first time something new shows up (saved in
+// localStorage, so each tip appears once). Which tips a game gets is decided in
+// tipsForGame(): the basics on your first game, then rescue / stones / score /
+// ceiling on the first level that has them, and each special move when it unlocks.
+const TIPS = {
+  aim:     { title: "Aim & shoot", icon: "aim", focus: { x: SHOOTER.x, y: SHOOTER.y, r: 58 },
+             lines: ["Drag to aim, then let go to shoot.", "Match 3 or more of the same", "character to pop them!"] },
+  swap:    { title: "Swap & drop", icon: "swap", focus: { x: NEXT_POS.x, y: NEXT_POS.y, r: 46 },
+             lines: ["Tap NEXT to swap it with the bubble", "you're about to shoot.", "Bubbles cut off from the top fall", "for bonus points!"] },
+  rescue:  { title: "Rescue your friends", icon: "friend",
+             lines: ["Friends in golden cages can't be popped.", "Pop what they're hanging from", "to drop them free!"] },
+  stone:   { title: "Stones", icon: "stone",
+             lines: ["Stones can't be matched.", "Knock away what holds them up", "and they'll fall."] },
+  score:   { title: "Score target", icon: "score",
+             lines: ["Reach the target score before", "you run out of shots.", "Big pops and drops score more!"] },
+  ceiling: { title: "Watch the ceiling", icon: "ceiling", focus: { x: 72, y: SHOOTER.y + 30, r: 56 },
+             lines: ["When the CEILING dots run out,", "every bubble moves down a row."] },
+  classic: { title: "Classic", icon: "ceiling", focus: { x: 90, y: SHOOTER.y + 4, r: 70 },
+             lines: ["Clear the board! Every shot ticks", "the ceiling countdown, and it", "drops sooner and sooner."] },
+  rush:    { title: "Rush", icon: "ceiling", focus: { x: 105, y: SHOOTER.y + 4, r: 80 },
+             lines: ["The ceiling drops on a timer that", "keeps getting faster.", "Survive as long as you can!"] },
+  torpedo: { title: "New move: Hamster Torpedo!", icon: "torpedo", focus: { x: 386, y: SHOOTER.y + 14, r: 34 },
+             lines: ["Tap it, aim, and shoot: the hamster", "blasts through everything in its path.", "You get one each game."] },
+  ghosts:  { title: "New move: Ghost Summon!", icon: "ghost", focus: { x: 444, y: SHOOTER.y + 14, r: 34 },
+             lines: ["Tap it to open a summoning circle.", "Ghosts float up and pop", "random bubbles for you."] },
+};
+let seenTips = {};
+try { seenTips = JSON.parse(localStorage.getItem("bubblepop_tips")) || {}; } catch (e) {}
+let tipQueue = [], tipT = 0;
+const tipActive = () => state === "play" && tipQueue.length > 0;
+
+function tipsForGame() {
+  const ids = ["aim", "swap"];
+  const m = mode();
+  if (m.id === "level") {
+    const L = LEVELS[m.levelIdx];
+    if (L.goal === "rescue") ids.push("rescue");
+    if (L.layout.some((row) => row.includes("#"))) ids.push("stone");
+    if (L.goal === "score") ids.push("score");
+    if (L.drop) ids.push("ceiling");
+  } else ids.push(m.id);
+  for (const kind of Object.keys(SPECIAL_UNLOCK_LEVEL)) if (specialUnlocked(kind)) ids.push(kind);
+  return ids;
+}
+function queueTips() {
+  tipQueue = tipsForGame().filter((id) => !seenTips[id]);
+  tipT = 0;
+}
+function closeTip() {
+  if (tipT < 0.35) return; // don't close on the tap that opened the level
+  seenTips[tipQueue.shift()] = 1;
+  try { localStorage.setItem("bubblepop_tips", JSON.stringify(seenTips)); } catch (e) {}
+  tipT = 0;
+  Sound.bounce();
+}
+
+function drawTipIcon(icon, x, y) {
+  if (icon === "aim") return drawBubble(mode().types[0], x, y, 1.2);
+  if (icon === "swap") { drawBubble(mode().types[0], x - 26, y, 1); drawBubble(mode().types[1 % mode().types.length], x + 26, y, 1); return; }
+  if (icon === "friend") return drawBubble(FRIEND + mode().types[0], x, y, 1.2);
+  if (icon === "stone") return drawBubble(STONE, x, y, 1.2);
+  if (icon === "score") return drawHamstar(x, y, 70, true);
+  if (icon === "torpedo") return drawTorpedo(x, y, 0, 1.1);
+  if (icon === "ghost") {
+    const img = FX.ghost_02;
+    if (fxReady(img)) { const k = 70 / Math.max(img.naturalWidth, img.naturalHeight); ctx.drawImage(img, x - (img.naturalWidth * k) / 2, y - (img.naturalHeight * k) / 2, img.naturalWidth * k, img.naturalHeight * k); }
+    return;
+  }
+  // ceiling: a little bar with a row of bubbles under it
+  ctx.fillStyle = "#6b4fc4";
+  roundRect(x - 60, y - 30, 120, 10, 5); ctx.fill();
+  for (let i = 0; i < 3; i++) drawBubble(mode().types[i % mode().types.length], x - 36 + i * 36, y + 2, 0.6);
+}
+
+function drawTip() {
+  const tip = TIPS[tipQueue[0]];
+  const a = Math.min(1, tipT / 0.2);
+  ctx.save();
+  ctx.globalAlpha = a;
+  ctx.fillStyle = "rgba(42,31,74,0.6)";
+  ctx.fillRect(0, 0, W, H);
+  if (tip.focus) {
+    const f = tip.focus, pulse = Math.sin(tipT * 5) * 4;
+    ctx.strokeStyle = "#ffc93c";
+    ctx.lineWidth = 5;
+    ctx.beginPath(); ctx.arc(f.x, f.y, f.r + pulse, 0, Math.PI * 2); ctx.stroke();
+  }
+  // card
+  const cw = 440, ch = 150 + tip.lines.length * 26, cx = (W - cw) / 2, cy = 250;
+  ctx.fillStyle = "#fff";
+  roundRect(cx, cy, cw, ch, 26); ctx.fill();
+  ctx.strokeStyle = "#6b4fc4";
+  ctx.lineWidth = 4;
+  ctx.stroke();
+  drawTipIcon(tip.icon, W / 2, cy);
+  ctx.textAlign = "center";
+  ctx.fillStyle = "#4b3a8a";
+  ctx.font = `bold 26px ${FONT}`;
+  ctx.fillText(tip.title, W / 2, cy + 70);
+  ctx.font = `18px ${FONT}`;
+  tip.lines.forEach((line, i) => ctx.fillText(line, W / 2, cy + 104 + i * 26));
+  const b = { x: W / 2 - 80, y: cy + ch - 56, w: 160, h: 40 };
+  drawPill(b, "GOT IT!");
+  ctx.restore();
 }
 
 // ---- menus (title + end screens) -------------------------------------------
 // Each screen is a title plus a column of buttons; tap one or use ↑/↓ + Enter.
 function menuButtons() {
+  if (state === "pause") {
+    const restart = mode().id === "level" ? () => startLevel(mode().levelIdx) : () => startMode(MODES.indexOf(mode()));
+    return [
+      { label: "RESUME", act: () => { state = "play"; menuT = 1; } },
+      { label: "RESTART", act: restart },
+      { label: `SOUND: ${Sound.muted ? "OFF" : "ON"}`, act: toggleSound },
+      { label: mode().id === "level" ? "QUIT TO MAP" : "QUIT TO MENU", act: quitToMenu },
+    ];
+  }
   if (state === "title") return [
     { label: "LEVELS", sub: `${totalStars()} / ${LEVELS.length * 3} hamstars  ·  hand-made puzzles`, act: openMap },
     { label: MODES[0].name, sub: MODES[0].desc, act: () => startMode(0) },
@@ -1132,7 +1300,7 @@ function menuButtons() {
 const menuArt = () => state === "title" && MENU_BG.complete && MENU_BG.naturalWidth;
 function buttonRects(list) {
   const art = menuArt();
-  const y0 = state === "title" ? (art ? 548 : 380) : mode().id === "level" && state === "win" ? 480 : 420;
+  const y0 = state === "title" ? (art ? 548 : 380) : state === "pause" ? 330 : mode().id === "level" && state === "win" ? 480 : 420;
   let y = y0;
   return list.map((b) => {
     const h = b.sub ? (art ? 84 : 96) : 70;
@@ -1178,7 +1346,7 @@ function drawMenu() {
   ctx.strokeText("pick how to play", W / 2, 160);
   ctx.fillText("pick how to play", W / 2, 160);
   drawButtons();
-  drawPill(STYLE_BTN, `STYLE: ${STYLES[styleIdx]}`);
+  drawSoundButton(TITLE_SOUND_BTN);
 }
 
 function drawOverlay() {
@@ -1191,12 +1359,14 @@ function drawOverlay() {
   let title = "BUBBLE POP";
   if (state === "win") title = lvl ? "LEVEL CLEAR!" : "CLEARED!";
   if (state === "lose") title = loseReason || "GAME OVER";
+  if (state === "pause") title = "PAUSED";
   if (state === "win" || state === "lose") drawSticker();
   ctx.fillStyle = "#fff";
   ctx.font = `bold 52px ${FONT}`;
   ctx.fillText(title, W / 2, 230);
   ctx.font = `bold 22px ${FONT}`;
   if (state === "title") ctx.fillText("pick how to play", W / 2, 285);
+  else if (state === "pause") ctx.fillText(mode().id === "level" ? `${mode().name} · ${mode().title}` : mode().name, W / 2, 285);
   else if (lvl && state === "lose") ctx.fillText(`${mode().name} · ${mode().title}   ·   ${hamstarWord(0)}`, W / 2, 285);
   else if (lvl) ctx.fillText(`${mode().name} · ${mode().title}   ·   Score ${score}`, W / 2, 285);
   else ctx.fillText(`${mode().name}   ·   Score ${score}   ·   Best ${best}`, W / 2, 285);
@@ -1386,6 +1556,8 @@ function mapTap(p) {
 // ---- update / loop ---------------------------------------------------------
 function update(dt) {
   menuT += dt;
+  if (state === "pause") return;               // everything frozen
+  if (tipActive()) { tipT += dt; return; }     // a tip card pauses the game too
   if (banner && (banner.t += dt) > 2.4) banner = null;
   if (state === "play" && mode().dropInterval && (dropTimer -= dt) <= 0) {
     dropCeiling();
@@ -1445,6 +1617,7 @@ function render() {
   drawPopups();
   drawHud();
   ctx.restore();
+  if (tipActive()) { drawTip(); return; }
   drawBanner();
   if (state === "play") drawSlide();
   else drawOverlay();
@@ -1484,7 +1657,6 @@ function setAim(p) {
 const inRect = (p, b) => p.x >= b.x && p.x <= b.x + b.w && p.y >= b.y && p.y <= b.y + b.h;
 function cycleStyle() {
   styleIdx = (styleIdx + 1) % STYLES.length;
-  try { localStorage.setItem("bubblepop_style", styleIdx); } catch (e) {}
 }
 
 let aiming = false, drag = null;
@@ -1492,14 +1664,16 @@ canvas.addEventListener("pointerdown", (e) => {
   Sound.unlock();
   const p = toGame(e);
   if (state === "map") { drag = { y0: p.y, s0: mapScroll, moved: false }; return; }
-  if (inRect(p, STYLE_BTN)) return cycleStyle();
+  if (tipActive()) return closeTip();
+  if (state === "title" && inCircle(p, TITLE_SOUND_BTN)) return toggleSound();
   if (state !== "play") {
-    if (state !== "title" && menuT < 0.6) return; // don't eat the tap that ended the game
+    if ((state === "win" || state === "lose") && menuT < 0.6) return; // don't eat the tap that ended the game
     const list = menuButtons();
     buttonRects(list).forEach((b, i) => { if (inRect(p, b)) list[i].act(); });
     return;
   }
-  if (inRect(p, QUIT_BTN)) return quitToMenu();
+  if (inCircle(p, SOUND_BTN)) return toggleSound();
+  if (inCircle(p, PAUSE_BTN)) return pauseGame();
   for (const kind of Object.keys(SPECIAL_BTNS)) {
     const b = SPECIAL_BTNS[kind];
     if (Math.hypot(p.x - b.x, p.y - b.y) < b.r + 6) return useSpecial(kind);
@@ -1539,7 +1713,9 @@ window.addEventListener("keydown", (e) => {
   Sound.unlock();
   const k = e.key;
   if (k === "s" || k === "S") return cycleStyle();
-  if (k === "m" || k === "M") { Sound.muted = !Sound.muted; return; }
+  if (k === "m" || k === "M") return toggleSound();
+  if (tipActive()) { if (k === " " || k === "Enter" || k === "Escape") closeTip(); return; }
+  if (state === "pause" && (k === "Escape" || k === "p" || k === "P")) { state = "play"; menuT = 1; return; }
   if (state === "map") {
     if (k === "Escape") setState("title");
     else if (k === "ArrowUp") mapScroll = clampScroll(mapScroll - MAP_SPACING);
@@ -1551,10 +1727,10 @@ window.addEventListener("keydown", (e) => {
     const n = menuButtons().length;
     if (k === "ArrowUp") focus = (focus + n - 1) % n;
     else if (k === "ArrowDown") focus = (focus + 1) % n;
-    else if ((k === " " || k === "Enter") && (state === "title" || menuT > 0.6)) menuButtons()[focus].act();
+    else if ((k === " " || k === "Enter") && ((state !== "win" && state !== "lose") || menuT > 0.6)) menuButtons()[focus].act();
     return;
   }
-  if (k === "Escape") quitToMenu();
+  if (k === "Escape" || k === "p" || k === "P") pauseGame();
   else if (k === "1") useSpecial("torpedo");
   else if (k === "2") useSpecial("ghosts");
   else if (k === " " || k === "Enter") fire();
@@ -1566,7 +1742,7 @@ document.addEventListener("gesturestart", (e) => e.preventDefault());
 
 // ---- tiny synth SFX --------------------------------------------------------
 const Sound = {
-  ac: null, muted: false,
+  ac: null, muted: (() => { try { return !!localStorage.getItem("bubblepop_muted"); } catch (e) { return false; } })(),
   unlock() { if (!this.ac) try { this.ac = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) {} },
   tone(freq, dur, type = "sine", vol = 0.15, slide = 0) {
     if (!this.ac || this.muted) return;
