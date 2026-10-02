@@ -234,6 +234,7 @@ function reset() {
   friendsTotal = grid.reduce((a, row) => a + row.filter(isFriend).length, 0);
   friendsFreed = 0;
   popping = []; falling = []; particles = []; popups = [];
+  shownScore = 0; scoreBump = 0; flashT = 0;
   shot = null;
   banner = null;
   slide = null; slideCool = 3; popStreak = 0;
@@ -317,10 +318,20 @@ function land() {
   const group = flood(r, c, (rr, cc) => get(rr, cc) === t);
   let dropped = 0, freed = 0, ceiling = false, missed = false;
   if (group.length >= 3) {
-    for (const [a, b] of group) popBubble(a, b, 0);
-    [dropped, freed] = dropFloating();
+    // chain reaction: pop outward from where the shot landed, one ring at a time
+    const ring = ringsFrom(r, c, group);
+    let last = 0;
+    for (const [a, b] of group) {
+      const d = ring.get(a + "," + b) || 0;
+      last = Math.max(last, d * POP_RING_DELAY);
+      popBubble(a, b, d * POP_RING_DELAY, 10, d);
+    }
+    const before = score;
+    [dropped, freed] = dropFloating(last + 0.1);
     score += group.length * 10;
-    Sound.pop(group.length);
+    // the shot's total, then a callout for big ones
+    spawnPopup(`+${group.length * 10}`, cellX(r, c), cellY(r) - 10, { size: 26 + Math.min(group.length, 12) * 2, color: "#fff", delay: last + 0.05 });
+    cheer(score - before, last + 0.25);
     popStreak++;
   } else {
     Sound.land();
@@ -360,9 +371,40 @@ function flood(r, c, ok) {
   return out;
 }
 
-function popBubble(r, c, delay) {
-  popping.push({ x: cellX(r, c), y: cellY(r), t: grid[r][c], age: -delay });
+// `points` shows a small "+N" when the bubble bursts; `ring` raises the pop pitch
+function popBubble(r, c, delay, points = 0, ring = 0) {
+  popping.push({ x: cellX(r, c), y: cellY(r), t: grid[r][c], age: -delay, points, ring });
   grid[r][c] = -1;
+}
+
+const POP_RING_DELAY = 0.06; // seconds between each ring of a chain pop
+
+// distance (in steps) of every cell in `group` from the cell the shot landed in
+function ringsFrom(r, c, group) {
+  const inGroup = new Set(group.map(([a, b]) => a + "," + b));
+  const dist = new Map([[r + "," + c, 0]]);
+  const q = [[r, c]];
+  while (q.length) {
+    const [a, b] = q.shift();
+    for (const [x, y] of neighbors(a, b)) {
+      const k = x + "," + y;
+      if (inGroup.has(k) && !dist.has(k)) { dist.set(k, dist.get(a + "," + b) + 1); q.push([x, y]); }
+    }
+  }
+  return dist;
+}
+
+// big shots get a word in the middle of the screen, a shake and (biggest) a flash
+const CHEERS = [[500, "INCREDIBLE!", "#ff7fb0"], [300, "AMAZING!", "#ffc93c"], [150, "GREAT!", "#7fd3e8"]];
+function cheer(points, delay) {
+  const tier = CHEERS.find(([min]) => points >= min);
+  if (!tier) return;
+  spawnPopup(tier[1], W / 2, H * 0.42, { size: tier[0] >= 500 ? 58 : tier[0] >= 300 ? 52 : 44, color: tier[2], delay, life: 1.4, rise: 20 });
+  setTimeout(() => {
+    shakeT = Math.max(shakeT, tier[0] >= 300 ? 0.35 : 0.2);
+    if (tier[0] >= 300) flashT = 0.25;
+    Sound.cheer(tier[0]);
+  }, delay * 1000);
 }
 
 // cells no longer connected to the ceiling
@@ -380,22 +422,27 @@ function floatingCells() {
 }
 
 // returns [bubbles dropped, friends freed]
-function dropFloating() {
-  let n = 0, freed = 0;
+function dropFloating(popupDelay = 0) {
+  let n = 0, freed = 0, sx = 0, sy = 0;
   for (const [r, c] of floatingCells()) {
     const v = grid[r][c];
     falling.push({ x: cellX(r, c), y: cellY(r), vx: (Math.random() - 0.5) * 120, vy: -Math.random() * 150, t: v, rot: 0, vr: (Math.random() - 0.5) * 6 });
     grid[r][c] = -1;
     n++;
+    sx += cellX(r, c); sy += cellY(r);
     if (isFriend(v)) {
       freed++;
       score += 100;
-      spawnPopup("FREED!", cellX(r, c), cellY(r));
+      spawnPopup("FREED! +100", cellX(r, c), cellY(r), { size: 26, color: "#ffc93c", delay: popupDelay });
       burst(cellX(r, c), cellY(r), "#ffc93c");
     }
   }
   friendsFreed += freed;
-  if (n) { score += n * 20; Sound.drop(); }
+  if (n) {
+    score += n * 20;
+    Sound.drop();
+    spawnPopup(`+${n * 20} DROP!`, sx / n, sy / n + 30, { size: 24 + Math.min(n, 10) * 2, color: "#ffc93c", delay: popupDelay + 0.15 });
+  }
   if (freed) Sound.win();
   return [n, freed];
 }
@@ -529,10 +576,9 @@ function updateTorpedo(dt) {
         const v = grid[r][c];
         if (v < 0 || isFriend(v)) continue;
         if (Math.hypot(shot.x - cellX(r, c), shot.y - cellY(r)) < TORPEDO_REACH) {
-          popBubble(r, c, 0);
+          popBubble(r, c, 0, 10, shot.hits); // pitch climbs with each hit
           shot.hits++;
           score += 10;
-          Sound.tone(500 + Math.min(shot.hits, 12) * 60, 0.07, "sine", 0.1, 300);
         }
       }
     if (shot.y < TOP - R * 2) return endTorpedo();
@@ -543,8 +589,11 @@ function updateTorpedo(dt) {
 
 function endTorpedo() {
   const hits = shot.hits;
+  const before = score - hits * 10;
+  if (hits) spawnPopup(`+${hits * 10}`, shot.x, TOP + 60, { size: 26 + Math.min(hits, 12) * 2 });
   shot = null;
   const [dropped, freed] = dropFloating();
+  cheer(score - before, 0.1);
   trimGrid();
   checkEnd();
   if (state === "play" && (hits >= 5 || dropped >= 3 || freed)) maybeSlide("bigPop");
@@ -581,9 +630,8 @@ function updateSpecials(dt) {
       const tx = cellX(r, c), ty = cellY(r);
       const dx = tx - g.x, dy = ty - g.y, d = Math.hypot(dx, dy);
       if (d < 14) {
-        popBubble(r, c, 0);
+        popBubble(r, c, 0, 10, 8);
         score += 10;
-        Sound.tone(880, 0.12, "triangle", 0.1, -300);
         g.target = null;
         dropFloating();
         trimGrid();
@@ -848,7 +896,7 @@ function drawSlide() {
 }
 
 // ---- drawing ---------------------------------------------------------------
-let shakeT = 0;
+let shakeT = 0, flashT = 0, shownScore = 0, scoreBump = 0;
 const FONT = "system-ui, sans-serif";
 
 function drawBubble(v, x, y, scale = 1, alpha = 1, rot = 0) {
@@ -1154,7 +1202,11 @@ function drawHud() {
   ctx.fillStyle = "#4b3a8a";
   ctx.font = `bold 24px ${FONT}`;
   ctx.textAlign = "left";
-  ctx.fillText(`${score}`, 20, 30);
+  ctx.save();
+  ctx.translate(20, 30);
+  ctx.scale(1 + scoreBump * 0.25, 1 + scoreBump * 0.25);
+  ctx.fillText(`${Math.round(shownScore)}`, 0, 0);
+  ctx.restore();
   ctx.font = `bold 13px ${FONT}`;
   const sub = mode().id === "level" ? `${mode().name} · ${goalText(false)}` : `${mode().name} · BEST ${best}`;
   ctx.fillText(sub, 20, 49);
@@ -1408,18 +1460,32 @@ function drawBanner() {
 }
 
 // floating score text ("FREED!")
-function spawnPopup(text, x, y) { popups.push({ text, x, y, t: 0 }); }
+// floating text: opts = { size, color, delay, life, rise }
+function spawnPopup(text, x, y, opts = {}) {
+  const { size = 22, color = "#fff", delay = 0, life = 1.1, rise = 70 } = opts;
+  x = Math.max(60, Math.min(W - 60, x)); // keep it on screen…
+  y = Math.max(TOP + rise + size, y);     // …and clear of the score at the top
+  popups.push({ text, x, y, size, color, life, rise, t: -delay });
+}
 function drawPopups() {
   ctx.textAlign = "center";
-  ctx.font = `bold 22px ${FONT}`;
-  ctx.lineWidth = 4;
+  ctx.lineJoin = "round";
   for (const p of popups) {
-    ctx.globalAlpha = Math.max(0, 1 - p.t / 1.2);
-    const y = p.y - p.t * 60;
-    ctx.strokeStyle = "#6b4fc4";
-    ctx.strokeText(p.text, p.x, y);
-    ctx.fillStyle = "#fff";
-    ctx.fillText(p.text, p.x, y);
+    if (p.t < 0) continue;
+    const k = p.t / p.life;
+    // springy pop-in, float up, fade out over the last 35%
+    const pop = p.t < 0.18 ? 0.4 + 0.8 * Math.sin((p.t / 0.18) * Math.PI * 0.75) : 1;
+    ctx.globalAlpha = Math.max(0, Math.min(1, (1 - k) / 0.35));
+    ctx.save();
+    ctx.translate(p.x, p.y - Math.sin(Math.min(1, k) * Math.PI / 2) * p.rise);
+    ctx.scale(pop, pop);
+    ctx.font = `900 ${p.size}px ${FONT}`;
+    ctx.lineWidth = Math.max(4, p.size / 5);
+    ctx.strokeStyle = "#4b3a8a";
+    ctx.strokeText(p.text, 0, 0);
+    ctx.fillStyle = p.color;
+    ctx.fillText(p.text, 0, 0);
+    ctx.restore();
   }
   ctx.globalAlpha = 1;
 }
@@ -1620,14 +1686,26 @@ function update(dt) {
   if (shot) updateShot(dt);
   updateSpecials(dt);
   for (const p of popping) p.age += dt;
-  for (const p of popping) if (p.age >= 0 && !p.burst) { p.burst = true; burst(p.x, p.y, isColor(p.t) ? TYPES[p.t].tint : "#9a94ad"); }
+  for (const p of popping) if (p.age >= 0 && !p.burst) {
+    p.burst = true;
+    burst(p.x, p.y, isColor(p.t) ? TYPES[p.t].tint : "#9a94ad");
+    if (p.points) {
+      spawnPopup(`+${p.points}`, p.x, p.y, { size: 18, life: 0.7, rise: 40 });
+      Sound.tone(560 + Math.min(p.ring, 12) * 70, 0.08, "sine", 0.1, 380);
+    }
+  }
   popping = popping.filter((p) => p.age < 0.22);
   for (const f of falling) { f.vy += 1800 * dt; f.x += f.vx * dt; f.y += f.vy * dt; f.rot += f.vr * dt; }
   falling = falling.filter((f) => f.y < H + R);
   for (const p of particles) { p.vy += 900 * dt; p.x += p.vx * dt; p.y += p.vy * dt; p.life -= dt; }
   particles = particles.filter((p) => p.life > 0);
   for (const p of popups) p.t += dt;
-  popups = popups.filter((p) => p.t < 1.2);
+  popups = popups.filter((p) => p.t < p.life);
+  // score counter rolls up to the real score, with a little bump while it climbs
+  if (shownScore < score) { shownScore = Math.min(score, shownScore + Math.max(1, (score - shownScore) * dt * 8)); scoreBump = 1; }
+  else shownScore = score;
+  scoreBump = Math.max(0, scoreBump - dt * 4);
+  flashT = Math.max(0, flashT - dt);
   shakeT = Math.max(0, shakeT - dt);
   updateSlide(dt);
 }
@@ -1667,6 +1745,7 @@ function render() {
   drawPopups();
   drawHud();
   ctx.restore();
+  if (flashT > 0) { ctx.fillStyle = `rgba(255,255,255,${flashT * 1.6})`; ctx.fillRect(0, 0, W, H); }
   if (tipActive()) { drawTip(); return; }
   drawBanner();
   if (state === "play") drawSlide();
@@ -1811,6 +1890,10 @@ const Sound = {
   pop(n) { for (let i = 0; i < Math.min(n, 6); i++) setTimeout(() => this.tone(600 + i * 110, 0.09, "sine", 0.14, 400), i * 40); },
   drop() { this.tone(700, 0.35, "triangle", 0.1, -500); },
   whoosh() { this.tone(250, 0.22, "triangle", 0.08, 500); },
+  cheer(points) {
+    const notes = points >= 500 ? [523, 659, 784, 1047, 1319] : points >= 300 ? [523, 659, 784, 1047] : [587, 784, 988];
+    notes.forEach((f, i) => setTimeout(() => this.tone(f, 0.16, "triangle", 0.12), i * 70));
+  },
   thud() { this.tone(90, 0.25, "sine", 0.25, -40); },
   win() { [523, 659, 784, 1047].forEach((f, i) => setTimeout(() => this.tone(f, 0.18, "triangle", 0.14), i * 110)); },
   lose() { [392, 330, 262].forEach((f, i) => setTimeout(() => this.tone(f, 0.25, "sawtooth", 0.07), i * 160)); },
