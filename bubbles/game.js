@@ -57,8 +57,13 @@ let gameBg = null; // background image for the current game
 
 // Optional map background art: drop a tall image at assets/map_bg.png and it's
 // tiled down the level map instead of the drawn pastel background.
-const MAP_BG = new Image();
-MAP_BG.src = "assets/map_bg.png";
+// Level map art: each world's `map` images (levels.js), stacked up the map. They're
+// big, so they only start loading the first time the map is opened.
+const MAP_ART = {};
+for (const wld of WORLDS) for (const n of wld.map || []) MAP_ART[n] = new Image();
+function loadMapArt() {
+  for (const n in MAP_ART) if (!MAP_ART[n].src) MAP_ART[n].src = `assets/map/${n}.jpg`;
+}
 
 // Bubble art styles that were compared during development.
 const STYLES = ["Raw art", "Glass bubble", "Colour ring"];
@@ -205,6 +210,7 @@ function startLevel(i) {
   queueTips();
 }
 function openMap() {
+  loadMapArt();
   setState("map");
   mapFocusOn(mode().levelIdx ?? nextLevelToPlay());
 }
@@ -1433,11 +1439,9 @@ function drawMap() {
   ctx.save();
   ctx.translate(0, -mapScroll);
 
-  // background: optional art, else a drawn pastel sky with floating character bubbles
-  if (MAP_BG.complete && MAP_BG.naturalWidth) {
-    const th = (W * MAP_BG.naturalHeight) / MAP_BG.naturalWidth;
-    for (let y = 0; y < mapH(); y += th) ctx.drawImage(MAP_BG, 0, y, W, th);
-  } else {
+  // background: the worlds' map art, else a drawn pastel sky with floating character bubbles
+  if (mapArtReady()) drawMapArt();
+  else {
     const g = ctx.createLinearGradient(0, 0, 0, mapH());
     g.addColorStop(0, "#bfe6ff");
     g.addColorStop(0.5, "#d9ccff");
@@ -1539,6 +1543,52 @@ function drawMap() {
   ctx.font = `bold 18px ${FONT}`;
   ctx.fillText(`${totalStars()}/${LEVELS.length * 3}`, W - 20, 42);
   drawHamstar(W - 34 - ctx.measureText(`${totalStars()}/${LEVELS.length * 3}`).width, 35, 34, true);
+}
+
+// Each world's map images share the stretch of map between its first and last
+// level (split at the midpoints between worlds), stacked bottom to top. Every image
+// except the bottom one hangs MAP_FADE px down over the one below and fades in.
+const MAP_FADE = 150;
+function mapSlots() {
+  const slots = [];
+  WORLDS.forEach((wld, k) => {
+    const first = wld.from - 1, last = k + 1 < WORLDS.length ? WORLDS[k + 1].from - 2 : LEVELS.length - 1;
+    const yBot = k === 0 ? mapH() : pathAt(first - 0.5).y;
+    const yTop = k + 1 < WORLDS.length ? pathAt(last + 0.5).y : 0;
+    const imgs = wld.map || [];
+    imgs.forEach((n, j) => {
+      const h = (yBot - yTop) / imgs.length;
+      slots.push({ img: MAP_ART[n], top: yBot - (j + 1) * h, bot: yBot - j * h });
+    });
+  });
+  return slots; // bottom first
+}
+const mapArtReady = () => Object.values(MAP_ART).length > 0 && Object.values(MAP_ART).every((img) => img.complete && img.naturalWidth);
+
+function drawMapArt() {
+  const viewTop = mapScroll, viewBot = mapScroll + H;
+  mapSlots().forEach((s, i) => {
+    const fade = i === 0 ? 0 : MAP_FADE;
+    const top = s.top, bot = s.bot + fade;
+    if (bot < viewTop || top > viewBot) return;
+    const img = s.img;
+    // cover-fit the image into W × (bot-top), centred
+    const k = Math.max(W / img.naturalWidth, (bot - top) / img.naturalHeight);
+    const dw = img.naturalWidth * k, dh = img.naturalHeight * k;
+    const dx = (W - dw) / 2, dy = top + ((bot - top) - dh) / 2;
+    const slice = (y0, y1, alpha) => {
+      ctx.globalAlpha = alpha;
+      ctx.drawImage(img, 0, (y0 - dy) / k, img.naturalWidth, (y1 - y0) / k, dx, y0, dw, y1 - y0);
+    };
+    slice(top, bot - fade, 1);
+    // stepped fade over the image below
+    const steps = 24;
+    for (let j = 0; j < steps && fade; j++) {
+      const y0 = bot - fade + (fade * j) / steps, y1 = y0 + fade / steps + 0.5;
+      slice(y0, Math.min(y1, bot), 1 - (j + 0.5) / steps);
+    }
+    ctx.globalAlpha = 1;
+  });
 }
 
 function mapTap(p) {

@@ -726,9 +726,11 @@ const LEVELS = [
 // Worlds: each covers a run of levels and gives them a background (built from
 // ~/Desktop/bubbles/level_bg_NN into assets/bg/). A world starts at level `from`
 // and lasts until the next world starts. Classic and Rush pick one at random.
+// `map` is the world's stretch of the level map, bottom image first (built from
+// ~/Desktop/bubbles/map_bg_NN into assets/map/); the images fade into each other.
 const WORLDS = [
-  { name: "Nature Trail",    bg: "level_bg_01", from: 1 },
-  { name: "Donut Shop",      bg: "level_bg_02", from: 16 },
-  { name: "Strawberry Farm", bg: "level_bg_03", from: 31 },
-  { name: "Japanese Garden", bg: "level_bg_04", from: 46 },
+  { name: "Nature Trail",    bg: "level_bg_01", from: 1,  map: ["map_bg_01", "map_bg_02"] },
+  { name: "Donut Shop",      bg: "level_bg_02", from: 16, map: ["map_bg_03", "map_bg_04"] },
+  { name: "Strawberry Farm", bg: "level_bg_03", from: 31, map: ["map_bg_05", "map_bg_06"] },
+  { name: "Japanese Garden", bg: "level_bg_04", from: 46, map: ["map_bg_07", "map_bg_08"] },
 ];
