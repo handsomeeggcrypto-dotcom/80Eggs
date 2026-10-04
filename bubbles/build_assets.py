@@ -133,7 +133,20 @@ def build_slide(src, dst):
     return [side for side in ("left", "right") if cuts[side] >= CUT_MIN]
 
 
+def copy_music():
+    """Songs (*.mp3) are copied as-is to assets/music/, renamed lower_snake_case
+    (e.g. "Fierce Suite.mp3" -> fierce_suite.mp3)."""
+    import shutil
+    os.makedirs(os.path.join(OUT, "music"), exist_ok=True)
+    for f in sorted(os.listdir(SRC)):
+        if f.lower().endswith(".mp3"):
+            name = re.sub(r"[^a-z0-9]+", "_", os.path.splitext(f)[0].lower()).strip("_") + ".mp3"
+            shutil.copyfile(os.path.join(SRC, f), os.path.join(OUT, "music", name))
+            print("wrote music/" + name)
+
+
 def main():
+    copy_music()
     os.makedirs(os.path.join(OUT, "slides"), exist_ok=True)
     names = sorted(f for f in os.listdir(SRC) if f.lower().endswith((".jpeg", ".jpg", ".png")))
     slides = {"good": [], "bad": [], "random": []}

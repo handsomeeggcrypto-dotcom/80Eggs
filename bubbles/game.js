@@ -1672,6 +1672,7 @@ function mapTap(p) {
 // ---- update / loop ---------------------------------------------------------
 function update(dt) {
   menuT += dt;
+  Music.update();
   if (state === "pause") return;               // everything frozen
   if (tipActive()) { tipT += dt; return; }     // a tip card pauses the game too
   if (banner && (banner.t += dt) > 2.4) banner = null;
@@ -1869,10 +1870,49 @@ window.addEventListener("keydown", (e) => {
 });
 document.addEventListener("gesturestart", (e) => e.preventDefault());
 
+// ---- menu music ------------------------------------------------------------
+// Loops on the title screen and level map only; fades out when a game starts and
+// back in on return (resuming where it left off). Follows the mute button. It goes
+// through Web Audio so fades work on iPhone too (iOS ignores <audio>.volume).
+const MUSIC_SRC = "assets/music/fierce_suite.mp3";
+const MUSIC_VOLUME = 0.45;
+const Music = {
+  el: null, gain: null, on: false, pauseTimer: 0,
+  wanted: () => (state === "title" || state === "map") && !Sound.muted,
+  update() {
+    if (!Sound.ac) return; // waits for the first tap/key press
+    if (!this.el) {
+      this.el = new Audio(MUSIC_SRC);
+      this.el.loop = true;
+      this.gain = Sound.ac.createGain();
+      this.gain.gain.value = 0;
+      Sound.ac.createMediaElementSource(this.el).connect(this.gain).connect(Sound.ac.destination);
+    }
+    const want = this.wanted();
+    if (want === this.on) return;
+    this.on = want;
+    const g = this.gain.gain, t = Sound.ac.currentTime;
+    g.cancelScheduledValues(t);
+    g.setValueAtTime(g.value, t);
+    clearTimeout(this.pauseTimer);
+    if (want) {
+      this.el.play().catch(() => { this.on = false; }); // retried on the next tap
+      g.linearRampToValueAtTime(MUSIC_VOLUME, t + 0.8);
+    } else {
+      g.linearRampToValueAtTime(0, t + 0.5);
+      this.pauseTimer = setTimeout(() => { if (!this.on) this.el.pause(); }, 600);
+    }
+  },
+};
+
 // ---- tiny synth SFX --------------------------------------------------------
 const Sound = {
   ac: null, muted: (() => { try { return !!localStorage.getItem("bubblepop_muted"); } catch (e) { return false; } })(),
-  unlock() { if (!this.ac) try { this.ac = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) {} },
+  unlock() {
+    if (!this.ac) try { this.ac = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) {}
+    if (this.ac && this.ac.state === "suspended") this.ac.resume();
+    Music.update(); // first start has to happen inside a tap/key press (browser autoplay rules)
+  },
   tone(freq, dur, type = "sine", vol = 0.15, slide = 0) {
     if (!this.ac || this.muted) return;
     const t = this.ac.currentTime, o = this.ac.createOscillator(), g = this.ac.createGain();
