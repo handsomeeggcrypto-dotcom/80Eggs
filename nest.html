@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>The Nest | 80Eggs</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: 'Courier New', monospace;
+    background: #2a2118;
+    color: #f3ead8;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 56px 16px 24px;
+  }
+  #back {
+    position: fixed; top: 14px; left: 14px;
+    color: #f3ead8; text-decoration: none; font-size: 14px;
+    border: 1px solid #6b5a44; padding: 4px 10px; border-radius: 6px;
+    background: #2a2118;
+  }
+  #back:hover { border-color: #f6c85f; color: #f6c85f; }
+  h1 { font-size: 22px; letter-spacing: 3px; margin-bottom: 4px; }
+  .sub { font-size: 13px; color: #b9a98c; margin-bottom: 18px; text-align: center; }
+  #nest {
+    width: 100%; max-width: 720px;
+    background: #3a2d20; border-radius: 18px; border: 2px solid #5a4733;
+  }
+  .egg { cursor: pointer; transform-box: fill-box; transform-origin: 50% 90%; }
+  .wob { animation: wob .6s ease-in-out 2; }
+  @keyframes wob { 25% { transform: rotate(-9deg); } 75% { transform: rotate(9deg); } }
+  .pop { animation: pop .4s ease-out; }
+  @keyframes pop { 0% { transform: scale(.4); } 70% { transform: scale(1.15); } 100% { transform: scale(1); } }
+  .bar {
+    width: 100%; max-width: 720px; margin-top: 12px;
+    display: flex; justify-content: space-between; align-items: center; gap: 12px;
+    font-size: 13px; color: #b9a98c;
+  }
+  button {
+    font-family: inherit; font-size: 13px; cursor: pointer;
+    padding: 5px 12px; border-radius: 6px;
+    border: 1px solid #6b5a44; background: transparent; color: #f3ead8;
+  }
+  button:hover { border-color: #f6c85f; color: #f6c85f; }
+  .note { margin-top: 22px; font-size: 12px; color: #8a7a62; text-align: center; max-width: 520px; line-height: 1.6; }
+</style>
+</head>
+<body>
+<a id="back" href="index.html">◂ MENU</a>
+
+<h1>THE NEST</h1>
+<div class="sub">80 eggs. tap one to hatch it.</div>
+
+<svg id="nest" viewBox="0 0 680 420" role="img" aria-label="A nest of eighty eggs that hatch into chicks when clicked"></svg>
+
+<div class="bar">
+  <span id="count">0 of 80 hatched</span>
+  <button id="reset">new clutch</button>
+</div>
+
+<div class="note">made by Claude, on an afternoon nobody needed anything.</div>
+
+<script>
+var svg = document.getElementById('nest'), NS = 'http://www.w3.org/2000/svg';
+var COLS = 10, ROWS = 8, CW = 64, CH = 50, OX = 20, OY = 18;
+var TINTS = ['#f6c85f', '#f4a259', '#9fd8cb', '#f7d6e0', '#c7e8a8'];
+var SHELL = 'M0,-20 C12,-20 16,0 16,6 C16,16 8,21 0,21 C-8,21 -16,16 -16,6 C-16,0 -12,-20 0,-20Z';
+var CRACKED = 'M-16,8 L-11,2 L-6,8 L0,2 L6,8 L11,2 L16,8 C16,17 8,21 0,21 C-8,21 -16,17 -16,8Z';
+var hatched = 0, eggs = [];
+
+function el(tag, attrs) {
+  var e = document.createElementNS(NS, tag);
+  for (var k in attrs) e.setAttribute(k, attrs[k]);
+  return e;
+}
+
+function drawEgg(g) {
+  g.innerHTML = '';
+  g.appendChild(el('path', { d: SHELL, fill: '#f3ead8', stroke: '#c9b48f', 'stroke-width': 1 }));
+  g.appendChild(el('ellipse', { cx: -6, cy: -6, rx: 3, ry: 5, fill: '#fff', opacity: .6 }));
+}
+
+function drawChick(g, color) {
+  g.innerHTML = '';
+  g.appendChild(el('path', { d: CRACKED, fill: '#f3ead8', stroke: '#c9b48f', 'stroke-width': 1 }));
+  g.appendChild(el('circle', { cx: 0, cy: -3, r: 12, fill: color }));
+  g.appendChild(el('circle', { cx: -4, cy: -6, r: 1.8, fill: '#2b2b2b' }));
+  g.appendChild(el('circle', { cx: 4, cy: -6, r: 1.8, fill: '#2b2b2b' }));
+  g.appendChild(el('path', { d: 'M-3,-1 L3,-1 L0,4Z', fill: '#e8743b' }));
+  g.classList.add('pop');
+}
+
+function wobble(g) {
+  g.classList.remove('wob');
+  void g.getBoundingClientRect();
+  g.classList.add('wob');
+}
+
+function updateCount() {
+  document.getElementById('count').textContent =
+    hatched === 80 ? 'all 80 hatched. good morning, everyone.' : hatched + ' of 80 hatched';
+}
+
+function hatch(e) {
+  if (e.done) { wobble(e.g); return; }
+  e.done = true;
+  hatched++;
+  updateCount();
+  drawChick(e.g, TINTS[Math.floor(Math.random() * TINTS.length)]);
+}
+
+function build() {
+  svg.innerHTML = '';
+  eggs = []; hatched = 0; updateCount();
+  for (var r = 0; r < ROWS; r++) {
+    for (var c = 0; c < COLS; c++) {
+      var x = OX + c * CW + CW / 2 + (r % 2 ? 8 : -8), y = OY + r * CH + CH / 2;
+      var outer = el('g', { transform: 'translate(' + x + ',' + y + ')' });
+      var g = el('g', { 'class': 'egg' });
+      outer.appendChild(g);
+      svg.appendChild(outer);
+      drawEgg(g);
+      var e = { g: g, done: false };
+      eggs.push(e);
+      g.addEventListener('click', hatch.bind(null, e));
+    }
+  }
+}
+
+setInterval(function () {
+  var left = eggs.filter(function (e) { return !e.done; });
+  if (left.length) wobble(left[Math.floor(Math.random() * left.length)].g);
+}, 900);
+
+document.getElementById('reset').onclick = build;
+build();
+</script>
+</body>
+</html>
