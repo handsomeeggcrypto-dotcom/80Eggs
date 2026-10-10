@@ -1,4 +1,5 @@
-// Bubble Pop — proof-of-concept bubble shooter with character art bubbles.
+// Tomochi Pop — proof-of-concept bubble shooter with character art bubbles.
+// (Saved data still uses the old "bubblepop_" localStorage keys so progress carries over.)
 // Aim with mouse/finger, release to shoot. Match 3+ of the same character to pop.
 // Bubbles cut off from the ceiling fall.
 //
@@ -6,6 +7,7 @@
 // CLASSIC / RUSH quick-play modes.
 
 const W = 600, H = 900;
+const GAME_TITLE = "TOMOCHI POP";
 const canvas = document.getElementById("game");
 const ctx = canvas.getContext("2d");
 
@@ -1329,7 +1331,8 @@ function menuButtons() {
     return [
       { label: "RESUME", act: () => { state = "play"; menuT = 1; } },
       { label: "RESTART", act: restart },
-      { label: `SOUND: ${Sound.muted ? "OFF" : "ON"}`, act: toggleSound },
+      { label: "MUSIC", volume: "music" },
+      { label: "SOUND FX", volume: "sfx" },
       { label: mode().id === "level" ? "QUIT TO MAP" : "QUIT TO MENU", act: quitToMenu },
     ];
   }
@@ -1368,6 +1371,36 @@ function buttonRects(list) {
   });
 }
 
+// a volume row: label, − button, level pips, + button
+const volumeHits = (b) => ({ minus: { x: b.x + 230, y: b.y + b.h / 2, r: 22 }, plus: { x: b.x + b.w - 36, y: b.y + b.h / 2, r: 22 } });
+function drawVolumeRow(b, item) {
+  const { minus, plus } = volumeHits(b), v = volume[item.volume];
+  ctx.fillStyle = "#fff";
+  ctx.textAlign = "left";
+  ctx.font = `bold 24px ${FONT}`;
+  ctx.fillText(item.label, b.x + 26, b.y + b.h / 2 + 8);
+  for (const [btn, sign, on] of [[minus, "−", v > 0], [plus, "+", v < VOLUME_STEPS]]) {
+    ctx.fillStyle = on ? "#fff" : "rgba(255,255,255,0.35)";
+    ctx.beginPath(); ctx.arc(btn.x, btn.y, btn.r, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = "#6b4fc4";
+    ctx.textAlign = "center";
+    ctx.font = `bold 30px ${FONT}`;
+    ctx.fillText(sign, btn.x, btn.y + 10);
+  }
+  // level pips between the buttons
+  const x0 = minus.x + 36, gap = (plus.x - 36 - x0) / VOLUME_STEPS;
+  for (let i = 0; i < VOLUME_STEPS; i++) {
+    ctx.fillStyle = i < v ? "#ffc93c" : "rgba(255,255,255,0.3)";
+    roundRect(x0 + i * gap + 3, b.y + b.h / 2 - 9, gap - 6, 18, 6); ctx.fill();
+  }
+  if (v === 0) {
+    ctx.fillStyle = "#fff";
+    ctx.textAlign = "center";
+    ctx.font = `bold 14px ${FONT}`;
+    ctx.fillText("OFF", x0 + (VOLUME_STEPS * gap) / 2, b.y + b.h / 2 + 5);
+  }
+}
+
 function drawButtons() {
   const list = menuButtons();
   const art = menuArt();
@@ -1376,6 +1409,7 @@ function drawButtons() {
     ctx.fillStyle = sel ? "#8f75e6" : art ? "rgba(107,79,196,0.94)" : "#6b4fc4";
     roundRect(b.x, b.y, b.w, b.h, 22); ctx.fill();
     if (sel || art) { ctx.strokeStyle = sel ? "#fff" : "rgba(255,255,255,0.55)"; ctx.lineWidth = 3; ctx.stroke(); }
+    if (list[i].volume) return drawVolumeRow(b, list[i]);
     ctx.fillStyle = "#fff";
     ctx.textAlign = "center";
     ctx.font = `bold 28px ${FONT}`;
@@ -1393,12 +1427,12 @@ function drawMenu() {
   ctx.textAlign = "center";
   ctx.lineJoin = "round";
   const bob = Math.sin(menuT * 2) * 4;
-  ctx.font = `bold 64px ${FONT}`;
+  ctx.font = `bold 60px ${FONT}`;
   ctx.lineWidth = 12;
   ctx.strokeStyle = "#4b3a8a";
-  ctx.strokeText("BUBBLE POP", W / 2, 118 + bob);
+  ctx.strokeText(GAME_TITLE, W / 2, 118 + bob);
   ctx.fillStyle = "#fff";
-  ctx.fillText("BUBBLE POP", W / 2, 118 + bob);
+  ctx.fillText(GAME_TITLE, W / 2, 118 + bob);
   ctx.font = `bold 20px ${FONT}`;
   ctx.lineWidth = 6;
   ctx.strokeText("pick how to play", W / 2, 160);
@@ -1414,7 +1448,7 @@ function drawOverlay() {
   ctx.fillStyle = "#fff";
   ctx.textAlign = "center";
   const lvl = mode().id === "level";
-  let title = "BUBBLE POP";
+  let title = GAME_TITLE;
   if (state === "win") title = lvl ? "LEVEL CLEAR!" : "CLEARED!";
   if (state === "lose") title = loseReason || "GAME OVER";
   if (state === "pause") title = "PAUSED";
@@ -1799,7 +1833,15 @@ canvas.addEventListener("pointerdown", (e) => {
   if (state !== "play") {
     if ((state === "win" || state === "lose") && menuT < 0.6) return; // don't eat the tap that ended the game
     const list = menuButtons();
-    buttonRects(list).forEach((b, i) => { if (inRect(p, b)) list[i].act(); });
+    buttonRects(list).forEach((b, i) => {
+      if (!inRect(p, b)) return;
+      if (list[i].volume) {
+        const { minus, plus } = volumeHits(b);
+        if (inCircle(p, minus)) changeVolume(list[i].volume, -1);
+        else if (inCircle(p, plus)) changeVolume(list[i].volume, +1);
+        focus = i;
+      } else list[i].act();
+    });
     return;
   }
   if (inCircle(p, SOUND_BTN)) return toggleSound();
@@ -1855,9 +1897,11 @@ window.addEventListener("keydown", (e) => {
   }
   if (state !== "play") {
     const n = menuButtons().length;
+    const item = menuButtons()[focus];
     if (k === "ArrowUp") focus = (focus + n - 1) % n;
     else if (k === "ArrowDown") focus = (focus + 1) % n;
-    else if ((k === " " || k === "Enter") && ((state !== "win" && state !== "lose") || menuT > 0.6)) menuButtons()[focus].act();
+    else if (item && item.volume && (k === "ArrowLeft" || k === "ArrowRight")) changeVolume(item.volume, k === "ArrowLeft" ? -1 : 1);
+    else if ((k === " " || k === "Enter") && item && item.act && ((state !== "win" && state !== "lose") || menuT > 0.6)) item.act();
     return;
   }
   if (k === "Escape" || k === "p" || k === "P") pauseGame();
@@ -1870,15 +1914,33 @@ window.addEventListener("keydown", (e) => {
 });
 document.addEventListener("gesturestart", (e) => e.preventDefault());
 
-// ---- menu music ------------------------------------------------------------
-// Loops on the title screen and level map only; fades out when a game starts and
-// back in on return (resuming where it left off). Follows the mute button. It goes
-// through Web Audio so fades work on iPhone too (iOS ignores <audio>.volume).
+// ---- music + volume --------------------------------------------------------
+// The song loops everywhere: full on the title screen and map, much quieter during
+// a game (it eases between the two). Both levels are scaled by the MUSIC volume
+// setting, and sound effects by the SOUND FX setting (pause menu, 0–5 steps,
+// saved). The mute button silences both. Music goes through Web Audio so volume
+// changes work on iPhone too (iOS ignores <audio>.volume).
 const MUSIC_SRC = "assets/music/fierce_suite.mp3";
-const MUSIC_VOLUME = 0.45;
+const MUSIC_MENU = 0.45;      // music level on menus at the default volume setting
+const MUSIC_IN_GAME = 0.1;    // …and during a game
+const VOLUME_STEPS = 5, VOLUME_DEFAULT = 3; // a setting of 3/5 = the levels above
+let volume = { music: VOLUME_DEFAULT, sfx: VOLUME_DEFAULT };
+try { volume = { ...volume, ...JSON.parse(localStorage.getItem("bubblepop_volume")) }; } catch (e) {}
+const volumeFactor = (kind) => volume[kind] / VOLUME_DEFAULT;
+function changeVolume(kind, delta) {
+  volume[kind] = Math.max(0, Math.min(VOLUME_STEPS, volume[kind] + delta));
+  try { localStorage.setItem("bubblepop_volume", JSON.stringify(volume)); } catch (e) {}
+  Sound.applyVolume();
+  if (kind === "sfx") Sound.tone(660, 0.1, "triangle", 0.12); // a blip at the new level
+}
+
 const Music = {
-  el: null, gain: null, on: false, pauseTimer: 0,
-  wanted: () => (state === "title" || state === "map") && !Sound.muted,
+  el: null, gain: null, level: 0, pauseTimer: 0,
+  target() {
+    if (Sound.muted) return 0;
+    const menu = state === "title" || state === "map";
+    return (menu ? MUSIC_MENU : MUSIC_IN_GAME) * volumeFactor("music");
+  },
   update() {
     if (!Sound.ac) return; // waits for the first tap/key press
     if (!this.el) {
@@ -1888,28 +1950,32 @@ const Music = {
       this.gain.gain.value = 0;
       Sound.ac.createMediaElementSource(this.el).connect(this.gain).connect(Sound.ac.destination);
     }
-    const want = this.wanted();
-    if (want === this.on) return;
-    this.on = want;
+    const want = this.target();
+    if (Math.abs(want - this.level) < 0.001) return;
+    const rising = want > this.level;
+    this.level = want;
     const g = this.gain.gain, t = Sound.ac.currentTime;
     g.cancelScheduledValues(t);
     g.setValueAtTime(g.value, t);
     clearTimeout(this.pauseTimer);
-    if (want) {
-      this.el.play().catch(() => { this.on = false; }); // retried on the next tap
-      g.linearRampToValueAtTime(MUSIC_VOLUME, t + 0.8);
-    } else {
-      g.linearRampToValueAtTime(0, t + 0.5);
-      this.pauseTimer = setTimeout(() => { if (!this.on) this.el.pause(); }, 600);
-    }
+    g.linearRampToValueAtTime(want, t + (rising ? 0.8 : 0.6));
+    if (want > 0) this.el.play().catch(() => { this.level = -1; }); // retried on the next tap
+    else this.pauseTimer = setTimeout(() => { if (this.level === 0) this.el.pause(); }, 700);
   },
 };
 
 // ---- tiny synth SFX --------------------------------------------------------
 const Sound = {
   ac: null, muted: (() => { try { return !!localStorage.getItem("bubblepop_muted"); } catch (e) { return false; } })(),
+  sfx: null, // master gain for every sound effect
+  applyVolume() { if (this.sfx) this.sfx.gain.value = volumeFactor("sfx"); },
   unlock() {
-    if (!this.ac) try { this.ac = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) {}
+    if (!this.ac) try {
+      this.ac = new (window.AudioContext || window.webkitAudioContext)();
+      this.sfx = this.ac.createGain();
+      this.sfx.connect(this.ac.destination);
+      this.applyVolume();
+    } catch (e) {}
     if (this.ac && this.ac.state === "suspended") this.ac.resume();
     Music.update(); // first start has to happen inside a tap/key press (browser autoplay rules)
   },
@@ -1921,7 +1987,7 @@ const Sound = {
     if (slide) o.frequency.exponentialRampToValueAtTime(Math.max(40, freq + slide), t + dur);
     g.gain.setValueAtTime(vol, t);
     g.gain.exponentialRampToValueAtTime(0.001, t + dur);
-    o.connect(g).connect(this.ac.destination);
+    o.connect(g).connect(this.sfx);
     o.start(t); o.stop(t + dur);
   },
   shoot() { this.tone(520, 0.08, "triangle", 0.1, 300); },

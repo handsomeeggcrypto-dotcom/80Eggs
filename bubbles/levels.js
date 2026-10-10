@@ -1,4 +1,4 @@
-// Bubble Pop — level map levels. Edit freely; the game reads this list as-is.
+// Tomochi Pop — level map levels. Edit freely; the game reads this list as-is.
 //
 // Each level:
 //   name    shown on the level intro banner
