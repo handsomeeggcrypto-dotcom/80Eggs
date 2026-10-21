@@ -1,0 +1,14 @@
+[shortcut]
+type: file
+name: MOEKADEX
+data: /YOLK/moekadex.lua
+
+[shortcut]
+type: file
+name: WAKE YOLK
+data: /YOLK/boot.lua
+
+[shortcut]
+type: browse
+name: MUSIC
+data: /Music/

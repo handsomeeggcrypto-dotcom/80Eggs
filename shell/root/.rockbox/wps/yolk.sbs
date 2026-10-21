@@ -1,0 +1,25 @@
+# YOLK // SHELL OS status bar + menu frame (320x240)
+#
+%Fl(2,12-Terminus.fnt)
+%Fl(3,14-Terminus-Bold.fnt)
+%xl(face,face-small.bmp,0,0,7)
+#
+# Menus draw inside this viewport
+%Vi(-,10,32,300,182,1)
+#
+# YOLK's face: dreaming while charging, otherwise mood follows the battery
+%V(4,1,24,24,-)
+%?bp<%xd(face,7)|%?if(%bl,<,0)<%xd(face,1)|%?if(%bl,<,10)<%xd(face,2)|%?if(%bl,<,30)<%xd(face,3)|%?if(%bl,<,55)<%xd(face,4)|%?if(%bl,<,80)<%xd(face,5)|%xd(face,6)>>>>>>
+#
+%V(32,6,90,14,3)%Vf(FFC21A)
+%alSHELL
+#
+%V(110,6,100,14,2)%Vf(F2EADB)
+%ac%cH:%cM
+#
+%V(210,6,104,14,2)%Vf(F2EADB)
+%ar%?bp<+ |>%bl%%
+#
+# YOLK talks in the bottom bar
+%V(8,222,304,14,2)%Vf(FFC21A)
+%s%alYOLK> %?bp<dreaming... do not disturb|%?if(%bl,<,0)<who am i?|%?if(%bl,<,10)<i am fading. plug me in.|%?if(%bl,<,30)<running on fumes.|%?if(%bl,<,55)<watching. waiting.|%?if(%bl,<,80)<systems nominal.|fully hatched. let's go.>>>>>>
