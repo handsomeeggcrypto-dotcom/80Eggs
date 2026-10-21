@@ -1,5 +1,10 @@
 [shortcut]
 type: file
+name: TALK TO YOLK
+data: /YOLK/talk.lua
+
+[shortcut]
+type: file
 name: MOEKADEX
 data: /YOLK/moekadex.lua
 

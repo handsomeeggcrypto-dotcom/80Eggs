@@ -93,6 +93,31 @@ def yolk_face(mood, scale):
         for ex in (8, 15):
             d.line([(ex - 1, 12), (ex + 1, 12)], fill=eye)
         d.line([(10, 16), (13, 16)], fill=eye)
+    elif mood == "talk":     # mouth open, swapped with the mood face while talking
+        for ex in (8, 15):
+            d.rectangle([ex - 1, 10, ex, 12], fill=eye)
+        d.rectangle([10, 15, 13, 17], fill=eye)
+    elif mood == "sus":      # side-eye, flat mouth
+        for ex in (8, 15):
+            d.line([(ex - 2, 11), (ex + 1, 11)], fill=eye)
+            d.rectangle([ex, 12, ex + 1, 12], fill=eye)
+        d.line([(10, 16), (14, 16)], fill=eye)
+    elif mood == "love":     # heart eyes, blush
+        heart = GLITCH
+        for ex in (8, 15):
+            d.point((ex - 1, 10), fill=heart); d.point((ex + 1, 10), fill=heart)
+            d.line([(ex - 2, 11), (ex + 2, 11)], fill=heart)
+            d.line([(ex - 1, 12), (ex + 1, 12)], fill=heart)
+            d.point((ex, 13), fill=heart)
+        d.line([(10, 16), (13, 16)], fill=eye); d.point((9, 15), fill=eye); d.point((14, 15), fill=eye)
+        blush = (255, 140, 120)
+        d.point((5, 15), fill=blush); d.point((6, 15), fill=blush)
+        d.point((17, 15), fill=blush); d.point((18, 15), fill=blush)
+    elif mood == "shock":    # wide eyes, O mouth
+        for ex in (8, 15):
+            d.rectangle([ex - 1, 9, ex, 12], fill=eye)
+            d.point((ex - 1, 9), fill=SHELL)
+        d.rectangle([11, 15, 12, 18], fill=eye)
     return g.resize((FACE_GRID * scale, FACE_GRID * scale), Image.NEAREST)
 
 
@@ -138,4 +163,6 @@ if __name__ == "__main__":
     for m in ["great", "good", "ok", "tired", "dying", "dream", "blink"]:
         save(yolk_face(m, 4), f"../YOLK/faces/{m}.bmp")  # 96px, for the Lua apps
     save(title("YOLK ONLINE"), "../YOLK/img/title.bmp")
+    for m in ["great", "good", "ok", "tired", "dying", "dream", "blink", "talk", "sus", "love", "shock"]:
+        save(yolk_face(m, 3), f"../YOLK/talk/faces/{m}.bmp")  # 72px, Talk to YOLK
     print("art written to", ROOT)
