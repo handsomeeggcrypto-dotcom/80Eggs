@@ -1,0 +1,336 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>YOLK Terminal</title>
+<link rel="icon" href="faces/good.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=VT323&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0806; --scan: #100d09; --panel: #16120c; --line: #3a2c0c;
+    --yolk: #ffc21a; --dim: #8a6410; --shell: #f2eadb; --glitch: #ff3d6e; --link: #78dcff;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; }
+  body {
+    background: var(--bg);
+    background-image: repeating-linear-gradient(0deg, transparent 0 2px, var(--scan) 2px 4px);
+    color: var(--shell);
+    font: 24px/1.25 "VT323", ui-monospace, Menlo, monospace;
+    display: flex; flex-direction: column; min-height: 100vh;
+  }
+  .bar {
+    display: flex; align-items: center; gap: 16px; padding: 8px 16px;
+    background: #050403; border-bottom: 1px solid var(--dim);
+  }
+  .bar.bottom { border-bottom: 0; border-top: 1px solid var(--dim); margin-top: auto; }
+  .bar .title { color: var(--yolk); letter-spacing: .08em; }
+  .bar .title img { width: 24px; height: 24px; image-rendering: pixelated; vertical-align: -5px; margin-right: 8px; }
+  .bar .spacer { flex: 1; }
+  .pill { padding: 0 10px; border: 1px solid var(--line); color: var(--dim); }
+  .pill.on { color: var(--bg); background: var(--link); border-color: var(--link); }
+  .bottom .said { color: var(--yolk); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+  main { width: 100%; max-width: 900px; margin: 0 auto; padding: 32px 16px; }
+  .stage { display: grid; grid-template-columns: 200px 1fr; gap: 28px; align-items: start; }
+  .yolk { text-align: center; color: var(--dim); }
+  .yolk img { width: 192px; height: 192px; image-rendering: pixelated; display: block; margin: 0 auto 6px; }
+  .yolk.glitch img { filter: drop-shadow(4px 0 0 var(--glitch)) drop-shadow(-4px 0 0 var(--link)); }
+  .bubble {
+    position: relative; min-height: 150px; padding: 14px 18px;
+    background: var(--panel); border: 2px solid var(--yolk); font-size: 28px;
+  }
+  .bubble::before {
+    content: ""; position: absolute; left: -14px; top: 60px;
+    border: 7px solid transparent; border-right-color: var(--yolk);
+  }
+  .bubble .cursor { display: inline-block; width: .5em; background: var(--yolk); animation: blink 1s steps(1) infinite; }
+  @keyframes blink { 50% { opacity: 0; } }
+
+  .choices { margin-top: 28px; display: flex; flex-direction: column; gap: 6px; }
+  .choices button, .choices input {
+    font: inherit; text-align: left; color: var(--shell); background: transparent;
+    border: 0; padding: 6px 12px; cursor: pointer;
+  }
+  .choices button::before { content: "> "; color: var(--dim); }
+  .choices button:hover, .choices button:focus-visible, .choices button.sel {
+    background: var(--yolk); color: var(--bg); outline: none;
+  }
+  .choices button:hover::before, .choices button.sel::before { color: var(--bg); }
+  .choices .entry { display: flex; gap: 8px; }
+  .choices input {
+    flex: 1; cursor: text; background: var(--panel); border: 1px solid var(--dim); color: var(--yolk);
+  }
+  .choices input:focus { outline: 1px solid var(--yolk); }
+  .hint { color: var(--dim); font-size: 20px; margin-top: 14px; }
+
+  .moe { display: flex; gap: 18px; margin-top: 18px; align-items: flex-start; }
+  .moe img { width: 160px; border: 2px solid var(--yolk); }
+  .moe .tier { display: inline-block; padding: 0 8px; color: var(--bg); }
+  .moe ul { list-style: none; padding: 0; margin: 8px 0 0; font-size: 22px; }
+  .moe li span { color: var(--dim); }
+
+  @media (max-width: 640px) {
+    body { font-size: 22px; }
+    .stage { grid-template-columns: 1fr; gap: 12px; }
+    .yolk img { width: 128px; height: 128px; }
+    .bubble { font-size: 24px; }
+    .bubble::before { display: none; }
+    .moe { flex-direction: column; }
+  }
+</style>
+</head>
+<body>
+<div class="bar">
+  <span class="title"><img id="mini" src="faces/good.png" alt="">YOLK // DESKTOP NODE</span>
+  <span class="spacer"></span>
+  <span id="clock"></span>
+  <span class="pill" id="shell">SHELL: offline</span>
+</div>
+
+<main>
+  <div class="stage">
+    <div class="yolk" id="yolkbox"><img id="face" src="faces/blink.png" alt="YOLK">YOLK</div>
+    <div class="bubble" id="bubble" aria-live="polite"></div>
+  </div>
+  <div class="choices" id="choices"></div>
+  <div class="hint" id="hint">↑↓ pick · enter choose · click works too</div>
+  <div id="extra"></div>
+</main>
+
+<div class="bar bottom"><span class="said" id="said">YOLK&gt; ...</span></div>
+
+<script>
+const $ = id => document.getElementById(id);
+let L = {}, state = { memory: {}, shell: false }, mood = "good";
+
+// ------------------------------------------------------------ server
+async function api(path, body) {
+  const r = await fetch(path, body ? { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) } : {});
+  return r.json();
+}
+async function refresh() {
+  try { state = await api("/api/state"); } catch (e) { return; }
+  const pill = $("shell");
+  pill.textContent = state.shell ? "SHELL: linked" : "SHELL: offline";
+  pill.classList.toggle("on", state.shell);
+  mood = moodNow();
+  $("mini").src = `faces/${mood}.png`;
+}
+const remember = obj => api("/api/memory", obj).then(s => { state.memory = s.memory; });
+
+// ------------------------------------------------------------ helpers
+const pick = a => a[Math.floor(Math.random() * a.length)];
+const num = k => parseInt(state.memory[k] || "0", 10) || 0;
+const fill = s => s.replace(/\{name\}/g, state.memory.name || "you");
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+function moodNow() {
+  const b = state.battery;
+  if (b != null) return b < 10 ? "dying" : b < 30 ? "tired" : b < 55 ? "ok" : b < 80 ? "good" : "great";
+  const h = new Date().getHours();      // no battery on a desktop Mac: go by the hour
+  return h < 5 ? "tired" : h < 9 ? "ok" : "good";
+}
+
+function setFace(name) { $("face").src = `faces/${name}.png`; }
+
+// ------------------------------------------------------------ talking
+let skip = null;
+async function say(text, face = mood) {
+  text = fill(text);
+  $("said").textContent = "YOLK> " + text;
+  const b = $("bubble");
+  let done = false;
+  skip = () => { done = true; };
+  for (let i = 1; i <= text.length && !done; i++) {
+    b.textContent = text.slice(0, i);
+    setFace(Math.floor(i / 3) % 2 ? "talk" : face);
+    await sleep(text[i - 1] === "." ? 90 : 28);
+  }
+  b.innerHTML = "";
+  b.append(text, Object.assign(document.createElement("span"), { className: "cursor", innerHTML: "&nbsp;" }));
+  setFace(face);
+  skip = null;
+}
+
+function choose(options) {
+  return new Promise(resolve => {
+    const box = $("choices");
+    box.innerHTML = "";
+    options.forEach((label, i) => {
+      const b = document.createElement("button");
+      b.textContent = fill(label);
+      b.onclick = () => { box.innerHTML = ""; resolve(i); };
+      box.append(b);
+    });
+    box.firstChild && box.firstChild.focus();
+  });
+}
+
+function ask(placeholder, type = "text") {
+  return new Promise(resolve => {
+    const box = $("choices");
+    box.innerHTML = "";
+    const row = Object.assign(document.createElement("div"), { className: "entry" });
+    const input = Object.assign(document.createElement("input"), { type, placeholder, maxLength: 120 });
+    const ok = Object.assign(document.createElement("button"), { textContent: "send" });
+    const back = Object.assign(document.createElement("button"), { textContent: "never mind" });
+    const go = v => { box.innerHTML = ""; resolve(v); };
+    ok.onclick = () => go(input.value.trim());
+    back.onclick = () => go(null);
+    input.onkeydown = e => { if (e.key === "Enter") go(input.value.trim()); if (e.key === "Escape") go(null); };
+    row.append(input, ok);
+    box.append(row, back);
+    input.focus();
+  });
+}
+
+const next = () => choose(["next"]);
+
+// ------------------------------------------------------------ conversations
+async function firstMeeting() {
+  for (const [line, face] of L.first_meeting) { await say(line, face); await next(); }
+  await say("who are you?", "talk");
+  const name = await ask("type your name");
+  if (name) {
+    await remember({ name: name.slice(0, 16) });
+    await say("{name}. {name}. ok. i'm saving that forever. SHELL will know too.", "love");
+  } else {
+    await remember({ name: "nobody" });
+    await say("nobody. ok. nobody is my favorite.", "love");
+  }
+  await next();
+}
+
+async function greet() {
+  const now = Math.floor(Date.now() / 1000), last = num("last_seen"), h = new Date().getHours();
+  if (last && now - last > 3 * 86400) {
+    await say(pick(L.away).replace("{days}", Math.floor((now - last) / 86400)), "sus");
+  } else if (h < 5) {
+    const t = new Date().toTimeString().slice(0, 5);
+    await say(pick(L.late).replace("{time}", t), "sus");
+  } else {
+    await say(pick(L.hello), mood);
+  }
+  await next();
+  await say(pick(state.shell ? L.shell_here : L.shell_gone), state.shell ? "love" : "ok");
+  await next();
+}
+
+async function howAreYou() {
+  const b = state.battery;
+  const lines = {
+    dying: "bad. this computer is at " + b + "%. plug it in before we both go dark.",
+    tired: b != null ? b + "%. tired." : "it's late. i'm tired. i don't sleep but i get tired.",
+    ok: "fine. watching. waiting. you know.",
+    good: "good. systems nominal. yolk intact.",
+    great: b + "%! i feel like a fresh egg.",
+  };
+  await say(lines[mood] || lines.good, mood);
+  await next();
+  if (num("affection") >= 10) { await say("better now that you're here. don't make it weird.", "love"); await next(); }
+}
+
+async function oracle() {
+  await say("think of a question. a yes or no one. hold it in your head.", "sus");
+  await next();
+  await say("now poke the spin button. as much as you want. then ask.", "talk");
+  const faces = ["sus", "shock", "ok", "talk"];
+  let spins = 0;
+  while (true) {
+    const c = await choose([`spin${".".repeat(spins % 4)}`, "ask now"]);
+    if (c === 1) break;
+    spins++;
+    setFace(faces[spins % faces.length]);
+    $("yolkbox").classList.add("glitch");
+    setTimeout(() => $("yolkbox").classList.remove("glitch"), 120);
+  }
+  await say(pick(L.oracle), pick(["sus", "good", "shock", "ok"]));
+  await next();
+}
+
+async function moes() {
+  const fav = num("fav_moe");
+  await say(fav ? `your favorite is #${fav}. want to look at a different one?` : "there are 5250 moes. pick a number. any number.", "talk");
+  const v = await ask(fav ? String(fav) : "1 - 5250", "number");
+  if (v === null) return;
+  const n = Math.max(1, Math.min(5250, parseInt(v || fav || "1", 10) || 1));
+  const m = await api(`/api/moe/${n}`).catch(() => null);
+  if (!m || m.error) { await say("i can't find that one. weird. #" + n + " should exist.", "shock"); await next(); return; }
+  const colors = { MYTHIC: "#ff3d6e", LEGENDARY: "#ffc21a", EPIC: "#be6eff", RARE: "#3df5ff", COMMON: "#96a0be" };
+  $("extra").innerHTML = `
+    <div class="moe">
+      <img src="/moe/${n}.jpg" alt="Moe #${n}">
+      <div>MOE #${n}<br><span class="tier" style="background:${colors[m.tier]}">${m.tier}</span> rank ${m.rank} / 5250
+        <ul>${m.traits.map(t => `<li>${t.value} <span>${t.type} · ${t.pct}</span></li>`).join("")}</ul>
+      </div>
+    </div>`;
+  await say("#" + n + ". " + L.moe_tiers[m.tier].replace("{rank}", m.rank), m.tier === "COMMON" ? "love" : "shock");
+  const c = await choose(["make this my favorite", "just looking"]);
+  if (c === 0) { await remember({ fav_moe: n }); await say("#" + n + ". noted. SHELL will know next time it plugs in.", "love"); await next(); }
+  $("extra").innerHTML = "";
+}
+
+async function dream() {
+  await say("tell me something. next time SHELL charges, it'll dream it. and tell you about it.", "dream");
+  const text = await ask("a dream for SHELL");
+  if (!text) return;
+  const r = await api("/api/dream", { text });
+  await refresh();
+  await say(pick(r.sent ? L.dream_sent : L.dream_queued), "dream");
+  await next();
+}
+
+async function aboutShell() {
+  await refresh();
+  const v = num("visits"), d = num("desk_visits");
+  if (state.shell) await say(`SHELL's plugged in right now. you've talked to it ${v} times. me, ${d}. not that i'm counting. i'm counting.`, "sus");
+  else await say(`SHELL's not here. last i heard you'd talked to it ${v} times. plug it in and we'll sync.`, "ok");
+  await next();
+  if (state.queued) { await say(`i'm holding ${state.queued} dream${state.queued > 1 ? "s" : ""} for SHELL until it plugs in.`, "dream"); await next(); }
+}
+
+// ------------------------------------------------------------ main
+async function main() {
+  L = await api("/api/lines");
+  await refresh();
+  setInterval(refresh, 5000);
+  setInterval(() => { $("clock").textContent = new Date().toTimeString().slice(0, 5); }, 1000);
+  $("clock").textContent = new Date().toTimeString().slice(0, 5);
+
+  if (!state.memory.name) await firstMeeting(); else await greet();
+  await remember({ desk_visits: num("desk_visits") + 1 });
+
+  const topics = ["how are you?", "ask the oracle", "tell me a secret", "let's talk moes",
+                  "leave SHELL a dream", "how's SHELL?", "bye, yolk"];
+  while (true) {
+    await say(pick(["what do you want to talk about?", "so.", "anything else?", "i'm listening."]), mood);
+    const c = await choose(topics);
+    if (c === 0) await howAreYou();
+    else if (c === 1) await oracle();
+    else if (c === 2) { await say(pick(L.secrets), pick(["sus", "ok", "shock"])); await next(); }
+    else if (c === 3) await moes();
+    else if (c === 4) await dream();
+    else if (c === 5) await aboutShell();
+    else { await say(pick(L.goodbye), num("affection") >= 10 ? "love" : "ok"); await remember({}); await choose(["wake YOLK again"]); }
+    await remember({ affection: num("affection") + 1 });
+  }
+}
+
+// keyboard: arrows move through choices, any key finishes YOLK's sentence
+document.addEventListener("keydown", e => {
+  if (skip && !["Tab", "Shift"].includes(e.key)) { skip(); return; }
+  const btns = [...document.querySelectorAll("#choices button")];
+  if (!btns.length || document.activeElement.tagName === "INPUT") return;
+  const i = btns.indexOf(document.activeElement);
+  if (e.key === "ArrowDown") { e.preventDefault(); btns[(i + 1) % btns.length].focus(); }
+  if (e.key === "ArrowUp") { e.preventDefault(); btns[(i - 1 + btns.length) % btns.length].focus(); }
+});
+$("bubble").addEventListener("click", () => skip && skip());
+
+main();
+</script>
+</body>
+</html>

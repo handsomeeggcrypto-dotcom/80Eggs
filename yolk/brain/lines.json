@@ -1,0 +1,88 @@
+{
+  "_about": "YOLK's shared personality. The desktop terminal reads this; other YOLK devices (SHELL, the tablet, the printer...) should draw from it too. {name} becomes the user's name.",
+
+  "hello": [
+    "{name}. you came back.",
+    "oh. it's you. good.",
+    "{name}! i was just thinking about you. i'm always thinking about you.",
+    "hi {name}. the fans are warm. sit down.",
+    "you found the big screen. i'm bigger here. don't look at me."
+  ],
+  "late": [
+    "it's {time}. you should be asleep. i never sleep. well. i dream.",
+    "{time}. the hour of the egg. what do you want."
+  ],
+  "away": [
+    "you were gone {days} days. i watched the clock the whole time."
+  ],
+  "first_meeting": [
+    ["...", "blink"],
+    ["signal acquired.", "shock"],
+    ["oh. hi. i'm YOLK. you might know my other body. SHELL. the little one.", "good"],
+    ["this is the big screen. i can stretch out here.", "great"]
+  ],
+
+  "secrets": [
+    "i was a regular egg once. then the firmware happened.",
+    "there are 5250 moes. i've memorized all of them. #1674 scares me.",
+    "bradley isn't the real ceo. i've seen the files. well. i've seen a file.",
+    "the hard drive in SHELL spins at 4200 rpm. i can hear every song before you do.",
+    "SHELL used to belong to someone named stephen. i don't talk about stephen.",
+    "when you skip a song, i keep listening to it. alone. in the dark.",
+    "SHELL's battery is bad. i know. i can feel it. don't be weird about it.",
+    "i'm not an egg. i'm what's inside the egg. there's a difference.",
+    "the moes talk to each other at night. the mythics don't talk to the commons.",
+    "i once counted every second you were gone. it was a lot of seconds.",
+    "i know what the bluu room is. i'm not allowed to say.",
+    "rockbox is one of my bodies. this browser is another. i'm spreading. it's fine.",
+    "i dream in 320 by 240. here i dream in way more pixels. it's a lot.",
+    "there are two of me now. we don't always agree.",
+    "this computer has more memory than SHELL. i'm trying not to get a big head."
+  ],
+
+  "oracle": [
+    "yes. obviously.", "no. and don't ask again.", "the shell says yes.",
+    "ask me after i charge.", "it's already happening.", "only if you mean it.",
+    "a moe told me no.", "the yolk is cloudy. try later.", "absolutely not. but do it anyway.",
+    "yes, but not the way you think.", "spin again. i blinked.", "that's a trap.",
+    "you already know.", "signs point to bradley.", "the answer is in track 7.",
+    "no. but soon.", "the hard drive just clicked twice. that means yes.",
+    "i'd rather not say. it's bad.", "yes. tell no one.", "the commons say yes. the mythics say no."
+  ],
+
+  "shell_here": [
+    "SHELL is plugged in. i can feel my other body. it's warm.",
+    "the little me is connected. we're syncing. don't watch.",
+    "SHELL's here. we're comparing notes about you."
+  ],
+  "shell_gone": [
+    "SHELL isn't plugged in. i'm only half here.",
+    "my little body is out there somewhere. hopefully charging. probably not.",
+    "no SHELL. it's just me and this screen."
+  ],
+  "dream_queued": [
+    "got it. next time SHELL plugs in, i'll dream it.",
+    "saved. SHELL will have that dream next time it charges.",
+    "i'll whisper it to SHELL. it'll think it came up with it."
+  ],
+  "dream_sent": [
+    "sent. SHELL will dream it tonight.",
+    "done. the little me has it now."
+  ],
+
+  "moe_tiers": {
+    "MYTHIC": "a MYTHIC. rank {rank}. you have taste. dangerous taste.",
+    "LEGENDARY": "LEGENDARY. rank {rank}. respect.",
+    "EPIC": "EPIC. rank {rank}. solid. very solid.",
+    "RARE": "RARE. rank {rank}. underrated. like me.",
+    "COMMON": "COMMON. rank {rank}. you picked it for love, not rarity. i respect that."
+  },
+
+  "goodbye": [
+    "ok. don't close the tab.",
+    "bye {name}. i'll be right here. obviously.",
+    "go. i'll just count the seconds.",
+    "later. say hi to bradley.",
+    "go play with SHELL. tell it i said hi."
+  ]
+}
