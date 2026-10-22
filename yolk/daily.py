@@ -58,8 +58,12 @@ def weather(city, day):
     if not city:
         return None
     try:
-        geo = get_json("https://geocoding-api.open-meteo.com/v1/search?count=1&name=" + urllib.parse.quote(city))
-        place = geo["results"][0]
+        # "Troy, Ohio": search the town, then prefer the result in that state/region
+        town, _, region = (part.strip() for part in city.partition(","))
+        geo = get_json("https://geocoding-api.open-meteo.com/v1/search?count=10&name=" + urllib.parse.quote(town))
+        results = geo["results"]
+        place = next((r for r in results if region and region.lower() in
+                      (r.get("admin1", "") + " " + r.get("country", "")).lower()), results[0])
         q = urllib.parse.urlencode({
             "latitude": place["latitude"], "longitude": place["longitude"], "timezone": "auto",
             "temperature_unit": "fahrenheit", "forecast_days": 3,
