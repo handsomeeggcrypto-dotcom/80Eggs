@@ -3,6 +3,8 @@
      or run it from the file browser. Any button skips. ]]
 
 require "actions"
+dofile("/YOLK/usb.lua")  -- close and hand SHELL over when plugged in
+
 
 local W, H = rb.LCD_WIDTH, rb.LCD_HEIGHT
 local BG     = rb.lcd_rgbpack(10, 8, 6)

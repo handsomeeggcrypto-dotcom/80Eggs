@@ -7,6 +7,8 @@
      Rockbox Lua is integer-only, so positions are kept in 1/16 px (FP). ]]
 
 require "actions"
+dofile("/YOLK/usb.lua")  -- close and hand SHELL over when plugged in
+
 
 local A = rb.actions
 local W, H, HZ = rb.LCD_WIDTH, rb.LCD_HEIGHT, rb.HZ

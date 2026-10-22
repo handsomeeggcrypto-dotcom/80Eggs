@@ -7,6 +7,8 @@
      and YOLK picks them up next time. ]]
 
 require "actions"
+dofile("/YOLK/usb.lua")  -- close and hand SHELL over when plugged in
+
 
 local A = rb.actions
 local W, H, HZ = rb.LCD_WIDTH, rb.LCD_HEIGHT, rb.HZ
@@ -627,6 +629,10 @@ end
 math.randomseed(rb.current_tick() + (os.time and os.time() or 0))
 load_mem()
 load_dreams()
+YOLK_ON_USB = function()  -- keep what YOLK learned if you plug in mid-chat
+    mem.last_seen = os.time and os.time() or 0
+    save_mem()
+end
 mem.visits = num("visits") + 1
 
 if CHECKIN_ONLY then

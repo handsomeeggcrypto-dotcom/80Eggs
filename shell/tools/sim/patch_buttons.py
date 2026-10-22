@@ -2,7 +2,7 @@
 """Adds a scripted-input hook to Rockbox's SDL simulator (button-sdl.c).
 
 With SIMCMD=<file>, the simulator reads one command per line from that file:
-  select longselect menu play left right down up dump "wait N"
+  select longselect menu play left right down up dump usb unusb "wait N"
 (down/up turn the click wheel; dump saves a screenshot to the sim's disk).
 """
 import sys
@@ -35,6 +35,8 @@ static int simcmd_poll(void)
         held = 0;
         if (!strcmp(buf, "dump")) { sim_trigger_screendump(); return 0; }
         if (!strncmp(buf, "wait ", 5)) { wait = atoi(buf + 5); return 0; }
+        if (!strcmp(buf, "usb")) { sim_trigger_usb(true); return 0; }
+        if (!strcmp(buf, "unusb")) { sim_trigger_usb(false); return 0; }
         if (!strcmp(buf, "menu")) held = BUTTON_MENU;
         else if (!strcmp(buf, "select")) held = BUTTON_SELECT;
         else if (!strcmp(buf, "longselect")) { held = BUTTON_SELECT; hold = 120; return held; }

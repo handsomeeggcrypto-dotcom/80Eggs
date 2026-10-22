@@ -4,6 +4,8 @@
      hold select  type a number           menu         back / exit ]]
 
 require "actions"
+dofile("/YOLK/usb.lua")  -- close and hand SHELL over when plugged in
+
 
 local A = rb.actions
 local W, H, HZ = rb.LCD_WIDTH, rb.LCD_HEIGHT, rb.HZ
@@ -250,6 +252,7 @@ splash()
 math.randomseed(rb.current_tick() + (os.time and os.time() or 0))
 
 local n = load_last()
+YOLK_ON_USB = function() save_last(n) end  -- remember your place if you plug in mid-browse
 local m = moe(n)
 local pic = nil
 local need_pic = true
