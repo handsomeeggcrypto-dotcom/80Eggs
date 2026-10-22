@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pair with YOLK</title>
+<style>
+  body { margin: 0; min-height: 100vh; background: #0a0806; color: #f2eadb;
+         font: 28px/1.3 "VT323", ui-monospace, Menlo, monospace;
+         display: flex; align-items: center; justify-content: center; text-align: center; }
+  img { width: 160px; height: 160px; image-rendering: pixelated; }
+  h1 { color: #ffc21a; font-size: 40px; margin: 10px 0; letter-spacing: .1em; }
+  p { color: #8a6410; margin: 6px 16px 20px; }
+  input { font: inherit; font-size: 48px; width: 6.5em; text-align: center; letter-spacing: .3em;
+          background: #16120c; color: #ffc21a; border: 2px solid #ffc21a; padding: 8px; }
+  button { font: inherit; font-size: 32px; margin-top: 18px; padding: 10px 36px;
+           background: #ffc21a; color: #0a0806; border: 0; }
+  #msg { color: #ff3d6e; min-height: 1.3em; margin-top: 12px; }
+</style>
+</head>
+<body>
+<div>
+  <img id="face" src="faces/blink.png" alt="YOLK">
+  <h1>PAIR WITH YOLK</h1>
+  <p>enter the code from the mac<br>(desktop terminal: "pair a tablet")</p>
+  <input id="code" inputmode="numeric" maxlength="6" autocomplete="off" placeholder="000000"><br>
+  <button id="go">PAIR</button>
+  <div id="msg"></div>
+</div>
+<script>
+// plain old JavaScript on purpose: the tablet's browser is from 2015
+document.getElementById("go").onclick = function () {
+  var code = document.getElementById("code").value;
+  var xhr = new XMLHttpRequest();
+  xhr.open("POST", "/api/pair");
+  xhr.setRequestHeader("Content-Type", "application/json");
+  xhr.onload = function () {
+    if (xhr.status === 200) {
+      document.getElementById("face").src = "faces/good.png";
+      document.getElementById("msg").style.color = "#ffc21a";
+      document.getElementById("msg").textContent = "paired. hi.";
+      setTimeout(function () { location.href = "/station"; }, 900);
+    } else {
+      var err = "wrong code";
+      try { err = JSON.parse(xhr.responseText).error; } catch (e) {}
+      document.getElementById("msg").textContent = err;
+    }
+  };
+  xhr.send(JSON.stringify({ code: code }));
+};
+document.getElementById("code").onkeydown = function (e) { if (e.keyCode === 13) document.getElementById("go").onclick(); };
+</script>
+</body>
+</html>

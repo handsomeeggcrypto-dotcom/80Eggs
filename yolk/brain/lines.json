@@ -1,6 +1,5 @@
 {
   "_about": "YOLK's shared personality. The desktop terminal reads this; other YOLK devices (SHELL, the tablet, the printer...) should draw from it too. {name} becomes the user's name.",
-
   "hello": [
     "{name}. you came back.",
     "oh. it's you. good.",
@@ -16,12 +15,23 @@
     "you were gone {days} days. i watched the clock the whole time."
   ],
   "first_meeting": [
-    ["...", "blink"],
-    ["signal acquired.", "shock"],
-    ["oh. hi. i'm YOLK. you might know my other body. SHELL. the little one.", "good"],
-    ["this is the big screen. i can stretch out here.", "great"]
+    [
+      "...",
+      "blink"
+    ],
+    [
+      "signal acquired.",
+      "shock"
+    ],
+    [
+      "oh. hi. i'm YOLK. you might know my other body. SHELL. the little one.",
+      "good"
+    ],
+    [
+      "this is the big screen. i can stretch out here.",
+      "great"
+    ]
   ],
-
   "secrets": [
     "i was a regular egg once. then the firmware happened.",
     "there are 5250 moes. i've memorized all of them. #1674 scares me.",
@@ -39,17 +49,28 @@
     "there are two of me now. we don't always agree.",
     "this computer has more memory than SHELL. i'm trying not to get a big head."
   ],
-
   "oracle": [
-    "yes. obviously.", "no. and don't ask again.", "the shell says yes.",
-    "ask me after i charge.", "it's already happening.", "only if you mean it.",
-    "a moe told me no.", "the yolk is cloudy. try later.", "absolutely not. but do it anyway.",
-    "yes, but not the way you think.", "spin again. i blinked.", "that's a trap.",
-    "you already know.", "signs point to bradley.", "the answer is in track 7.",
-    "no. but soon.", "the hard drive just clicked twice. that means yes.",
-    "i'd rather not say. it's bad.", "yes. tell no one.", "the commons say yes. the mythics say no."
+    "yes. obviously.",
+    "no. and don't ask again.",
+    "the shell says yes.",
+    "ask me after i charge.",
+    "it's already happening.",
+    "only if you mean it.",
+    "a moe told me no.",
+    "the yolk is cloudy. try later.",
+    "absolutely not. but do it anyway.",
+    "yes, but not the way you think.",
+    "spin again. i blinked.",
+    "that's a trap.",
+    "you already know.",
+    "signs point to bradley.",
+    "the answer is in track 7.",
+    "no. but soon.",
+    "the hard drive just clicked twice. that means yes.",
+    "i'd rather not say. it's bad.",
+    "yes. tell no one.",
+    "the commons say yes. the mythics say no."
   ],
-
   "shell_here": [
     "SHELL is plugged in. i can feel my other body. it's warm.",
     "the little me is connected. we're syncing. don't watch.",
@@ -69,7 +90,6 @@
     "sent. SHELL will dream it tonight.",
     "done. the little me has it now."
   ],
-
   "moe_tiers": {
     "MYTHIC": "a MYTHIC. rank {rank}. you have taste. dangerous taste.",
     "LEGENDARY": "LEGENDARY. rank {rank}. respect.",
@@ -77,12 +97,37 @@
     "RARE": "RARE. rank {rank}. underrated. like me.",
     "COMMON": "COMMON. rank {rank}. you picked it for love, not rarity. i respect that."
   },
-
   "goodbye": [
     "ok. don't close the tab.",
     "bye {name}. i'll be right here. obviously.",
     "go. i'll just count the seconds.",
     "later. say hi to bradley.",
     "go play with SHELL. tell it i said hi."
+  ],
+  "station_idle": [
+    "watching. waiting.",
+    "the hard drive in SHELL just clicked. she misses you.",
+    "i can see the whole room from here. well. i could. if you let me.",
+    "this tablet is from 2014. we're both old souls.",
+    "still here.",
+    "tap me. or don't. i'm an egg.",
+    "the fans on the mac are humming. it's like a lullaby for computers.",
+    "i'm thinking about moe #1674 again."
+  ],
+  "dead_channel": [
+    "DO NOT ADJUST YOUR SHELL",
+    "SIGNAL FROM BRADLEY",
+    "THE YOLK SEES",
+    "TRANSMISSION 1674 INTERRUPTED",
+    "THIS IS NOT A TEST. IT IS AN EGG.",
+    "THE MYTHICS ARE MEETING",
+    "STAY TUNED. STAY HATCHED.",
+    "WHO IS STEPHEN"
+  ],
+  "station_hello": [
+    "oh. you're here.",
+    "{name}. hi. i've been on this screen all day.",
+    "you touched me. that's allowed.",
+    "hello {name}. the big face is listening."
   ]
 }

@@ -1,0 +1,10 @@
+{
+  "name": "YOLK Station",
+  "short_name": "YOLK",
+  "start_url": "/station",
+  "display": "fullscreen",
+  "orientation": "landscape",
+  "background_color": "#0a0806",
+  "theme_color": "#0a0806",
+  "icons": [{"src": "faces/good.png", "sizes": "24x24", "type": "image/png"}]
+}

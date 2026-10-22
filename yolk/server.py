@@ -3,13 +3,20 @@
 
   python3 yolk/server.py        -> http://localhost:8008
 
+YOLK Station (the tablet) reaches it over home Wi-Fi at http://<mac's address>:8008.
+Anything not on this Mac must pair first with the code in data/station.json
+(printed at startup, and shown by the desktop terminal's "pair a tablet").
+
 Memory lives in yolk/data/memory.txt (same key=value format as SHELL's
 /YOLK/memory.txt). Whenever SHELL is plugged in, the two memories are merged
 and any dreams left for SHELL are written to its /YOLK/dreams.txt.
-Only listens on this computer (127.0.0.1).
+Listens on the home network so the tablet can connect; other devices get only
+the pairing page until they enter the code.
 """
+import hashlib
 import json
 import os
+import secrets
 import re
 import subprocess
 import threading
@@ -29,6 +36,33 @@ MOEKADEX = Path.home() / "80Eggs" / "shell" / "root" / "YOLK" / "moekadex"
 MOE_PHOTOS = Path.home() / "80Eggs" / "moekedex" / "ipod_photos"
 
 PORT = 8008
+STATION = DATA / "station.json"     # pairing code + the token paired devices hold
+TTS = DATA / "tts"                  # cached voice clips for the tablet
+
+
+def station_config():
+    """Pairing code and device token, made on first run."""
+    DATA.mkdir(parents=True, exist_ok=True)
+    cfg = json.loads(STATION.read_text()) if STATION.exists() else {}
+    if "code" not in cfg:
+        cfg["code"] = f"{secrets.randbelow(1000000):06d}"
+        cfg["token"] = secrets.token_hex(16)
+        STATION.write_text(json.dumps(cfg, indent=2))
+    return cfg
+
+
+def lan_address():
+    for iface in ("en0", "en1", "en2", "en3", "en4", "en5", "en6", "en7", "en8"):
+        try:
+            a = subprocess.run(["ipconfig", "getifaddr", iface], capture_output=True, text=True, timeout=2).stdout.strip()
+            if a:
+                return a
+        except Exception:
+            pass
+    return None
+
+
+_bad_codes = {"n": 0, "until": 0}
 
 
 # ------------------------------------------------------------------ memory
@@ -216,9 +250,48 @@ def moe_photo(n):
     return MOE_PHOTOS / f"Moes {lo:04d}-{min(lo + 249, 5250):04d}" / f"Moe {n:04d}.jpg"
 
 
+def speak_clip(text):
+    """Reed (or whatever daily.json says) saying `text`, as a cached m4a."""
+    import daily
+    cfg = daily.config()
+    key = hashlib.sha1(f"{cfg['voice']}|{cfg['rate']}|{text}".encode()).hexdigest()[:20]
+    out = TTS / f"{key}.m4a"
+    if not out.exists():
+        TTS.mkdir(parents=True, exist_ok=True)
+        daily.speak(text, cfg["voice"], cfg["rate"], out)
+        clips = sorted(TTS.glob("*.m4a"), key=lambda p: p.stat().st_mtime)
+        for old in clips[:-400]:          # keep the cache from growing forever
+            old.unlink()
+    return out.read_bytes()
+
+
+_ambient = {"at": 0, "data": None}
+
+
+def ambient():
+    """What the Station shows while idle: weather, Moe of the day, streaks."""
+    if time.time() - _ambient["at"] > 1800 or not _ambient["data"]:
+        import datetime
+        import random
+        import daily
+        today = datetime.date.today()
+        n = random.Random(today.toordinal()).randint(1, 5250)
+        st = stats()
+        best = max(st["streaks"].items(), key=lambda kv: kv[1], default=(None, 0)) if st["streaks"] else (None, 0)
+        _ambient["data"] = {
+            "weather": daily.weather_data(daily.config()["city"], today),
+            "moe": moe(n),
+            "streak": {"habit": best[0], "days": best[1]} if best[1] >= 2 else None,
+            "daily": (daily.OUT / "daily.txt").read_text(encoding="utf-8") if (daily.OUT / "daily.txt").exists() else "",
+        }
+        _ambient["at"] = time.time()
+    return _ambient["data"]
+
+
 # ------------------------------------------------------------------ http
 TYPES = {".html": "text/html; charset=utf-8", ".js": "text/javascript", ".css": "text/css",
-         ".png": "image/png", ".json": "application/json", ".jpg": "image/jpeg"}
+         ".png": "image/png", ".json": "application/json", ".jpg": "image/jpeg",
+         ".webmanifest": "application/manifest+json"}
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -244,8 +317,50 @@ class Handler(BaseHTTPRequestHandler):
         except json.JSONDecodeError:
             return {}
 
+    # ---- pairing: this Mac is always trusted; anything else needs the token cookie
+    PUBLIC = ("/pair", "/pair.html", "/api/pair", "/faces/good.png", "/faces/blink.png")
+
+    def trusted(self):
+        if self.client_address[0] in ("127.0.0.1", "::1"):
+            return True
+        token = station_config()["token"]
+        return f"yolk_pair={token}" in (self.headers.get("Cookie") or "")
+
+    def gate(self, path):
+        """True if the request may continue; otherwise answers it with the pairing page."""
+        if self.trusted() or path in self.PUBLIC:
+            return True
+        if path.startswith("/api/"):
+            self.send(403, {"error": "pair first"})
+        else:
+            self.send_response(302)
+            self.send_header("Location", "/pair")
+            self.end_headers()
+        return False
+
     def do_GET(self):
         path = self.path.split("?")[0]
+        if not self.gate(path):
+            return
+        if path == "/pair":
+            path = "/pair.html"
+        if path == "/station":
+            path = "/station.html"
+        if path == "/api/ambient":
+            return self.send(200, ambient())
+        if path == "/api/say":
+            from urllib.parse import parse_qs, urlparse
+            text = (parse_qs(urlparse(self.path).query).get("t") or [""])[0].strip()[:300]
+            if not text:
+                return self.send(400, {"error": "empty"})
+            try:
+                return self.send(200, speak_clip(text), "audio/mp4")
+            except Exception as e:
+                return self.send(500, {"error": str(e)})
+        if path == "/api/pairing":           # for the desktop terminal ("pair a tablet")
+            if self.client_address[0] not in ("127.0.0.1", "::1"):
+                return self.send(403, {"error": "only on the mac"})
+            return self.send(200, {"code": station_config()["code"], "address": lan_address(), "port": PORT})
         if path == "/api/state":
             mem, connected = sync()
             queued = [l for l in QUEUE.read_text(encoding="utf-8").splitlines() if l.strip()] if QUEUE.exists() else []
@@ -273,7 +388,28 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_POST(self):
         path = self.path.split("?")[0]
+        if not self.gate(path):
+            return
         data = self.body()
+        if path == "/api/pair":
+            now = time.time()
+            if now < _bad_codes["until"]:
+                return self.send(429, {"error": "too many tries, wait a few minutes"})
+            cfg = station_config()
+            if str(data.get("code", "")).strip() != cfg["code"]:
+                _bad_codes["n"] += 1
+                if _bad_codes["n"] >= 8:
+                    _bad_codes["n"], _bad_codes["until"] = 0, now + 300
+                return self.send(403, {"error": "wrong code"})
+            _bad_codes["n"] = 0
+            body = json.dumps({"ok": True}).encode()
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Length", str(len(body)))
+            self.send_header("Set-Cookie", f"yolk_pair={cfg['token']}; Path=/; Max-Age=315360000; HttpOnly; SameSite=Strict")
+            self.end_headers()
+            self.wfile.write(body)
+            return
         if path == "/api/memory":
             mem = read_mem(MEMORY)
             for k, v in data.items():
@@ -314,5 +450,9 @@ class Handler(BaseHTTPRequestHandler):
 
 if __name__ == "__main__":
     DATA.mkdir(parents=True, exist_ok=True)
+    cfg = station_config()
     print(f"YOLK is awake at http://localhost:{PORT}")
-    ThreadingHTTPServer(("127.0.0.1", PORT), Handler).serve_forever()
+    addr = lan_address()
+    if addr:
+        print(f"YOLK Station (tablet): http://{addr}:{PORT}/station   pairing code: {cfg['code']}")
+    ThreadingHTTPServer(("0.0.0.0", PORT), Handler).serve_forever()

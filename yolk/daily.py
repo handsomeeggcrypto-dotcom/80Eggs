@@ -53,8 +53,8 @@ def get_json(url):
         return json.loads(r.read())
 
 
-def weather(city, day):
-    """One spoken sentence about `day`'s weather, or None."""
+def weather_data(city, day):
+    """{"place", "sky", "hi", "lo", "rain"} for `day`, or None."""
     if not city:
         return None
     try:
@@ -73,10 +73,18 @@ def weather(city, day):
         i = d["time"].index(day.isoformat())
     except Exception:
         return None
-    hi, lo = round(d["temperature_2m_max"][i]), round(d["temperature_2m_min"][i])
-    rain = d["precipitation_probability_max"][i] or 0
-    sky = WEATHER_CODES.get(d["weather_code"][i], "weather")
-    line = f"Weather in {place['name']}: {sky}, a high of {hi} and a low of {lo}."
+    return {"place": place["name"], "sky": WEATHER_CODES.get(d["weather_code"][i], "weather"),
+            "hi": round(d["temperature_2m_max"][i]), "lo": round(d["temperature_2m_min"][i]),
+            "rain": d["precipitation_probability_max"][i] or 0}
+
+
+def weather(city, day):
+    """One spoken sentence about `day`'s weather, or None."""
+    w = weather_data(city, day)
+    if not w:
+        return None
+    hi, lo, rain, sky = w["hi"], w["lo"], w["rain"], w["sky"]
+    line = f"Weather in {w['place']}: {sky}, a high of {hi} and a low of {lo}."
     if rain >= 60:
         line += f" {rain} percent chance of rain. Bring something. I can't come with you, I'm an egg."
     elif rain >= 30:

@@ -340,6 +340,14 @@ async function editHabits() {
   await next();
 }
 
+async function pairTablet() {
+  const p = await api("/api/pairing");
+  await say(`on the tablet, open http://${p.address}:${p.port}/station in chrome. the pairing code is ${p.code.split("").join(" ")}.`, "talk");
+  $("extra").innerHTML = `<div class="moe"><div>TABLET ADDRESS<br><span style="color:var(--yolk)">http://${p.address}:${p.port}/station</span><br><br>PAIRING CODE<br><span style="color:var(--yolk);font-size:48px;letter-spacing:.2em">${p.code}</span></div></div>`;
+  await next();
+  $("extra").innerHTML = "";
+}
+
 async function aboutShell() {
   await refresh();
   const v = num("visits"), d = num("desk_visits");
@@ -361,7 +369,7 @@ async function main() {
   await remember({ desk_visits: num("desk_visits") + 1 });
 
   const topics = ["how are you?", "how am i doing?", "ask the oracle", "tell me a secret", "let's talk moes",
-                  "leave SHELL a dream", "remind me tomorrow", "edit my habits", "how's SHELL?", "bye, yolk"];
+                  "leave SHELL a dream", "remind me tomorrow", "edit my habits", "how's SHELL?", "pair a tablet", "bye, yolk"];
   while (true) {
     await say(pick(["what do you want to talk about?", "so.", "anything else?", "i'm listening."]), mood);
     const c = await choose(topics);
@@ -374,6 +382,7 @@ async function main() {
     else if (c === 6) await remind();
     else if (c === 7) await editHabits();
     else if (c === 8) await aboutShell();
+    else if (c === 9) await pairTablet();
     else { await say(pick(L.goodbye), num("affection") >= 10 ? "love" : "ok"); await remember({}); await choose(["wake YOLK again"]); }
     await remember({ affection: num("affection") + 1 });
   }
