@@ -21,14 +21,26 @@ local skipped = false
 -- buttons are ignored for the first half second, so releasing the button
 -- that launched this doesn't count as a skip
 local listen_from = rb.current_tick() + rb.HZ / 2
--- sleeps for `ticks`, but bails out the moment any button is pressed
+
+-- only real presses count. Rockbox also sends system events (disk, battery,
+-- charger...) through the same call, and they pile up right after power-on.
+local A = rb.actions
+local BUTTONS = {}
+for _, k in ipairs({ "PLA_SELECT", "PLA_SELECT_REL", "PLA_UP", "PLA_DOWN", "PLA_LEFT", "PLA_RIGHT",
+                     "PLA_SCROLL_FWD", "PLA_SCROLL_BACK", "PLA_CANCEL", "PLA_EXIT" }) do
+    if A[k] then BUTTONS[A[k]] = true end
+end
+local function button_pressed()
+    local a = rb.get_plugin_action(0)
+    return rb.current_tick() >= listen_from and BUTTONS[a] == true
+end
+
+-- sleeps for `ticks`, but bails out the moment a button is pressed
 local function pause(ticks)
     if skipped then return end
     local stop = rb.current_tick() + ticks
     repeat
-        local a = rb.get_plugin_action(0)
-        if rb.current_tick() >= listen_from and a ~= rb.actions.ACTION_NONE
-            and a ~= rb.actions.ACTION_UNKNOWN and a ~= nil then
+        if button_pressed() then
             skipped = true
             return
         end
@@ -225,8 +237,23 @@ local function wake()
     frame(face);        pause(120)
     frame(blink);       pause(10)
     frame(face);        pause(150)
-    frame(blink);       pause(10)
-    frame(face);        pause(200)
+    -- then YOLK waits for you (up to ~8 more seconds), blinking now and then
+    if skipped then return end
+    skipped = false
+    local stop = rb.current_tick() + rb.HZ * 8
+    local next_blink = rb.current_tick() + rb.HZ * 2
+    text(DIM, "o  continue", nil, H - 20)
+    rb.lcd_update()
+    while rb.current_tick() < stop do
+        if button_pressed() then return end
+        if rb.current_tick() >= next_blink then
+            frame(blink); text(DIM, "o  continue", nil, H - 20); rb.lcd_update()
+            rb.sleep(rb.HZ / 10)
+            frame(face); text(DIM, "o  continue", nil, H - 20); rb.lcd_update()
+            next_blink = rb.current_tick() + rb.HZ * 3
+        end
+        rb.sleep(2)
+    end
 end
 
 ---------------------------------------------------------------- run
