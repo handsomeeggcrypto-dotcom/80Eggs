@@ -125,6 +125,14 @@ def script(day, cfg):
     if rem:
         lines.append("You told me to remind you:" if len(rem) > 1 else "You told me to remind you of something.")
         lines += [f"{r.rstrip('.')}." for r in rem]
+    st = server.stats()
+    if st["entries"]:
+        best = max(st["streaks"].items(), key=lambda kv: kv[1], default=(None, 0))
+        if best[1] >= 2:
+            lines.append(f"Streak report: {best[0]}, {best[1]} days in a row. Don't break it. I'll know.")
+        latest = st["entries"][-1]
+        if latest.get("mood") and latest["mood"] <= 2:
+            lines.append("Last check-in you said it was a rough one. New day. I'm rooting for you.")
     m = moe_of_the_day(day)
     if m:
         lines.append(m)

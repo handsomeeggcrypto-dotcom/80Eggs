@@ -72,6 +72,17 @@
   .moe ul { list-style: none; padding: 0; margin: 8px 0 0; font-size: 22px; }
   .moe li span { color: var(--dim); }
 
+  .stats { margin-top: 18px; }
+  .stats .days { display: flex; gap: 10px; margin-bottom: 14px; }
+  .stats .day { text-align: center; font-size: 18px; color: var(--dim); width: 44px; }
+  .stats .day img { width: 40px; height: 40px; image-rendering: pixelated; display: block; margin: 0 auto 2px; }
+  .stats .day .none { width: 40px; height: 40px; border: 1px dashed var(--line); margin: 0 auto 2px; }
+  .stats table { border-collapse: collapse; font-size: 22px; }
+  .stats td { padding: 2px 12px 2px 0; }
+  .stats .dot { display: inline-block; width: 12px; height: 12px; margin-right: 4px; border: 1px solid var(--dim); }
+  .stats .dot.on { background: var(--yolk); border-color: var(--yolk); }
+  .stats .streak { color: var(--yolk); }
+
   @media (max-width: 640px) {
     body { font-size: 22px; }
     .stage { grid-template-columns: 1fr; gap: 12px; }
@@ -292,6 +303,43 @@ async function remind() {
   await next();
 }
 
+const MOOD_FACE = [null, "dying", "tired", "ok", "good", "great"];
+const MOOD_WORD = [null, "rough", "meh", "okay", "good", "great"];
+
+async function progress() {
+  const st = await api("/api/stats");
+  if (!st.entries.length) {
+    await say("no check-ins yet. do one on SHELL: shortcuts, CHECK IN. then plug it in here.", "sus");
+    await next(); return;
+  }
+  const last = st.entries.length - 1;
+  const days = st.entries.map((e, i) => {
+    const label = i === last ? "latest" : `-${last - i}`;
+    return `<div class="day">${e.mood ? `<img src="faces/${MOOD_FACE[e.mood]}.png" alt="${MOOD_WORD[e.mood]}">` : `<div class="none"></div>`}${label}</div>`;
+  }).join("");
+  const rows = st.habits.map(h => {
+    const dots = st.entries.map(e => `<span class="dot${e.habits.includes(h) ? " on" : ""}"></span>`).join("");
+    const n = st.streaks[h] || 0;
+    return `<tr><td>${h}</td><td>${dots}</td><td class="streak">${n ? n + " day" + (n > 1 ? "s" : "") : ""}</td></tr>`;
+  }).join("");
+  $("extra").innerHTML = `<div class="stats"><div class="days">${days}</div><table>${rows}</table></div>`;
+  const best = Object.entries(st.streaks).sort((a, b) => b[1] - a[1])[0];
+  await say(`last 7 check-ins, mood averaging ${st.mood_avg} out of 5.` + (best && best[1] > 1 ? ` best streak: ${best[0]}, ${best[1]} days.` : ""), st.mood_avg >= 3.5 ? "good" : "ok");
+  await next();
+  if (best && best[1] >= 5) { await say(`${best[1]} days of ${best[0]}. i'm not crying. eggs can't cry.`, "love"); await next(); }
+  $("extra").innerHTML = "";
+}
+
+async function editHabits() {
+  const st = await api("/api/stats");
+  await say(`your habits are: ${st.habits.join(", ")}. type the new list, commas between. SHELL gets it next time it plugs in.`, "talk");
+  const text = await ask(st.habits.join(", "));
+  if (!text) return;
+  const r = await api("/api/habits", { habits: text.split(",") });
+  if (r.habits) await say("updated: " + r.habits.join(", ") + ".", "good");
+  await next();
+}
+
 async function aboutShell() {
   await refresh();
   const v = num("visits"), d = num("desk_visits");
@@ -312,18 +360,20 @@ async function main() {
   if (!state.memory.name) await firstMeeting(); else await greet();
   await remember({ desk_visits: num("desk_visits") + 1 });
 
-  const topics = ["how are you?", "ask the oracle", "tell me a secret", "let's talk moes",
-                  "leave SHELL a dream", "remind me tomorrow", "how's SHELL?", "bye, yolk"];
+  const topics = ["how are you?", "how am i doing?", "ask the oracle", "tell me a secret", "let's talk moes",
+                  "leave SHELL a dream", "remind me tomorrow", "edit my habits", "how's SHELL?", "bye, yolk"];
   while (true) {
     await say(pick(["what do you want to talk about?", "so.", "anything else?", "i'm listening."]), mood);
     const c = await choose(topics);
     if (c === 0) await howAreYou();
-    else if (c === 1) await oracle();
-    else if (c === 2) { await say(pick(L.secrets), pick(["sus", "ok", "shock"])); await next(); }
-    else if (c === 3) await moes();
-    else if (c === 4) await dream();
-    else if (c === 5) await remind();
-    else if (c === 6) await aboutShell();
+    else if (c === 1) await progress();
+    else if (c === 2) await oracle();
+    else if (c === 3) { await say(pick(L.secrets), pick(["sus", "ok", "shock"])); await next(); }
+    else if (c === 4) await moes();
+    else if (c === 5) await dream();
+    else if (c === 6) await remind();
+    else if (c === 7) await editHabits();
+    else if (c === 8) await aboutShell();
     else { await say(pick(L.goodbye), num("affection") >= 10 ? "love" : "ok"); await remember({}); await choose(["wake YOLK again"]); }
     await remember({ affection: num("affection") + 1 });
   }

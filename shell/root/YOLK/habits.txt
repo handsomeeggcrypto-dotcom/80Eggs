@@ -1,0 +1,5 @@
+water
+walk
+meditate
+draw
+sleep

@@ -19,7 +19,7 @@ from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 STATIC = HERE / "static"
-DATA = HERE / "data"            # personal; not in git
+DATA = Path(os.environ.get("YOLK_DATA", HERE / "data"))  # personal; not in git
 MEMORY = DATA / "memory.txt"
 QUEUE = DATA / "dreams_queue.txt"
 SENT = DATA / "dreams_sent.txt"
@@ -68,6 +68,66 @@ def merge(desk, shell):
     return out
 
 
+# ------------------------------------------------------------------ check-ins
+# One line per day: "day|time|mood|habit,habit". `day` comes from SHELL's own
+# clock (unix time / 86400), so it only matches the calendar once that's set.
+LOG = DATA / "log.txt"
+HABITS = DATA / "habits.txt"
+DEFAULT_HABITS = ["water", "walk", "meditate", "draw", "sleep"]
+
+
+def read_log(path):
+    entries = {}
+    if path.exists():
+        for line in path.read_text(encoding="latin-1").splitlines():
+            m = re.match(r"^(\d+)\|(\d+)\|(\d)\|(.*)$", line)
+            if m:
+                d, t, mood, h = int(m[1]), int(m[2]), int(m[3]), [x for x in m[4].split(",") if x]
+                if d not in entries or t >= entries[d]["time"]:
+                    entries[d] = {"day": d, "time": t, "mood": mood, "habits": h}
+    return entries
+
+
+def write_log(path, entries):
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text("".join(f"{e['day']}|{e['time']}|{e['mood']}|{','.join(sorted(e['habits']))}\n"
+                            for _, e in sorted(entries.items())), encoding="latin-1")
+
+
+def habits():
+    if HABITS.exists():
+        h = [l.strip() for l in HABITS.read_text(encoding="utf-8").splitlines() if l.strip()]
+        if h:
+            return h
+    return DEFAULT_HABITS
+
+
+def streak(entries, habit, last_day):
+    """Consecutive days ending at the latest check-in (or the one before it)."""
+    d = last_day if habit in entries.get(last_day, {}).get("habits", []) else last_day - 1
+    n = 0
+    while habit in entries.get(d, {}).get("habits", []):
+        n += 1
+        d -= 1
+    return n
+
+
+def stats():
+    entries = read_log(LOG)
+    if not entries:
+        return {"habits": habits(), "entries": [], "streaks": {}, "mood_avg": None}
+    last = max(entries)
+    recent = [entries.get(d) for d in range(last - 6, last + 1)]
+    moods = [e["mood"] for e in recent if e]
+    return {
+        "habits": habits(),
+        "entries": [e or {"day": last - 6 + i, "mood": None, "habits": []} for i, e in enumerate(recent)],
+        "streaks": {h: streak(entries, h, last) for h in habits()},
+        "mood_avg": round(sum(moods) / len(moods), 1) if moods else None,
+        "total": len(entries),
+    }
+
+
 def shell_connected():
     return SHELL.is_dir()
 
@@ -81,6 +141,17 @@ def sync():
     mem = merge(desk, shell)
     write_mem(MEMORY, mem)
     write_mem(SHELL / "memory.txt", mem)
+    # check-ins: union of both sides (newest wins per day), kept on both, so the
+    # Mac also holds a backup for after SHELL's storage swap
+    log = read_log(LOG)
+    for d, e in read_log(SHELL / "log.txt").items():
+        if d not in log or e["time"] >= log[d]["time"]:
+            log[d] = e
+    if log:
+        write_log(LOG, log)
+        write_log(SHELL / "log.txt", log)
+    if HABITS.exists():
+        (SHELL / "habits.txt").write_text(HABITS.read_text(encoding="utf-8"), encoding="latin-1", errors="replace")
     if QUEUE.exists() and QUEUE.read_text().strip():
         dreams = [l for l in QUEUE.read_text(encoding="utf-8").splitlines() if l.strip()]
         with open(SHELL / "dreams.txt", "a", encoding="latin-1", errors="replace") as f:
@@ -180,6 +251,8 @@ class Handler(BaseHTTPRequestHandler):
             queued = [l for l in QUEUE.read_text(encoding="utf-8").splitlines() if l.strip()] if QUEUE.exists() else []
             return self.send(200, {"memory": mem, "shell": connected, "queued": len(queued),
                                    "battery": mac_battery(), "now": int(time.time())})
+        if path == "/api/stats":
+            return self.send(200, stats())
         if path == "/api/lines":
             return self.send(200, (HERE / "brain" / "lines.json").read_bytes())
         m = re.match(r"^/api/moe/(\d+)$", path)
@@ -210,6 +283,15 @@ class Handler(BaseHTTPRequestHandler):
             write_mem(MEMORY, mem)
             mem, connected = sync()
             return self.send(200, {"memory": mem, "shell": connected})
+        if path == "/api/habits":
+            items = [re.sub(r"[|,\n]", "", str(h)).strip().lower()[:20] for h in data.get("habits", [])]
+            items = [h for h in items if h][:12]
+            if not items:
+                return self.send(400, {"error": "empty"})
+            DATA.mkdir(parents=True, exist_ok=True)
+            HABITS.write_text("\n".join(items) + "\n", encoding="utf-8")
+            sync()
+            return self.send(200, {"habits": items})
         if path == "/api/remind":
             text = str(data.get("text", "")).replace("\n", " ").strip()[:200]
             if not text:

@@ -461,6 +461,162 @@ local function today()
     say("it's also in your music, under YOLK Daily, if you'd rather listen.", "good")
 end
 
+
+---------------------------------------------------------------- check-in
+-- One entry per day in /YOLK/log.txt: "day|time|mood|habit,habit".
+-- day counts from SHELL's own clock, so streaks work even before the clock is
+-- set right (they just won't line up with the calendar until it is).
+local MOODS = {
+    { "rough", "dying" }, { "meh", "tired" }, { "okay", "ok" }, { "good", "good" }, { "great", "great" },
+}
+
+local function today_n()
+    local t = os.time and os.time() or 0
+    return t / 86400, t
+end
+
+local function read_log()
+    local entries = {}
+    local f = io.open(DIR .. "log.txt", "r")
+    if not f then return entries end
+    for line in f:lines() do
+        local d, t, m, h = line:match("^(%d+)|(%d+)|(%d)|(.*)$")
+        if d then
+            local set = {}
+            for name in h:gmatch("[^,]+") do set[name] = true end
+            entries[#entries + 1] = { day = tonumber(d), time = tonumber(t), mood = tonumber(m), habits = set, raw = h }
+        end
+    end
+    f:close()
+    return entries
+end
+
+local function write_log(entries)
+    local f = io.open(DIR .. "log.txt", "w")
+    if not f then return end
+    for _, e in ipairs(entries) do
+        local names = {}
+        for name in pairs(e.habits) do names[#names + 1] = name end
+        table.sort(names)
+        f:write(e.day .. "|" .. e.time .. "|" .. e.mood .. "|" .. table.concat(names, ",") .. "\n")
+    end
+    f:close()
+end
+
+local function habit_list()
+    local list = {}
+    local f = io.open(DIR .. "habits.txt", "r")
+    if f then
+        for line in f:lines() do
+            local h = line:gsub("^%s+", ""):gsub("%s+$", ""):lower():gsub("[|,]", "")
+            if h ~= "" then list[#list + 1] = h end
+        end
+        f:close()
+    end
+    if #list == 0 then list = { "water", "walk", "meditate", "draw", "sleep" } end
+    return list
+end
+
+-- consecutive days (ending today, or yesterday if today isn't done yet) with `habit`
+local function streak(entries, habit, today)
+    local by_day = {}
+    for _, e in ipairs(entries) do by_day[e.day] = e end
+    local d = today
+    if not (by_day[d] and by_day[d].habits[habit]) then d = d - 1 end
+    local n = 0
+    while by_day[d] and by_day[d].habits[habit] do n = n + 1; d = d - 1 end
+    return n
+end
+
+local function mood_dial(start)
+    local m = start or 3
+    rb.get_plugin_action(HZ / 5)
+    while true do
+        draw_frame(MOODS[m][2], wrap("how are you feeling today?", COLS))
+        local label = string.rep("<", m > 1 and 1 or 0) .. " " .. m .. "  " .. MOODS[m][1] .. " " .. (m < 5 and ">" or "")
+        rect(YOLK, 6, OY + 10, W - 12, CH + 8)
+        text(BG, label, (W - #label * CW) / 2, OY + 14)
+        text(DIM, "spin to pick . o to choose", 12, H - CH - 6)
+        rb.lcd_update()
+        local a = rb.get_plugin_action(-1)
+        if a == A.PLA_SCROLL_FWD then if m < 5 then m = m + 1 end
+        elseif a == A.PLA_SCROLL_BACK then if m > 1 then m = m - 1 end
+        elseif a == A.PLA_SELECT_REL or a == A.PLA_RIGHT then return m
+        elseif a == A.PLA_UP then return nil end
+    end
+end
+
+local function habit_checklist(habits, done)
+    local items = {}
+    for _, h in ipairs(habits) do items[#items + 1] = h end
+    items[#items + 1] = "-- done --"
+    local sel, top = 1, 1
+    local rows = math.floor((H - OY - 4) / (CH + 4))
+    rb.get_plugin_action(HZ / 5)
+    while true do
+        draw_frame("talk", wrap("what did you do today? check them off.", COLS))
+        if sel < top then top = sel elseif sel >= top + rows then top = sel - rows + 1 end
+        for i = top, math.min(#items, top + rows - 1) do
+            local y = OY + (i - top) * (CH + 4)
+            local h = items[i]
+            local label = i == #items and h or ((done[h] and "[x] " or "[ ] ") .. h)
+            if i == sel then rect(YOLK, 6, y - 2, W - 12, CH + 4); text(BG, label, 12, y)
+            else text(done[h] and YOLK or SHELL, label, 12, y) end
+        end
+        rb.lcd_update()
+        local a = rb.get_plugin_action(-1)
+        if a == A.PLA_SCROLL_FWD or a == A.PLA_SCROLL_FWD_REPEAT then sel = sel % #items + 1
+        elseif a == A.PLA_SCROLL_BACK or a == A.PLA_SCROLL_BACK_REPEAT then sel = (sel + #items - 2) % #items + 1
+        elseif a == A.PLA_SELECT_REL or a == A.PLA_RIGHT then
+            if sel == #items then return done end
+            done[items[sel]] = not done[items[sel]] or nil
+        elseif a == A.PLA_UP then return nil end
+    end
+end
+
+local function checkin()
+    local today, now = today_n()
+    local entries = read_log()
+    local entry
+    for _, e in ipairs(entries) do if e.day == today then entry = e end end
+    if entry then say("you already checked in today. want to change anything?", "sus")
+    else say(pick({ "check-in time. this is the part where i learn things about you.",
+                    "daily check-in. be honest. i'll know if you're not.", "hi. report in." }), "talk") end
+
+    local mood = mood_dial(entry and entry.mood or 3)
+    if not mood then return end
+    local done = {}
+    if entry then for h in pairs(entry.habits) do done[h] = true end end
+    local habits = habit_list()
+    done = habit_checklist(habits, done)
+    if not done then return end
+
+    if not entry then entry = { day = today }; entries[#entries + 1] = entry end
+    entry.time, entry.mood, entry.habits = now, mood, done
+    write_log(entries)
+
+    local mood_lines = {
+        "rough day. i'm sorry. i'm right here. well. in here.",
+        "meh. noted. tomorrow's a new egg.",
+        "okay is okay. okay?",
+        "good. i like good.",
+        "great! i knew it. i could feel it through the click wheel.",
+    }
+    say(mood_lines[mood], MOODS[mood][2])
+    local best, best_n, count = nil, 0, 0
+    for _, h in ipairs(habits) do
+        if done[h] then
+            count = count + 1
+            local n = streak(entries, h, today)
+            if n > best_n then best, best_n = h, n end
+        end
+    end
+    if count == 0 then say("nothing checked off. that's allowed. resting is a habit too.", "ok")
+    elseif best_n >= 2 then say(best .. ": " .. best_n .. " days in a row. i'm keeping track. obviously.", "love")
+    else say(count .. " done today. that's " .. count .. " more than an egg does.", "good") end
+    mem.checkins = num("checkins") + 1
+end
+
 local function goodbye()
     local byes = { "ok. don't unplug me.", "bye {name}. i'll be right here. obviously.",
                    "go. i'll just count the seconds.", "later. say hi to bradley." }
@@ -473,20 +629,31 @@ load_mem()
 load_dreams()
 mem.visits = num("visits") + 1
 
+if CHECKIN_ONLY then
+    if not mem.name then intro() end
+    checkin()
+    say(pick({ "ok. go live your life.", "saved. see you tomorrow.", "logged. i'll remember." }), "good")
+    mem.last_seen = os.time and os.time() or 0
+    save_mem()
+    rb.lcd_set_drawmode(3)
+    return
+end
+
 if not mem.name then intro() else greet() end
 
-local topics = { "how are you?", "what's today?", "ask the oracle", "tell me a secret",
+local topics = { "check in", "how are you?", "what's today?", "ask the oracle", "tell me a secret",
                  "what am i listening to?", "let's talk moes", "bye, yolk" }
 while true do
     local c = choose(pick({ "what do you want to talk about?", "so.", "anything else?", "i'm listening." }),
                      mood_face(), topics)
-    if c == nil or c == 7 then goodbye(); break
-    elseif c == 1 then how_are_you()
-    elseif c == 2 then today()
-    elseif c == 3 then oracle()
-    elseif c == 4 then say(pick(SECRETS), pick({ "sus", "ok", "shock" }))
-    elseif c == 5 then music()
-    elseif c == 6 then moes() end
+    if c == nil or c == 8 then goodbye(); break
+    elseif c == 1 then checkin()
+    elseif c == 2 then how_are_you()
+    elseif c == 3 then today()
+    elseif c == 4 then oracle()
+    elseif c == 5 then say(pick(SECRETS), pick({ "sus", "ok", "shock" }))
+    elseif c == 6 then music()
+    elseif c == 7 then moes() end
     mem.affection = num("affection") + 1
 end
 
