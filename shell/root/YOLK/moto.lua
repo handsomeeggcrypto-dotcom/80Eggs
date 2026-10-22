@@ -49,6 +49,7 @@ local star_img, ring_img, title = bmp("star", true), bmp("ring", true), bmp("tit
 local yolk = {}
 for _, m in ipairs({ "great", "good", "ok", "sus", "shock", "love", "dying" }) do yolk[m] = bmp("yolk_" .. m, true) end
 
+local FRONT_Y = 160   -- the see-through strip only covers the bottom of the screen (gen_moto.py)
 local BACK_W = back and back:width() or W
 local FRONT_W = front and front:width() or W
 
@@ -63,15 +64,17 @@ local function shadow_text(c, s, x, y) text(C.shade, s, x + 1, y + 1); text(c, s
 local function blit(img, x, y) if img then rb.lcd_bitmap_transparent(img, x, y, img:width(), img:height()) end end
 local function rnd(a, b) return math.random(a, b) end
 
--- horizontally tiled scrolling layer
-local function scroll_layer(img, imgw, off, transparent)
+-- horizontally tiled scrolling layer, drawn at screen row y
+local function scroll_layer(img, imgw, off, transparent, y)
     if not img then return end
+    y = y or 0
+    local h = img:height()
     off = off % imgw
     local first = imgw - off
     if first > W then first = W end
     local f = transparent and rb.lcd_bitmap_transparent_part or rb.lcd_bitmap_part
-    f(img, off, 0, imgw, 0, 0, first, H)
-    if first < W then f(img, 0, 0, imgw, first, 0, W - first, H) end
+    f(img, off, 0, imgw, 0, y, first, h)
+    if first < W then f(img, 0, 0, imgw, first, y, W - first, h) end
 end
 
 local function load_best()
@@ -262,24 +265,25 @@ end
 
 local function draw_world()
     local d = dist / FP
-    scroll_layer(back, BACK_W, d / 10, false)
-    scroll_layer(front, FRONT_W, d * 6 / 10, true)
+    scroll_layer(back, BACK_W, d / 5, false)
+    scroll_layer(front, FRONT_W, d * 8 / 10, true, FRONT_Y)
     for _, s in ipairs(segs) do
         local sx = s.x - d
         if sx < W and sx + s.w > 0 then draw_road(s, sx) end
     end
     for _, r in ipairs(rings) do
-        if not r.got then blit(ring_img, r.x - d - 20 + PX, r.y - 20) end
+        if not r.got then blit(ring_img, r.x - d - 20, r.y - 20) end
     end
     for _, s in ipairs(stars) do
-        if not s.got then blit(star_img, s.x - d - 5 + PX, s.y - 5) end
+        if not s.got then blit(star_img, s.x - d - 5, s.y - 5) end
     end
     for _, hz in ipairs(hazards) do
-        if not hz.dead then blit(hay[hz.h], hz.x - d + PX, hz.top - hz.h) end
+        if not hz.dead then blit(hay[hz.h], hz.x - d, hz.top - hz.h) end
     end
 end
 
 local bob_t = 0
+local fps, fps_frames, fps_since = 0, 0, 0
 local function draw_player()
     local img
     if not p.alive then img = ride.crash
@@ -305,6 +309,7 @@ local function draw_hud()
     local ready = p.dash_cd == 0
     rect(C.dirt_dark, 60, 9, 42, 6)
     rect(ready and C.dash or C.lip, 61, 10, ready and 40 or 40 - 40 * p.dash_cd / DASH_CD, 4)
+    text(C.dirt_top, fps .. "fps", 120, 4)
     blit(star_img, W - 52, 6)
     text(C.yolk, tostring(got_stars), W - 38, 4)
     -- YOLK's commentary, just under the strip
@@ -333,7 +338,7 @@ local function title_screen()
     local t = 0
     while true do
         scroll_layer(back, BACK_W, t / 4, false)
-        scroll_layer(front, FRONT_W, t, true)
+        scroll_layer(front, FRONT_W, t, true, FRONT_Y)
         rect(C.dirt, 0, GROUND, W, H - GROUND); rect(C.dirt_top, 0, GROUND, W, 3); rect(C.grass, 0, GROUND - 1, W, 2)
         if title then blit(title, (W - title:width()) / 2, 18) end
         center(C.white, "MINI . for SHELL", 56)
@@ -383,7 +388,7 @@ local function run()
     while true do
         local now = rb.current_tick()
         local dt = now - last
-        if dt < 1 then dt = 1 elseif dt > 6 then dt = 6 end
+        if dt < 1 then dt = 1 elseif dt > 12 then dt = 12 end
         last = now
         bob_t = bob_t + dt
 
@@ -402,11 +407,18 @@ local function run()
         end
 
         generate()
-        update(dt)
+        local left = dt
+        while left > 0 do
+            local step = left > 3 and 3 or left
+            update(step)
+            left = left - step
+        end
         draw_world()
         draw_player()
         draw_hud()
         rb.lcd_update()
+        fps_frames = fps_frames + 1
+        if now - fps_since >= HZ then fps, fps_frames, fps_since = fps_frames, 0, now end
 
         if not p.alive and p.dead_t > HZ then return game_over() end
         -- ~30 frames a second

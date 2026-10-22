@@ -42,14 +42,18 @@ def layer(name, h=240):
     return im.resize((round(im.width * h / im.height), h), Image.LANCZOS)
 
 
+FRONT_TOP = 160   # the near layer (fences, flowers) only has content below this row
+
+
 def backgrounds():
-    # sky + far baked into one solid layer (slow scroll), mid + near into one see-through layer
+    # see-through layers are slow to draw on SHELL, so sky + far + mid are baked into
+    # one solid layer, and only the bottom strip of the near layer stays see-through
     back = layer("sky")
     back.alpha_composite(layer("far"))
+    back.alpha_composite(layer("mid"))
     back.convert("RGB").save(OUT / "back.bmp", "BMP")
-    front = layer("mid")
-    front.alpha_composite(layer("near"))
-    to_bmp(front).save(OUT / "front.bmp", "BMP")
+    front = layer("near")
+    to_bmp(front.crop((0, FRONT_TOP, front.width, front.height))).save(OUT / "front.bmp", "BMP")
 
 
 def ride():
