@@ -4,3 +4,4 @@ root/YOLK/moekadex/data.txt
 root/YOLK/moekadex/reclen.txt
 root/YOLK/moekadex/last.txt
 __pycache__/
+tools/sim/build/

@@ -5,6 +5,11 @@ data: /YOLK/talk.lua
 
 [shortcut]
 type: file
+name: MOETORCYCLES
+data: /YOLK/moto.lua
+
+[shortcut]
+type: file
 name: MOEKADEX
 data: /YOLK/moekadex.lua
 
