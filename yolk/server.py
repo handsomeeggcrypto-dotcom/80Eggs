@@ -12,6 +12,7 @@ import json
 import os
 import re
 import subprocess
+import threading
 import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -89,7 +90,30 @@ def sync():
             for d in dreams:
                 f.write(f"{int(time.time())}\t{d}\n")
         QUEUE.write_text("")
+    deliver_daily()
     return mem, True
+
+
+_daily_lock = threading.Lock()
+
+
+def deliver_daily():
+    """Builds today's YOLK Daily if it's stale and copies it to SHELL, in the background."""
+    def work():
+        if not _daily_lock.acquire(blocking=False):
+            return
+        try:
+            import daily
+            if daily.needs_build():
+                daily.build()
+                daily.deliver()
+            elif not (SHELL.parent / "Music" / "YOLK Daily" / "YOLK Daily.m4a").exists():
+                daily.deliver()
+        except Exception as e:
+            print("YOLK Daily failed:", e)
+        finally:
+            _daily_lock.release()
+    threading.Thread(target=work, daemon=True).start()
 
 
 # ------------------------------------------------------------------ extras
@@ -186,6 +210,14 @@ class Handler(BaseHTTPRequestHandler):
             write_mem(MEMORY, mem)
             mem, connected = sync()
             return self.send(200, {"memory": mem, "shell": connected})
+        if path == "/api/remind":
+            text = str(data.get("text", "")).replace("\n", " ").strip()[:200]
+            if not text:
+                return self.send(400, {"error": "empty"})
+            DATA.mkdir(parents=True, exist_ok=True)
+            with open(DATA / "reminders.txt", "a", encoding="utf-8") as f:
+                f.write(text + "\n")
+            return self.send(200, {"ok": True})
         if path == "/api/dream":
             text = str(data.get("text", "")).replace("\n", " ").strip()[:200]
             if not text:

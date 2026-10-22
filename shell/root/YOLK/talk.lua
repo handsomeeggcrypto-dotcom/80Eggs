@@ -445,6 +445,22 @@ local function moes()
     end
 end
 
+-- today's YOLK Daily, left here by the Mac while SHELL charged
+local function today()
+    local f = io.open(DIR .. "daily.txt", "r")
+    if not f then
+        say("no briefing yet. plug me into the mac while YOLK's awake over there and i'll get one.", "sus")
+        return
+    end
+    local lines = {}
+    for line in f:lines() do if line:match("%S") then lines[#lines + 1] = line end end
+    f:close()
+    for i, line in ipairs(lines) do
+        if not say(line, i == 1 and "good" or "talk") then return end
+    end
+    say("it's also in your music, under YOLK Daily, if you'd rather listen.", "good")
+end
+
 local function goodbye()
     local byes = { "ok. don't unplug me.", "bye {name}. i'll be right here. obviously.",
                    "go. i'll just count the seconds.", "later. say hi to bradley." }
@@ -459,17 +475,18 @@ mem.visits = num("visits") + 1
 
 if not mem.name then intro() else greet() end
 
-local topics = { "how are you?", "ask the oracle", "tell me a secret",
+local topics = { "how are you?", "what's today?", "ask the oracle", "tell me a secret",
                  "what am i listening to?", "let's talk moes", "bye, yolk" }
 while true do
     local c = choose(pick({ "what do you want to talk about?", "so.", "anything else?", "i'm listening." }),
                      mood_face(), topics)
-    if c == nil or c == 6 then goodbye(); break
+    if c == nil or c == 7 then goodbye(); break
     elseif c == 1 then how_are_you()
-    elseif c == 2 then oracle()
-    elseif c == 3 then say(pick(SECRETS), pick({ "sus", "ok", "shock" }))
-    elseif c == 4 then music()
-    elseif c == 5 then moes() end
+    elseif c == 2 then today()
+    elseif c == 3 then oracle()
+    elseif c == 4 then say(pick(SECRETS), pick({ "sus", "ok", "shock" }))
+    elseif c == 5 then music()
+    elseif c == 6 then moes() end
     mem.affection = num("affection") + 1
 end
 
