@@ -83,6 +83,21 @@
   .ambbtn { font: inherit; font-size: 26px; color: #8a6410; background: transparent; border: 2px solid #3a2c0c;
             padding: 6px 22px; margin-top: 14px; }
 
+  /* ---- YOLK's eye ---- */
+  #eyebtn { position: absolute; right: 18px; top: 14px; font: inherit; font-size: 22px; color: #3a2c0c;
+            background: transparent; border: 2px solid #2a2010; padding: 2px 12px; z-index: 5; }
+  #eyebtn.on { color: #78dcff; border-color: #78dcff; }
+  #eyebtn.needs { color: #ff3d6e; border-color: #ff3d6e; }
+  #away { position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: #000; opacity: 0;
+          pointer-events: none; -webkit-transition: opacity 3s; transition: opacity 3s; }
+  #eyehelp { position: absolute; left: 60px; right: 60px; top: 60px; bottom: 60px; padding: 24px 32px;
+             background: #16120c; border: 3px solid #ff3d6e; font-size: 26px; z-index: 10; overflow: auto; }
+  #eyehelp b { color: #ffc21a; font-weight: normal; }
+  #eyehelp .addr { color: #78dcff; font-size: 30px; }
+  #hint { position: absolute; left: 0; right: 0; top: 70px; font-size: 32px; color: #78dcff; opacity: 0;
+          -webkit-transition: opacity 1s; transition: opacity 1s; }
+  video#cam { position: absolute; width: 2px; height: 2px; opacity: 0; pointer-events: none; }
+
   #offline { position: absolute; left: 0; right: 0; top: 0; padding: 6px; text-align: center; font-size: 22px;
              background: #3a0c14; color: #ff3d6e; }
 
@@ -138,12 +153,19 @@
     <img id="medface" src="faces/big/blink.png" alt="">
     <div id="breath"></div>
     <div id="medleft"></div>
+    <div id="hint"></div>
     <div id="medask" class="hidden">
       <button class="medbtn" id="keepgoing">keep going</button>
       <button class="medbtn" id="endnow" style="background:#3a2c0c;color:#f2eadb">end session</button>
     </div>
   </div>
 </div>
+
+<div id="away"></div>
+<button id="eyebtn">eye: off</button>
+<div id="eyehelp" class="hidden"></div>
+<video id="cam" autoplay muted playsinline></video>
+<canvas id="eyecanvas" width="64" height="48" style="display:none"></canvas>
 
 <div id="offline" class="hidden">YOLK's brain (the mac) isn't answering. is it awake?</div>
 
@@ -421,6 +443,7 @@ function medStart(minutes) {
   med.start = Date.now();
   med.end = med.start + minutes * 60000;
   med.rang = false;
+  eye.fidget = 0; eye.fidgets = 0;
   $("medface").src = big("blink");
   ding();
   clearInterval(med.timer);
@@ -469,6 +492,7 @@ function medDone(minutes, early) {
                                   "that's ok. sitting down was the hard part.")
                      : pick(["welcome back.", "and... back.", "that was nice. i liked that."]) + " " + minutes + " minutes.";
     if (st && st.streak > 1) line += " that's " + st.streak + " days in a row.";
+    if (eye.on && !early && minutes >= 5) line += eye.fidgets === 0 ? " you were very still. i was watching. respectfully." : "";
     setTimeout(function () {
       say(line, "blink", function () {
         choose(["sit again", "done"], function (c) { if (c === 0) medPick(); else sleepNow(); });
@@ -512,10 +536,160 @@ function deadChannel() {
   }, 70);
 }
 
+// ------------------------------------------------------------ YOLK's eye
+// Movement only. Twice a second the camera frame is shrunk to 64x48 grey
+// pixels and compared with the previous one; the only thing kept is what
+// percent of it changed. No picture is ever stored or sent anywhere.
+var eye = { on: false, stream: null, prev: null, timer: null, lastMove: Date.now(), present: true,
+            level: 0, fidget: 0, fidgets: 0 };
+var AWAY_AFTER = 10 * 60000;      // nobody moving for 10 minutes = away
+var MOVE = 3;                     // % of the view changing that counts as movement
+var BIG_MOVE = 10;                // % changing that counts as fidgeting during meditation
+var PIXEL_CHANGE = 25;            // a pixel "changed" if it brightened/darkened by this much (camera grain is less)
+
+function eyePref(v) {
+  try { if (v === undefined) return localStorage.getItem("yolk_eye") === "on"; localStorage.setItem("yolk_eye", v ? "on" : "off"); }
+  catch (e) { return false; }
+}
+
+function eyeLabel(state) {
+  var b = $("eyebtn");
+  b.className = state === "on" ? "on" : state === "needs" ? "needs" : "";
+  b.textContent = state === "on" ? "eye: watching" : state === "needs" ? "eye: needs setup" : "eye: off";
+}
+
+function chromeVersion() {
+  var m = navigator.userAgent.match(/Chrome\/(\d+)/);
+  return m ? parseInt(m[1], 10) : 0;
+}
+
+function eyeHelp(why) {
+  var v = chromeVersion(), origin = location.protocol + "//" + location.host;
+  var h = '<div style="color:#ff3d6e;font-size:32px">YOLK can\'t open the camera yet</div>' +
+          '<div class="dim">' + why + "</div><br>";
+  if (v && v < 62) {
+    h += "your Chrome is version " + v + ", too old for the camera switch.<br><br>" +
+         "<b>1.</b> open the <b>Play Store</b>, search <b>Chrome</b>, tap <b>Update</b>.<br>" +
+         "<b>2.</b> then come back here and tap the eye again.";
+  } else {
+    h += "Chrome only lets pages use the camera on secure sites. one switch tells it to trust your mac:<br><br>" +
+         "<b>1.</b> in Chrome's address bar, type <b>chrome://flags</b> and open it<br>" +
+         "<b>2.</b> search for <b>insecure origins treated as secure</b><br>" +
+         "<b>3.</b> in its box, type exactly:<br><span class=\"addr\">" + origin + "</span><br>" +
+         "<b>4.</b> set it to <b>Enabled</b>, then tap <b>Relaunch</b><br>" +
+         "<b>5.</b> come back here and tap the eye. when Chrome asks about the camera, tap <b>Allow</b>.";
+  }
+  h += '<br><br><button class="medbtn" id="eyehelpclose">ok</button>';
+  $("eyehelp").innerHTML = h;
+  $("eyehelp").className = "";
+  $("eyehelpclose").onclick = function () { $("eyehelp").className = "hidden"; };
+}
+
+function eyeStart() {
+  var md = navigator.mediaDevices;
+  var constraints = { video: { facingMode: "user", width: 320, height: 240 }, audio: false };
+  var ok = function (stream) {
+    eye.stream = stream;
+    var v = $("cam");
+    if ("srcObject" in v) v.srcObject = stream; else v.src = URL.createObjectURL(stream);
+    try { v.play(); } catch (e) {}
+    eye.on = true; eye.prev = null; eye.lastMove = Date.now();
+    eyePref(true);
+    eyeLabel("on");
+    clearInterval(eye.timer);
+    eye.timer = setInterval(eyeLook, 500);
+  };
+  var fail = function (err) {
+    eyePref(false);
+    eyeLabel("needs");
+    eyeHelp(err && err.name === "NotAllowedError" ? "camera permission was turned down." : (err && (err.name || err.message)) || "no camera access on this page.");
+  };
+  if (md && md.getUserMedia) md.getUserMedia(constraints).then(ok, fail);
+  else if (navigator.webkitGetUserMedia) navigator.webkitGetUserMedia({ video: true, audio: false }, ok, fail);
+  else fail({ message: "this page isn't allowed to ask for the camera (not a secure site)." });
+}
+
+function eyeStop() {
+  clearInterval(eye.timer);
+  if (eye.stream) {
+    var tracks = eye.stream.getTracks ? eye.stream.getTracks() : [];
+    for (var i = 0; i < tracks.length; i++) tracks[i].stop();
+  }
+  eye.stream = null; eye.on = false; eye.prev = null;
+  eyePref(false);
+  eyeLabel("off");
+  setAway(false);
+}
+
+function eyeLook() {
+  var v = $("cam");
+  if (!v.videoWidth) return;
+  var c = $("eyecanvas"), ctx = c.getContext("2d");
+  ctx.drawImage(v, 0, 0, c.width, c.height);
+  var px = ctx.getImageData(0, 0, c.width, c.height).data;
+  var grey = new Array(c.width * c.height), changed = 0;
+  for (var i = 0, j = 0; i < px.length; i += 4, j++) {
+    grey[j] = (px[i] * 3 + px[i + 1] * 6 + px[i + 2]) / 10;
+    if (eye.prev && Math.abs(grey[j] - eye.prev[j]) > PIXEL_CHANGE) changed++;
+  }
+  var first = !eye.prev;
+  eye.prev = grey;
+  if (first) return;
+  eye.level = changed * 100 / grey.length;
+  var now = Date.now();
+  if (eye.level > MOVE) {
+    if (!eye.present) arrived();
+    eye.lastMove = now;
+  } else if (eye.present && now - eye.lastMove > AWAY_AFTER && mode === "ambient") {
+    leftRoom();
+  }
+  if (mode === "med" && $("medrun").className === "") stillness();
+}
+
+function setAway(away) {
+  eye.present = !away;
+  $("away").style.opacity = away ? 0.75 : 0;
+}
+
+function leftRoom() {
+  setAway(true);
+  $("idle").textContent = "you left. i'll keep watching the door.";
+}
+
+function arrived() {
+  setAway(false);
+  if (mode !== "ambient") return;
+  var line = pick(["oh. you're back.", "there you are.", "i saw you come in. obviously.", "welcome back, {name}."]);
+  $("idle").textContent = fill(line);
+  $("bigface").src = big("shock");
+  setTimeout(function () { if (mode === "ambient") $("bigface").src = big("good"); }, 900);
+  speak(fill(line));   // works once the page has been tapped since it loaded
+}
+
+// during meditation: notice sustained fidgeting, say nothing out loud
+function stillness() {
+  if (eye.level > BIG_MOVE) eye.fidget++;
+  else eye.fidget = Math.max(0, eye.fidget - 1);
+  if (eye.fidget >= 6) {             // ~3 seconds of big movement
+    eye.fidget = 0;
+    eye.fidgets++;
+    var h = $("hint");
+    h.textContent = pick(["you moved. it's ok. start your breath again.", "settle back in.", "find your breath again."]);
+    h.style.opacity = 1;
+    setTimeout(function () { h.style.opacity = 0; }, 4000);
+  }
+}
+
+$("eyebtn").onclick = function (e) {
+  e.stopPropagation();
+  if (eye.on) eyeStop(); else eyeStart();
+};
+
 // ------------------------------------------------------------ go
 $("yolkspot").onclick = wake;
 $("bigface").onclick = wake;
 document.addEventListener("click", resetIdle);
+document.addEventListener("click", function () { eye.lastMove = Date.now(); if (!eye.present) setAway(false); });
 get("/api/lines", function (d) { L = d; $("idle").textContent = fill(pick(L.station_idle || ["still here."])); });
 refresh();
 tick();
@@ -523,6 +697,7 @@ setInterval(tick, 1000);
 setInterval(refresh, 10 * 60000);
 idleLife();
 scheduleDead();
+if (eyePref()) eyeStart(); else eyeLabel("off");
 if (location.hash === "#dead") setTimeout(deadChannel, 1500);   // for testing
 </script>
 </body>
