@@ -141,6 +141,9 @@ def script(day, cfg):
         latest = st["entries"][-1]
         if latest.get("mood") and latest["mood"] <= 2:
             lines.append("Last check-in you said it was a rough one. New day. I'm rooting for you.")
+    med = server.meditation_stats()
+    if med["streak"] >= 2:
+        lines.append(f"You've meditated {med['streak']} days in a row. I sit with you. Quietly. For an egg.")
     m = moe_of_the_day(day)
     if m:
         lines.append(m)

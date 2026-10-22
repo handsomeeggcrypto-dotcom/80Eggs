@@ -162,6 +162,35 @@ def stats():
     }
 
 
+# ------------------------------------------------------------------ meditation
+# Sessions from the Station: "unixtime|minutes". Kept apart from SHELL's
+# check-ins until SHELL's clock is right (its day numbers don't match real days).
+MEDITATIONS = DATA / "meditations.txt"
+
+
+def local_day(t):
+    return int(t + time.localtime(t).tm_gmtoff) // 86400
+
+
+def meditation_stats():
+    sessions = []
+    if MEDITATIONS.exists():
+        for line in MEDITATIONS.read_text().splitlines():
+            m = re.match(r"^(\d+)\|(\d+)$", line)
+            if m:
+                sessions.append((int(m[1]), int(m[2])))
+    days = {local_day(t) for t, _ in sessions}
+    today = local_day(time.time())
+    d = today if today in days else today - 1          # today not done yet doesn't break it
+    streak = 0
+    while d in days:
+        streak += 1
+        d -= 1
+    week = sum(mins for t, mins in sessions if local_day(t) > today - 7)
+    return {"streak": streak, "today": today in days, "sessions": len(sessions),
+            "minutes_week": week, "minutes_total": sum(m for _, m in sessions)}
+
+
 def shell_connected():
     return SHELL.is_dir()
 
@@ -285,7 +314,7 @@ def ambient():
             "daily": (daily.OUT / "daily.txt").read_text(encoding="utf-8") if (daily.OUT / "daily.txt").exists() else "",
         }
         _ambient["at"] = time.time()
-    return _ambient["data"]
+    return {**_ambient["data"], "meditation": meditation_stats()}
 
 
 # ------------------------------------------------------------------ http
@@ -367,7 +396,7 @@ class Handler(BaseHTTPRequestHandler):
             return self.send(200, {"memory": mem, "shell": connected, "queued": len(queued),
                                    "battery": mac_battery(), "now": int(time.time())})
         if path == "/api/stats":
-            return self.send(200, stats())
+            return self.send(200, {**stats(), "meditation": meditation_stats()})
         if path == "/api/lines":
             return self.send(200, (HERE / "brain" / "lines.json").read_bytes())
         m = re.match(r"^/api/moe/(\d+)$", path)
@@ -419,6 +448,14 @@ class Handler(BaseHTTPRequestHandler):
             write_mem(MEMORY, mem)
             mem, connected = sync()
             return self.send(200, {"memory": mem, "shell": connected})
+        if path == "/api/meditate":
+            mins = int(data.get("minutes", 0) or 0)
+            if not 1 <= mins <= 180:
+                return self.send(400, {"error": "minutes?"})
+            DATA.mkdir(parents=True, exist_ok=True)
+            with open(MEDITATIONS, "a") as f:
+                f.write(f"{int(time.time())}|{mins}\n")
+            return self.send(200, meditation_stats())
         if path == "/api/habits":
             items = [re.sub(r"[|,\n]", "", str(h)).strip().lower()[:20] for h in data.get("habits", [])]
             items = [h for h in items if h][:12]

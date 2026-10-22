@@ -35,14 +35,15 @@
   .moe .label { font-size: 22px; color: #8a6410; }
   .moe .name { font-size: 32px; }
   .tier { display: inline-block; padding: 0 8px; color: #0a0806; font-size: 24px; }
-  #bigface { width: 280px; height: 280px; image-rendering: pixelated; image-rendering: -webkit-optimize-contrast; }
+  /* faces/big/* are already 240px; shown at exactly that size so old Chrome never blurs them */
+  #bigface { width: 240px; height: 240px; }
   #idle { margin-top: 18px; font-size: 30px; color: #8a6410; text-align: center; max-width: 90%; min-height: 2.5em; }
   .tap { font-size: 22px; color: #3a2c0c; margin-top: 10px; }
 
   /* ---- talk ---- */
   #talk { padding: 30px 40px; box-sizing: border-box; }
   .stage { display: -webkit-flex; display: flex; -webkit-align-items: flex-start; align-items: flex-start; }
-  #talkface { width: 220px; height: 220px; image-rendering: pixelated; margin-right: 34px; }
+  #talkface { width: 240px; height: 240px; margin-right: 34px; }
   #bubble { -webkit-flex: 1; flex: 1; min-height: 180px; padding: 16px 22px; font-size: 36px;
             background: #16120c; border: 3px solid #ffc21a; }
   #choices { margin-top: 28px; }
@@ -57,8 +58,30 @@
   #deadmoe { position: absolute; width: 260px; left: 50%; top: 50%; margin: -150px 0 0 -130px; opacity: 0; }
   #deadtext { position: absolute; left: 0; right: 0; bottom: 70px; text-align: center; font-size: 56px;
               color: #fff; text-shadow: 4px 0 #ff3d6e, -4px 0 #3df5ff; letter-spacing: .08em; }
-  #deadface { position: absolute; right: 40px; top: 40px; width: 120px; height: 120px; image-rendering: pixelated;
+  #deadface { position: absolute; right: 40px; top: 40px; width: 120px; height: 120px;
               -webkit-filter: drop-shadow(5px 0 0 #ff3d6e); filter: drop-shadow(5px 0 0 #ff3d6e); }
+
+  /* ---- meditation ---- */
+  #med { background: #000; text-align: center; }
+  .medbtn { display: inline-block; font: inherit; font-size: 30px; color: #0a0806; background: #ffc21a;
+            border: 0; padding: 10px 26px; margin-top: 16px; }
+  #medpick h2 { font-weight: normal; color: #ffc21a; font-size: 44px; margin: 60px 0 10px; }
+  #medpick .dim { font-size: 26px; }
+  .mins { margin: 30px 0 10px; }
+  .mins button { font: inherit; font-size: 48px; width: 130px; height: 110px; margin: 8px; color: #ffc21a;
+                 background: #16120c; border: 3px solid #ffc21a; }
+  .mins button:active { background: #ffc21a; color: #0a0806; }
+  .mins button small { display: block; font-size: 22px; color: #8a6410; }
+  #halfway, #medcancel { font: inherit; font-size: 28px; color: #8a6410; background: transparent; border: 0; margin: 10px 18px; }
+  #medrun { position: absolute; top: 0; left: 0; right: 0; bottom: 0; }
+  #ring { position: absolute; left: 50%; top: 46%; border-radius: 50%;
+          border: 3px solid #4a3810; background: rgba(255, 194, 26, .06); }
+  #medface { position: absolute; left: 50%; top: 46%; width: 240px; height: 240px; margin: -120px 0 0 -120px; opacity: .85; }
+  #breath { position: absolute; left: 0; right: 0; bottom: 120px; font-size: 44px; color: #8a6410; }
+  #medleft { position: absolute; left: 0; right: 0; bottom: 60px; font-size: 26px; color: #3a2c0c; }
+  #medask { position: absolute; left: 0; right: 0; bottom: 40px; }
+  .ambbtn { font: inherit; font-size: 26px; color: #8a6410; background: transparent; border: 2px solid #3a2c0c;
+            padding: 6px 22px; margin-top: 14px; }
 
   #offline { position: absolute; left: 0; right: 0; top: 0; padding: 6px; text-align: center; font-size: 22px;
              background: #3a0c14; color: #ff3d6e; }
@@ -80,15 +103,16 @@
     <div class="moe" id="moe"></div>
   </div>
   <div class="right" id="yolkspot">
-    <img id="bigface" src="faces/good.png" alt="YOLK">
+    <img id="bigface" src="faces/big/good.png" alt="YOLK">
     <div id="idle"></div>
     <div class="tap">tap YOLK to talk</div>
+    <button class="ambbtn" id="medgo">meditate</button>
   </div>
 </div>
 
 <div id="talk" class="screen hidden">
   <div class="stage">
-    <img id="talkface" src="faces/good.png" alt="YOLK">
+    <img id="talkface" src="faces/big/good.png" alt="YOLK">
     <div id="bubble"></div>
   </div>
   <div id="choices"></div>
@@ -97,8 +121,28 @@
 <div id="dead" class="screen hidden">
   <canvas id="static" width="160" height="100"></canvas>
   <img id="deadmoe" alt="">
-  <img id="deadface" src="faces/shock.png" alt="">
+  <img id="deadface" src="faces/big/shock.png" alt="">
   <div id="deadtext"></div>
+</div>
+
+<div id="med" class="screen hidden">
+  <div id="medpick">
+    <h2>sit with YOLK</h2>
+    <div class="dim">pick a length. YOLK breathes with you. a bell starts and ends it.</div>
+    <div class="mins" id="mins"></div>
+    <button id="halfway">halfway bell: off</button>
+    <button id="medcancel">never mind</button>
+  </div>
+  <div id="medrun" class="hidden">
+    <div id="ring"></div>
+    <img id="medface" src="faces/big/blink.png" alt="">
+    <div id="breath"></div>
+    <div id="medleft"></div>
+    <div id="medask" class="hidden">
+      <button class="medbtn" id="keepgoing">keep going</button>
+      <button class="medbtn" id="endnow" style="background:#3a2c0c;color:#f2eadb">end session</button>
+    </div>
+  </div>
 </div>
 
 <div id="offline" class="hidden">YOLK's brain (the mac) isn't answering. is it awake?</div>
@@ -108,6 +152,7 @@
 var L = {}, mem = {}, amb = null, mode = "ambient";
 
 function $(id) { return document.getElementById(id); }
+function big(face) { return "faces/big/" + face + ".png"; }
 function pick(a) { return a[Math.floor(Math.random() * a.length)]; }
 function fill(s) { return s.replace(/\{name\}/g, (mem.name && mem.name !== "nobody") ? mem.name : "you"); }
 
@@ -152,7 +197,10 @@ function drawAmbient() {
   var w = amb.weather;
   $("weather").innerHTML = w ? (w.hi + "&deg; / " + w.lo + "&deg; " + w.sky +
     (w.rain >= 30 ? " &middot; " + w.rain + "% rain" : "") + ' <span class="dim">' + w.place + "</span>") : "";
-  $("streak").textContent = amb.streak ? amb.streak.habit + ": " + amb.streak.days + " days in a row" : "";
+  var parts = [];
+  if (amb.meditation && amb.meditation.streak) parts.push("meditation: " + amb.meditation.streak + " day" + (amb.meditation.streak > 1 ? "s" : "") + (amb.meditation.today ? " (done today)" : ""));
+  if (amb.streak) parts.push(amb.streak.habit + ": " + amb.streak.days + " days");
+  $("streak").textContent = parts.join("  .  ");
   var m = amb.moe;
   if (m) {
     var t = m.traits[0];
@@ -173,8 +221,8 @@ var blinkT = null;
 function idleLife() {
   if (mode !== "ambient") return;
   var f = moodFace();
-  $("bigface").src = "faces/blink.png";
-  setTimeout(function () { $("bigface").src = "faces/" + f + ".png"; }, 140);
+  $("bigface").src = big("blink");
+  setTimeout(function () { if (mode === "ambient") $("bigface").src = big(f); }, 140);
   if (Math.random() < 0.25 && L.station_idle) $("idle").textContent = fill(pick(L.station_idle));
   blinkT = setTimeout(idleLife, 2500 + Math.random() * 4000);
 }
@@ -199,6 +247,7 @@ function show(id) {
   $("ambient").className = "screen" + (id === "ambient" ? "" : " hidden");
   $("talk").className = "screen" + (id === "talk" ? "" : " hidden");
   $("dead").className = "screen" + (id === "dead" ? "" : " hidden");
+  $("med").className = "screen" + (id === "med" ? "" : " hidden");
   mode = id;
 }
 
@@ -213,13 +262,13 @@ function say(text, face, cb) {
     i++;
     b.textContent = text.slice(0, i);
     mouth = (mouth + 1) % 6;
-    $("talkface").src = "faces/" + (mouth < 3 ? "talk" : face) + ".png";
-    if (i >= text.length) { clearInterval(typing); $("talkface").src = "faces/" + face + ".png"; }
+    $("talkface").src = big(mouth < 3 ? "talk" : face);
+    if (i >= text.length) { clearInterval(typing); $("talkface").src = big(face); }
   }, 32);
   speak(text, function () {
     clearInterval(typing);
     b.textContent = text;
-    $("talkface").src = "faces/" + face + ".png";
+    $("talkface").src = big(face);
     cb && cb();
   });
   resetIdle();
@@ -250,26 +299,29 @@ function lines(list, faces, cb) {   // say several lines in a row
 
 function resetIdle() {
   clearTimeout(idleOut);
+  if (mode === "med") return;               // meditation has its own clock
   idleOut = setTimeout(sleepNow, 60000);   // a minute with no taps: back to ambient
 }
 
 function sleepNow() {
   clearTimeout(idleOut);
+  clearInterval(med.timer);
   audio.pause();
   show("ambient");
   idleLife();
 }
 
-var TOPICS = ["how are you?", "what's today?", "ask the oracle", "tell me a secret", "how am i doing?", "go back to sleep"];
+var TOPICS = ["meditate", "how are you?", "what's today?", "ask the oracle", "tell me a secret", "how am i doing?", "go back to sleep"];
 function menu() {
   say(pick(["what do you want to talk about?", "so.", "anything else?", "i'm listening."]), null, function () {
     choose(TOPICS, function (c) {
       var then = function () { setTimeout(menu, 300); };
-      if (c === 0) howAreYou(then);
-      else if (c === 1) today(then);
-      else if (c === 2) oracle(then);
-      else if (c === 3) say(pick(L.secrets), pick(["sus", "ok", "shock"]), then);
-      else if (c === 4) progress(then);
+      if (c === 0) say(pick(["ok. let's sit.", "good idea. i'll breathe too. sort of."]), "blink", medPick);
+      else if (c === 1) howAreYou(then);
+      else if (c === 2) today(then);
+      else if (c === 3) oracle(then);
+      else if (c === 4) say(pick(L.secrets), pick(["sus", "ok", "shock"]), then);
+      else if (c === 5) progress(then);
       else say(pick(["going back to watching.", "ok. i'll be right here.", "sleep mode. not really. i never sleep."]), "ok",
                function () { setTimeout(sleepNow, 800); });
     });
@@ -296,7 +348,7 @@ function oracle(cb) {
     var spins = 0, faces = ["sus", "shock", "ok", "talk"];
     (function loop() {
       choose(["spin" + new Array((spins % 4) + 1).join("."), "ask now"], function (c) {
-        if (c === 0) { spins++; $("talkface").src = "faces/" + faces[spins % 4] + ".png"; loop(); }
+        if (c === 0) { spins++; $("talkface").src = big(faces[spins % 4]); loop(); }
         else say(pick(L.oracle), pick(["sus", "good", "shock", "ok"]), cb);
       });
     })();
@@ -325,6 +377,109 @@ function wake() {
   post("/api/memory", { station_visits: (parseInt(mem.station_visits || "0", 10) || 0) + 1 }, function (r) { if (r && r.memory) mem = r.memory; });
   say(pick(L.station_hello || ["oh. hi."]), "good", function () { setTimeout(menu, 300); });
 }
+
+// ------------------------------------------------------------ meditation
+var bell = new Audio("sounds/bell.wav");
+var med = { halfway: false, timer: null };
+var BREATH_IN = 4000, BREATH_OUT = 6000;     // a slow, calming rhythm
+
+function ring(size) {
+  var r = $("ring");
+  r.style.width = r.style.height = size + "px";
+  r.style.marginLeft = r.style.marginTop = (-size / 2) + "px";
+}
+
+function ding() { try { bell.currentTime = 0; bell.play(); } catch (e) {} }
+
+function medPick() {
+  clearTimeout(blinkT);
+  audio.pause();
+  show("med");
+  clearTimeout(idleOut);
+  $("medpick").className = "";
+  $("medrun").className = "hidden";
+  var box = $("mins");
+  box.innerHTML = "";
+  [5, 10, 15, 20, 30].forEach(function (m) {
+    var b = document.createElement("button");
+    b.innerHTML = m + "<small>min</small>";
+    b.onclick = function () { medStart(m); };
+    box.appendChild(b);
+  });
+}
+$("halfway").onclick = function () {
+  med.halfway = !med.halfway;
+  $("halfway").textContent = "halfway bell: " + (med.halfway ? "on" : "off");
+};
+$("medcancel").onclick = function () { sleepNow(); };
+
+function medStart(minutes) {
+  $("medpick").className = "hidden";
+  $("medrun").className = "";
+  $("medask").className = "hidden";
+  med.minutes = minutes;
+  med.start = Date.now();
+  med.end = med.start + minutes * 60000;
+  med.rang = false;
+  $("medface").src = big("blink");
+  ding();
+  clearInterval(med.timer);
+  med.timer = setInterval(medTick, 60);
+}
+
+function medTick() {
+  var now = Date.now();
+  var cycle = BREATH_IN + BREATH_OUT;
+  var p = (now - med.start) % cycle;
+  var k, word;
+  if (p < BREATH_IN) { k = p / BREATH_IN; word = "breathe in"; }
+  else { k = 1 - (p - BREATH_IN) / BREATH_OUT; word = "breathe out"; }
+  var ease = (1 - Math.cos(k * Math.PI)) / 2;          // smooth start and stop
+  ring(300 + ease * 260);
+  var b = $("breath");
+  b.textContent = word;
+  b.style.opacity = 0.35 + 0.65 * Math.sin(Math.min(1, (p < BREATH_IN ? p / BREATH_IN : (p - BREATH_IN) / BREATH_OUT)) * Math.PI);
+  var left = Math.max(0, med.end - now);
+  var s = Math.ceil(left / 1000);
+  $("medleft").textContent = Math.floor(s / 60) + ":" + pad(s % 60);
+  if (med.halfway && !med.rang && now - med.start >= (med.end - med.start) / 2) { med.rang = true; ding(); }
+  if (left <= 0) medDone(med.minutes);
+}
+
+// tapping during a session asks before ending it
+$("medrun").onclick = function (e) {
+  if (e.target.tagName === "BUTTON") return;
+  $("medask").className = $("medask").className ? "" : "hidden";
+};
+$("keepgoing").onclick = function () { $("medask").className = "hidden"; };
+$("endnow").onclick = function () {
+  medDone(Math.floor((Date.now() - med.start) / 60000), true);
+};
+
+function medDone(minutes, early) {
+  clearInterval(med.timer);
+  ding();
+  $("medask").className = "hidden";
+  $("breath").textContent = "";
+  $("medleft").textContent = "";
+  ring(300);
+  var finish = function (st) {
+    show("talk");
+    var line = early ? (minutes ? "that counts. " + minutes + " minute" + (minutes > 1 ? "s" : "") + " is " + minutes + " more than zero." :
+                                  "that's ok. sitting down was the hard part.")
+                     : pick(["welcome back.", "and... back.", "that was nice. i liked that."]) + " " + minutes + " minutes.";
+    if (st && st.streak > 1) line += " that's " + st.streak + " days in a row.";
+    setTimeout(function () {
+      say(line, "blink", function () {
+        choose(["sit again", "done"], function (c) { if (c === 0) medPick(); else sleepNow(); });
+      });
+    }, 2500);   // let the bell ring out first
+  };
+  if (minutes >= 1) post("/api/meditate", { minutes: minutes }, function (st) { refresh(); finish(st); });
+  else finish(null);
+}
+
+$("medgo").onclick = function (e) { e.stopPropagation(); medPick(); };
 
 // ------------------------------------------------------------ dead channel
 var deadT = null;
