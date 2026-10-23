@@ -72,7 +72,7 @@
                  background: #16120c; border: 3px solid #ffc21a; }
   .mins button:active { background: #ffc21a; color: #0a0806; }
   .mins button small { display: block; font-size: 22px; color: #8a6410; }
-  #halfway, #medcancel { font: inherit; font-size: 28px; color: #8a6410; background: transparent; border: 0; margin: 10px 18px; }
+  #medsound, #halfway, #medcancel { font: inherit; font-size: 28px; color: #8a6410; background: transparent; border: 0; margin: 10px 18px; }
   #medrun { position: absolute; top: 0; left: 0; right: 0; bottom: 0; }
   #ring { position: absolute; left: 50%; top: 46%; border-radius: 50%;
           border: 3px solid #4a3810; background: rgba(255, 194, 26, .06); }
@@ -147,7 +147,9 @@
     <h2>sit with YOLK</h2>
     <div class="dim">pick a length. YOLK breathes with you. a bell starts and ends it.</div>
     <div class="mins" id="mins"></div>
+    <button id="medsound">sound: silence</button>
     <button id="halfway">halfway bell: off</button>
+    <div class="dim" id="medsoundnote" style="font-size:22px;min-height:1.2em"></div>
     <button id="medcancel">never mind</button>
   </div>
   <div id="medrun" class="hidden">
@@ -334,6 +336,7 @@ function resetIdle() {
 function sleepNow() {
   clearTimeout(idleOut);
   clearInterval(med.timer);
+  if (!bed.paused) bed.pause();
   audio.pause();
   show("ambient");
   idleLife();
@@ -408,7 +411,41 @@ function wake() {
 
 // ------------------------------------------------------------ meditation
 var bell = new Audio("sounds/bell.wav");
-var med = { halfway: false, timer: null };
+var med = { halfway: false, timer: null, sound: 0 };
+// files from tools/make_meditation_audio.py; binaural beats need stereo headphones
+var SOUNDS = [
+  { name: "silence" },
+  { name: "theta 6Hz binaural", file: "01 Theta 6Hz binaural.m4a", phones: true },
+  { name: "alpha 10Hz binaural", file: "02 Alpha 10Hz binaural.m4a", phones: true },
+  { name: "delta 3Hz binaural", file: "03 Delta 3Hz binaural.m4a", phones: true },
+  { name: "white noise", file: "04 White noise.m4a" },
+  { name: "pink noise", file: "05 Pink noise.m4a" },
+  { name: "brown noise", file: "06 Brown noise.m4a" }
+];
+var bed = new Audio();
+bed.loop = true;
+
+function soundLabel() {
+  var snd = SOUNDS[med.sound];
+  $("medsound").textContent = "sound: " + snd.name;
+  $("medsoundnote").textContent = snd.phones ? "binaural beats only work with headphones" : "";
+}
+function bedStart() {
+  var snd = SOUNDS[med.sound];
+  if (!snd.file) return;
+  bed.src = "sounds/med/" + encodeURIComponent(snd.file);
+  bed.volume = 0.8;
+  try { var p = bed.play(); if (p && p.catch) p.catch(function () {}); } catch (e) {}
+}
+function bedStop() {
+  // a short fade so it doesn't cut off abruptly
+  var v = bed.volume;
+  var f = setInterval(function () {
+    v -= 0.08;
+    if (v <= 0) { clearInterval(f); bed.pause(); bed.volume = 0.8; return; }
+    try { bed.volume = v; } catch (e) { clearInterval(f); bed.pause(); }
+  }, 120);
+}
 var BREATH_IN = 4000, BREATH_OUT = 6000;     // a slow, calming rhythm
 
 function ring(size) {
@@ -440,6 +477,13 @@ $("halfway").onclick = function () {
   $("halfway").textContent = "halfway bell: " + (med.halfway ? "on" : "off");
 };
 $("medcancel").onclick = function () { sleepNow(); };
+$("medsound").onclick = function () {
+  med.sound = (med.sound + 1) % SOUNDS.length;
+  soundLabel();
+  try { localStorage.setItem("yolk_med_sound", med.sound); } catch (e) {}
+};
+try { med.sound = parseInt(localStorage.getItem("yolk_med_sound") || "0", 10) % SOUNDS.length || 0; } catch (e) {}
+soundLabel();
 
 function medStart(minutes) {
   $("medpick").className = "hidden";
@@ -452,6 +496,7 @@ function medStart(minutes) {
   eye.fidget = 0; eye.fidgets = 0;
   $("medface").src = big("blink");
   ding();
+  bedStart();
   clearInterval(med.timer);
   med.timer = setInterval(medTick, 60);
 }
@@ -487,6 +532,7 @@ $("endnow").onclick = function () {
 
 function medDone(minutes, early) {
   clearInterval(med.timer);
+  bedStop();
   ding();
   $("medask").className = "hidden";
   $("breath").textContent = "";

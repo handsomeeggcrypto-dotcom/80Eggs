@@ -320,7 +320,7 @@ def ambient():
 # ------------------------------------------------------------------ http
 TYPES = {".html": "text/html; charset=utf-8", ".js": "text/javascript", ".css": "text/css",
          ".png": "image/png", ".json": "application/json", ".jpg": "image/jpeg",
-         ".webmanifest": "application/manifest+json"}
+         ".webmanifest": "application/manifest+json", ".m4a": "audio/mp4", ".wav": "audio/wav"}
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -408,8 +408,9 @@ class Handler(BaseHTTPRequestHandler):
         if m:
             p = moe_photo(int(m.group(1)))
             return self.send(200, p.read_bytes(), "image/jpeg") if p.exists() else self.send(404, {})
-        # static files
-        rel = "index.html" if path == "/" else path.lstrip("/")
+        # static files (file names can have spaces, which arrive as %20)
+        from urllib.parse import unquote
+        rel = "index.html" if path == "/" else unquote(path).lstrip("/")
         f = (STATIC / rel).resolve()
         if STATIC in f.parents and f.is_file():
             return self.send(200, f.read_bytes(), TYPES.get(f.suffix, "application/octet-stream"))

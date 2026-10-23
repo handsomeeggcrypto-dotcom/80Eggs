@@ -184,8 +184,27 @@ def build(print_only=False):
     return text, OUT / "YOLK Daily.m4a", day
 
 
+MEDITATION = HERE / "static" / "sounds" / "med"     # tools/make_meditation_audio.py
+
+
+def deliver_meditation():
+    """Puts the binaural / noise tracks on SHELL as a Meditation album (only missing ones)."""
+    if not (SHELL / "YOLK").is_dir() or not MEDITATION.is_dir():
+        return 0
+    dest = SHELL / "Music" / "Meditation"
+    dest.mkdir(parents=True, exist_ok=True)
+    copied = 0
+    for track in sorted(MEDITATION.glob("*.m4a")):
+        target = dest / track.name
+        if not target.exists() or target.stat().st_size != track.stat().st_size:
+            target.write_bytes(track.read_bytes())
+            copied += 1
+    return copied
+
+
 def deliver():
     """Copies the latest briefing onto SHELL. Returns True if it was copied."""
+    deliver_meditation()
     if not (SHELL / "YOLK").is_dir() or not (OUT / "YOLK Daily.m4a").exists():
         return False
     music = SHELL / "Music" / "YOLK Daily"
