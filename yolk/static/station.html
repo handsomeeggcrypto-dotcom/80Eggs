@@ -88,6 +88,8 @@
             background: transparent; border: 2px solid #2a2010; padding: 2px 12px; z-index: 5; }
   #eyebtn.on { color: #78dcff; border-color: #78dcff; }
   #eyebtn.needs { color: #ff3d6e; border-color: #ff3d6e; }
+  #eyemeter { position: absolute; right: 18px; top: 50px; height: 4px; width: 0; background: #78dcff; z-index: 5;
+              -webkit-transition: width .3s; transition: width .3s; }
   #away { position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: #000; opacity: 0;
           pointer-events: none; -webkit-transition: opacity 3s; transition: opacity 3s; }
   #eyehelp { position: absolute; left: 60px; right: 60px; top: 60px; bottom: 60px; padding: 24px 32px;
@@ -163,6 +165,7 @@
 
 <div id="away"></div>
 <button id="eyebtn">eye: off</button>
+<div id="eyemeter"></div>
 <div id="eyehelp" class="hidden"></div>
 <video id="cam" autoplay muted playsinline></video>
 <canvas id="eyecanvas" width="64" height="48" style="display:none"></canvas>
@@ -244,7 +247,10 @@ function idleLife() {
   if (mode !== "ambient") return;
   var f = moodFace();
   $("bigface").src = big("blink");
-  setTimeout(function () { if (mode === "ambient") $("bigface").src = big(f); }, 140);
+  setTimeout(function () {
+    if (mode !== "ambient") return;
+    $("bigface").src = big(eye.on && Date.now() < eye.glanceUntil ? eye.glance : f);
+  }, 140);
   if (Math.random() < 0.25 && L.station_idle) $("idle").textContent = fill(pick(L.station_idle));
   blinkT = setTimeout(idleLife, 2500 + Math.random() * 4000);
 }
@@ -541,7 +547,8 @@ function deadChannel() {
 // pixels and compared with the previous one; the only thing kept is what
 // percent of it changed. No picture is ever stored or sent anywhere.
 var eye = { on: false, stream: null, prev: null, timer: null, lastMove: Date.now(), present: true,
-            level: 0, fidget: 0, fidgets: 0 };
+            level: 0, fidget: 0, fidgets: 0, cx: 0.5, cy: 0.5, glance: null, glanceUntil: 0, noPic: 0 };
+var GLANCE = 1.2;                 // % changing that's enough for YOLK to look over
 var AWAY_AFTER = 10 * 60000;      // nobody moving for 10 minutes = away
 var MOVE = 3;                     // % of the view changing that counts as movement
 var BIG_MOVE = 10;                // % changing that counts as fidgeting during meditation
@@ -616,6 +623,7 @@ function eyeStop() {
     for (var i = 0; i < tracks.length; i++) tracks[i].stop();
   }
   eye.stream = null; eye.on = false; eye.prev = null;
+  $("eyemeter").style.width = "0";
   eyePref(false);
   eyeLabel("off");
   setAway(false);
@@ -623,19 +631,32 @@ function eyeStop() {
 
 function eyeLook() {
   var v = $("cam");
-  if (!v.videoWidth) return;
+  if (!v.videoWidth) {
+    // the camera is on but sending no picture: say so instead of silently doing nothing
+    if (++eye.noPic === 6) { eyeLabel("needs"); $("eyebtn").textContent = "eye: no picture"; try { v.play(); } catch (e) {} }
+    return;
+  }
+  if (eye.noPic >= 6) eyeLabel("on");
+  eye.noPic = 0;
   var c = $("eyecanvas"), ctx = c.getContext("2d");
   ctx.drawImage(v, 0, 0, c.width, c.height);
   var px = ctx.getImageData(0, 0, c.width, c.height).data;
-  var grey = new Array(c.width * c.height), changed = 0;
+  var grey = new Array(c.width * c.height), changed = 0, sx = 0, sy = 0;
   for (var i = 0, j = 0; i < px.length; i += 4, j++) {
     grey[j] = (px[i] * 3 + px[i + 1] * 6 + px[i + 2]) / 10;
-    if (eye.prev && Math.abs(grey[j] - eye.prev[j]) > PIXEL_CHANGE) changed++;
+    if (eye.prev && Math.abs(grey[j] - eye.prev[j]) > PIXEL_CHANGE) {
+      changed++;
+      sx += j % c.width;
+      sy += (j / c.width) | 0;
+    }
   }
   var first = !eye.prev;
   eye.prev = grey;
   if (first) return;
   eye.level = changed * 100 / grey.length;
+  if (changed) { eye.cx = sx / changed / c.width; eye.cy = sy / changed / c.height; }
+  $("eyemeter").style.width = Math.min(120, eye.level * 8) + "px";
+  if (eye.level > GLANCE && mode === "ambient") glanceAt(eye.cx, eye.cy);
   var now = Date.now();
   if (eye.level > MOVE) {
     if (!eye.present) arrived();
@@ -644,6 +665,15 @@ function eyeLook() {
     leftRoom();
   }
   if (mode === "med" && $("medrun").className === "") stillness();
+}
+
+// look toward the movement. The front camera's picture isn't mirrored: when you
+// move to your left you show up on the camera's right, so the sides swap.
+function glanceAt(cx, cy) {
+  var face = cx > 0.6 ? "lookl" : cx < 0.4 ? "lookr" : cy < 0.35 ? "lookup" : "good";
+  eye.glance = face;
+  eye.glanceUntil = Date.now() + 2500;
+  if (eye.present) $("bigface").src = big(face);
 }
 
 function setAway(away) {

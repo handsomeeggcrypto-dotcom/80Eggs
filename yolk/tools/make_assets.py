@@ -19,7 +19,8 @@ STATIC = HERE.parent / "static"
 sys.path.insert(0, str(Path.home() / "80Eggs" / "shell" / "tools"))
 from gen_art import yolk_face, PINK  # noqa: E402
 
-MOODS = ["great", "good", "ok", "tired", "dying", "dream", "blink", "talk", "sus", "love", "shock"]
+MOODS = ["great", "good", "ok", "tired", "dying", "dream", "blink", "talk", "sus", "love", "shock",
+         "lookl", "lookr", "lookup"]
 
 
 def transparent(img):

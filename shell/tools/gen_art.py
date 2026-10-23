@@ -118,6 +118,12 @@ def yolk_face(mood, scale):
             d.rectangle([ex - 1, 9, ex, 12], fill=eye)
             d.point((ex - 1, 9), fill=SHELL)
         d.rectangle([11, 15, 12, 18], fill=eye)
+    elif mood in ("lookl", "lookr", "lookup"):   # glancing toward movement (YOLK's eye)
+        dx = {"lookl": -2, "lookr": 2, "lookup": 0}[mood]
+        dy = -2 if mood == "lookup" else 0
+        for ex in (8, 15):
+            d.rectangle([ex - 1 + dx, 10 + dy, ex + dx, 12 + dy], fill=eye)
+        d.line([(10 + dx // 2, 16), (13 + dx // 2, 16)], fill=eye)
     return g.resize((FACE_GRID * scale, FACE_GRID * scale), Image.NEAREST)
 
 
