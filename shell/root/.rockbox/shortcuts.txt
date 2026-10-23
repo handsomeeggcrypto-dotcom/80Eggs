@@ -20,6 +20,11 @@ data: /YOLK/moekadex.lua
 
 [shortcut]
 type: file
+name: DREAM THINGS
+data: /YOLK/dreams.lua
+
+[shortcut]
+type: file
 name: WAKE YOLK
 data: /YOLK/boot.lua
 

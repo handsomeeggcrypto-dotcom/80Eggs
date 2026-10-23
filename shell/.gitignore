@@ -5,3 +5,8 @@ root/YOLK/moekadex/reclen.txt
 root/YOLK/moekadex/last.txt
 __pycache__/
 tools/sim/build/
+root/YOLK/dreams/img/
+root/YOLK/dreams/data.txt
+root/YOLK/dreams/reclen.txt
+root/YOLK/dreams/last.txt
+tools/cache/

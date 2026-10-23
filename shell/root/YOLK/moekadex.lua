@@ -1,7 +1,10 @@
 --[[ MOEKADEX // every moemoe LLC Moe, on SHELL
      wheel    browse          left/right   jump 50
      play     random Moe      select       full trait list
-     hold select  type a number           menu         back / exit ]]
+     hold select  type a number           menu         back / exit
+
+     Other collections reuse this file: set a DEX table and dofile it (see
+     dreams.lua). Anything DEX leaves out falls back to Moekadex's settings. ]]
 
 require "actions"
 dofile("/YOLK/usb.lua")  -- close and hand SHELL over when plugged in
@@ -9,16 +12,21 @@ dofile("/YOLK/usb.lua")  -- close and hand SHELL over when plugged in
 
 local A = rb.actions
 local W, H, HZ = rb.LCD_WIDTH, rb.LCD_HEIGHT, rb.HZ
-local DIR = "/YOLK/moekadex/"
-local N = 5250
+local D = DEX or {}
+local DIR = D.dir or "/YOLK/moekadex/"
+local N = D.count or 5250
+local ITEM = D.item or "MOE"                       -- "MOE #12", "JUMP TO MOE"
+local TAGLINE = D.tagline or ("moemoe LLC . " .. N .. " moes")
+local PIC_W, PIC_H = D.pic_w or 160, D.pic_h or 176
 local UI = rb.FONT_UI
 
-local NAVY   = rb.lcd_rgbpack(6, 18, 74)
-local BLUE   = rb.lcd_rgbpack(4, 86, 250)
-local YELLOW = rb.lcd_rgbpack(255, 194, 26)
-local WHITE  = rb.lcd_rgbpack(242, 234, 219)
-local DIM    = rb.lcd_rgbpack(130, 160, 235)
-local BROWN  = rb.lcd_rgbpack(106, 62, 0)
+local function rgb(c, r, g, b) c = c or { r, g, b }; return rb.lcd_rgbpack(c[1], c[2], c[3]) end
+local C = D.colors or {}
+local NAVY   = rgb(C.bg, 6, 18, 74)               -- background
+local BLUE   = rgb(C.bar, 4, 86, 250)             -- top and bottom bars
+local YELLOW = rgb(C.accent, 255, 194, 26)        -- frames, highlights
+local WHITE  = rgb(C.text, 242, 234, 219)
+local DIM    = rgb(C.dim, 130, 160, 235)
 local TIER = {
     MYTHIC    = rb.lcd_rgbpack(255, 61, 110),
     LEGENDARY = YELLOW,
@@ -99,7 +107,7 @@ end
 
 ---------------------------------------------------------------- screens
 local title = bmp(DIR .. "title.bmp")
-local bradley = bmp(DIR .. "bradley.bmp")
+local fallback = bmp(DIR .. (D.fallback or "bradley.bmp"))   -- shown while a picture loads
 
 local function bars(right_text, hint)
     rect(NAVY, 0, 0, W, H)
@@ -112,22 +120,24 @@ local function bars(right_text, hint)
     text(WHITE, hint, 0, H - 19, "center", W)
 end
 
-local PX, PY = 10, 36  -- where the picture goes
+local PX = 10                                  -- where the picture goes
+local PY = 36 + (176 - PIC_H) / 2              -- taller art sits a little higher
 
 local function draw_main(m, pic, loading)
     bars(string.format("#%04d", m.n), "spin:browse  >:random  o:traits")
-    -- picture in a yellow frame
-    rect(YELLOW, PX - 2, PY - 2, 164, 180)
-    rect(NAVY, PX, PY, 160, 176)
+    -- picture in an accent-coloured frame
+    rect(YELLOW, PX - 2, PY - 2, PIC_W + 4, PIC_H + 4)
+    rect(NAVY, PX, PY, PIC_W, PIC_H)
     if pic then
-        rb.lcd_bitmap(pic, PX, PY, 160, 176)
+        rb.lcd_bitmap(pic, PX, PY, PIC_W, PIC_H)
     else
-        blit(bradley, PX + 48, PY + 56)
-        if loading then text(DIM, "loading", PX, PY + 128, "center", 160) end
+        if fallback then blit(fallback, PX + (PIC_W - fallback:width()) / 2, PY + (PIC_H - fallback:height()) / 2 - 10) end
+        if loading then text(DIM, "loading", PX, PY + PIC_H * 3 / 4, "center", PIC_W) end
     end
     -- info panel
-    local x, cols = 184, math.floor((W - 184 - 6) / CW)
-    text(YELLOW, "MOE #" .. m.n, x, 36)
+    local x = PX + PIC_W + 14
+    local cols = math.floor((W - x - 6) / CW)
+    text(YELLOW, ITEM .. " #" .. m.n, x, 36)
     local tcol = TIER[m.tier] or WHITE
     local tw = rb.font_getstringsize(" " .. m.tier .. " ", UI)
     rect(tcol, x, 56, tw, CH + 2)
@@ -190,7 +200,7 @@ local function jump_screen(n)
         rect(NAVY, 50, 70, 220, 100)
         rect(YELLOW, 50, 70, 220, 2); rect(YELLOW, 50, 168, 220, 2)
         rect(YELLOW, 50, 70, 2, 100); rect(YELLOW, 268, 70, 2, 100)
-        text(YELLOW, "JUMP TO MOE", 50, 80, "center", 220)
+        text(YELLOW, "JUMP TO " .. ITEM, 50, 80, "center", 220)
         local x0 = 160 - (CW * 2 + 6) * 2
         for i = 1, 4 do
             local x = x0 + (i - 1) * (CW * 2 + 6) + CW / 2
@@ -222,7 +232,7 @@ end
 local function splash()
     local s = rb.read_bmp_file(DIR .. "splash.bmp", false, false)
     if s then rb.lcd_bitmap(s, 0, 0, W, H) else rect(BLUE, 0, 0, W, H) end
-    text(WHITE, "moemoe LLC . " .. N .. " moes", 0, 206, "center", W)
+    text(D.tagline_color and rgb(D.tagline_color) or WHITE, TAGLINE, 0, 206, "center", W)
     rb.lcd_update()
     s = nil
     local stop = rb.current_tick() + HZ * 3 / 2
