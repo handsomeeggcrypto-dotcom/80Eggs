@@ -13,6 +13,7 @@ desktop terminal ("remind me tomorrow") are read out once, then cleared.
 import datetime as dt
 import json
 import random
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -185,20 +186,25 @@ def build(print_only=False):
 
 
 MEDITATION = HERE / "static" / "sounds" / "med"     # tools/make_meditation_audio.py
+SESSIONS = HERE / "static" / "sounds" / "sessions"  # tools/make_meditation_sessions.py
 
 
 def deliver_meditation():
-    """Puts the binaural / noise tracks on SHELL as a Meditation album (only missing ones)."""
-    if not (SHELL / "YOLK").is_dir() or not MEDITATION.is_dir():
+    """Puts the binaural / noise tracks on SHELL as a Meditation album, and the ready-made
+    bell-to-bell sessions MEDITATE plays in Meditation Sessions (only missing ones)."""
+    if not (SHELL / "YOLK").is_dir():
         return 0
-    dest = SHELL / "Music" / "Meditation"
-    dest.mkdir(parents=True, exist_ok=True)
     copied = 0
-    for track in sorted(MEDITATION.glob("*.m4a")):
-        target = dest / track.name
-        if not target.exists() or target.stat().st_size != track.stat().st_size:
-            target.write_bytes(track.read_bytes())
-            copied += 1
+    for src, album in [(MEDITATION, "Meditation"), (SESSIONS, "Meditation Sessions")]:
+        if not src.is_dir():
+            continue
+        dest = SHELL / "Music" / album
+        dest.mkdir(parents=True, exist_ok=True)
+        for track in sorted(src.glob("*.m4a")):
+            target = dest / track.name
+            if not target.exists() or target.stat().st_size != track.stat().st_size:
+                shutil.copyfile(track, target)
+                copied += 1
     return copied
 
 

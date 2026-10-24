@@ -140,6 +140,33 @@ def face_strip(scale):
     return strip
 
 
+# breathing ring around YOLK on the meditation now-playing screen; the skin steps
+# through these with %t timed sublines (in 4s, out 6s). Opaque, with the backdrop
+# baked in, so each step fully covers the last (see-through frames smear).
+RING_SIZE, RING_FRAMES, RING_MIN, RING_MAX = 136, 11, 42, 66
+RING_AT = (92, 32)          # where yolk.wps draws it on screen
+
+
+def breath_ring_strip():
+    s = RING_SIZE
+    back = backdrop().crop((RING_AT[0], RING_AT[1], RING_AT[0] + s, RING_AT[1] + s))
+    face = yolk_face("blink", 3)                       # eyes closed
+    keep = Image.new("L", face.size, 0)
+    keep.putdata([0 if px == PINK else 255 for px in face.getdata()])
+    strip = Image.new("RGB", (s, s * RING_FRAMES))
+    for i in range(RING_FRAMES):
+        frame = back.copy()
+        d = ImageDraw.Draw(frame)
+        r = RING_MIN + (RING_MAX - RING_MIN) * i / (RING_FRAMES - 1)
+        c = s / 2
+        d.ellipse([c - r - 3, c - r - 3, c + r + 3, c + r + 3], outline=YOLK_DARK, width=1)
+        d.ellipse([c - r, c - r, c + r, c + r], outline=YOLK_DIM, width=2)
+        f = (s - face.width) // 2
+        frame.paste(face, (f, f), keep)
+        strip.paste(frame, (0, i * s))
+    return strip
+
+
 def progress_bar():
     img = Image.new("RGB", (300, 6), YOLK)
     d = ImageDraw.Draw(img)
@@ -166,6 +193,7 @@ if __name__ == "__main__":
     save(face_strip(1), "wps/yolk/face-small.bmp")   # 24px, status bar
     save(face_strip(3), "wps/yolk/face-big.bmp")     # 72px, now playing
     save(progress_bar(), "wps/yolk/pb.bmp")
+    save(breath_ring_strip(), "wps/yolk/breath.bmp")
     for m in ["great", "good", "ok", "tired", "dying", "dream", "blink"]:
         save(yolk_face(m, 4), f"../YOLK/faces/{m}.bmp")  # 96px, for the Lua apps
     save(title("YOLK ONLINE"), "../YOLK/img/title.bmp")

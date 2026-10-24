@@ -5,6 +5,11 @@ data: /YOLK/checkin.lua
 
 [shortcut]
 type: file
+name: MEDITATE
+data: /YOLK/meditate.lua
+
+[shortcut]
+type: file
 name: TALK TO YOLK
 data: /YOLK/talk.lua
 

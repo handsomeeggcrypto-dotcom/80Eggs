@@ -1,4 +1,5 @@
 # YOLK // SHELL OS now-playing screen (320x240)
+# Tracks in Music/Meditation Sessions (MEDITATE) get a breathing view instead.
 #
 %wd
 %Fl(2,12-Terminus.fnt)
@@ -6,17 +7,21 @@
 %Fl(4,14-Terminus.fnt)
 %xl(face,face-small.bmp,0,0,7)
 %xl(big,face-big.bmp,0,0,7)
+%xl(ring,breath.bmp,92,0,11)
 #
 # Top bar (same as the status bar, which %wd hides here)
 %V(4,1,24,24,-)
 %?bp<%xd(face,7)|%?if(%bl,<,0)<%xd(face,1)|%?if(%bl,<,10)<%xd(face,2)|%?if(%bl,<,30)<%xd(face,3)|%?if(%bl,<,55)<%xd(face,4)|%?if(%bl,<,80)<%xd(face,5)|%xd(face,6)>>>>>>
 %V(32,6,180,14,4)%Vf(FFC21A)
-%alNOW TRANSMITTING
+%al%?if(%d(1),=,Meditation Sessions)<BREATHE WITH YOLK|NOW TRANSMITTING>
 %V(210,6,104,14,2)%Vf(F2EADB)
 %ar%cH:%cM  %?bp<+|>%bl%%
 #
+# Meditation view, or the normal one
+%?if(%d(1),=,Meditation Sessions)<%Vd(m)|%Vd(n)>
+#
 # Album art in a yolk frame, or YOLK's big face when there's none
-%?C<%Vd(a)|%Vd(b)>
+%?if(%d(1),=,Meditation Sessions)<|%?C<%Vd(a)|%Vd(b)>>
 %Vl(a,10,36,124,124,-)%Vf(FFC21A)
 %dr(0,0,124,124)
 %Vl(a,12,38,120,120,-)
@@ -26,26 +31,44 @@
 %?bp<%xd(big,7)|%?if(%bl,<,0)<%xd(big,1)|%?if(%bl,<,10)<%xd(big,2)|%?if(%bl,<,30)<%xd(big,3)|%?if(%bl,<,55)<%xd(big,4)|%?if(%bl,<,80)<%xd(big,5)|%xd(big,6)>>>>>>
 #
 # Track info
-%V(146,38,166,18,3)%Vf(FFC21A)
+%Vl(n,146,38,166,18,3)%Vf(FFC21A)
 %s%al%?it<%it|%fn>
-%V(146,60,166,16,4)%Vf(F2EADB)
+%Vl(n,146,60,166,16,4)%Vf(F2EADB)
 %s%al%?ia<%ia|%?iA<%iA|unknown signal>>
-%V(146,78,166,14,2)%Vf(8A6410)
+%Vl(n,146,78,166,14,2)%Vf(8A6410)
 %s%al%?id<%id|>
-%V(146,94,166,14,2)%Vf(8A6410)
+%Vl(n,146,94,166,14,2)%Vf(8A6410)
 %al%?iy<%ss(0,4,%iy)|>
-%V(146,124,166,14,2)%Vf(8A6410)
+%Vl(n,146,124,166,14,2)%Vf(8A6410)
 %alNEXT >
-%V(146,138,166,14,2)%Vf(F2EADB)
+%Vl(n,146,138,166,14,2)%Vf(F2EADB)
 %s%al%?It<%It|%Fn>
 #
 # Progress: dim track with the yolk filling it
-%V(10,172,300,6,-)%Vf(4A3810)
+%Vl(n,10,172,300,6,-)%Vf(4A3810)
 %dr(0,0,300,6)
 %pb(0,0,300,6,pb.bmp)
-%V(10,182,300,14,2)%Vf(F2EADB)
+%Vl(n,10,182,300,14,2)%Vf(F2EADB)
 %al%pc%ac%?ps<SHUFFLE|>%?mm<| REPEAT| REPEAT 1| REPEAT| REPEAT>%ar-%pr
+#
+# Meditation: YOLK with eyes closed in a ring that grows (in, 4s) and shrinks (out, 6s)
+%Vl(m,0,32,320,168,3)%Vf(F2EADB)
+
+
+
+
+
+
+
+
+
+%t(0.5)%xd(ring,1)%acbreathe in;%t(0.5)%xd(ring,1)%acbreathe in;%t(0.5)%xd(ring,3)%acbreathe in;%t(0.5)%xd(ring,4)%acbreathe in;%t(0.5)%xd(ring,6)%acbreathe in;%t(0.5)%xd(ring,8)%acbreathe in;%t(0.5)%xd(ring,9)%acbreathe in;%t(0.5)%xd(ring,11)%acbreathe in;%t(0.6)%xd(ring,11)%acbreathe out;%t(0.6)%xd(ring,11)%acbreathe out;%t(0.6)%xd(ring,10)%acbreathe out;%t(0.6)%xd(ring,9)%acbreathe out;%t(0.6)%xd(ring,7)%acbreathe out;%t(0.6)%xd(ring,6)%acbreathe out;%t(0.6)%xd(ring,5)%acbreathe out;%t(0.6)%xd(ring,3)%acbreathe out;%t(0.6)%xd(ring,2)%acbreathe out;%t(0.6)%xd(ring,1)%acbreathe out
+%Vl(m,20,196,280,4,-)%Vf(4A3810)
+%dr(0,0,280,4)
+%pb(0,0,280,4,pb.bmp)
+%Vl(m,20,202,280,14,2)%Vf(8A6410)
+%al%s%fn%ar-%pr
 #
 # YOLK talks in the bottom bar
 %V(8,222,304,14,2)%Vf(FFC21A)
-%s%alYOLK> %?bp<dreaming... do not disturb|%?if(%bl,<,0)<who am i?|%?if(%bl,<,10)<i am fading. plug me in.|%?if(%bl,<,30)<running on fumes.|%?if(%bl,<,55)<watching. waiting.|%?if(%bl,<,80)<systems nominal.|fully hatched. let's go.>>>>>>
+%s%alYOLK> %?if(%d(1),=,Meditation Sessions)<i'm right here. just breathe.|%?bp<dreaming... do not disturb|%?if(%bl,<,0)<who am i?|%?if(%bl,<,10)<i am fading. plug me in.|%?if(%bl,<,30)<running on fumes.|%?if(%bl,<,55)<watching. waiting.|%?if(%bl,<,80)<systems nominal.|fully hatched. let's go.>>>>>>>

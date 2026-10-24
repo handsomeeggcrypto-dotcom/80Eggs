@@ -12,8 +12,8 @@ Nothing is ever erased: files are only added or replaced. In order:
   3. your SHELL                  settings, boot animation, scores, notes... from
                                  the latest backup (tools/backup_shell.py)
   4. music                       the songs you picked (Desktop/Classic Ipod)
-  5. YOLK                        newest memory, check-ins, dreams, YOLK Daily
-                                 from the Mac's YOLK brain
+  5. YOLK                        newest memory, check-ins, dreams, YOLK Daily,
+                                 meditation sessions, from the Mac's YOLK brain
 
 The bootloader lives in SHELL's own flash chip, not on the drive, so it
 survives the swap and isn't touched here.
@@ -137,7 +137,14 @@ def main():
     else:
         print(f"   no song picks at {PICKS}; skipping")
 
-    step(5, "YOLK (memory, check-ins, dreams, YOLK Daily)")
+    step(5, "YOLK (memory, check-ins, dreams, YOLK Daily, meditation)")
+    # meditation sounds aren't in git either; make them if missing (daily.deliver() copies them)
+    for script, folder, count in [("make_meditation_audio.py", "med", 6),
+                                  ("make_meditation_sessions.py", "sessions", 35)]:
+        d = YOLK / "static" / "sounds" / folder
+        if not d.is_dir() or len(list(d.glob("*.m4a"))) < count:
+            print(f"   meditation {folder} missing, making them (a few minutes)...")
+            run([sys.executable, YOLK / "tools" / script])
     if not DRY:
         env = dict(os.environ, YOLK_SHELL=str(target / "YOLK"))
         subprocess.run([sys.executable, "-c",
