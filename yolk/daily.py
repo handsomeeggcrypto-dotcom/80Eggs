@@ -11,7 +11,9 @@ Weather comes from open-meteo.com and crypto prices from CoinGecko (both free, n
 Optional wallets, by public address only (read-only balance lookups; a Solana
 wallet's other tokens are counted too, priced by Jupiter):
   "wallets": {"solana": "<address>", "ethereum": "0x...", "bitcoin": "bc1..."} Reminders left on the
-desktop terminal ("remind me tomorrow") are read out once, then cleared.
+desktop terminal ("remind me tomorrow") are read out once, then cleared. With an API key
+(python3 yolk/ai.py --key), YOLK writes her own sign-off and leaves SHELL a dream, a
+secret and an oracle answer each day (see ai.py).
 """
 import datetime as dt
 import json
@@ -33,6 +35,7 @@ SHELL = Path("/Volumes/SHELL")
 
 sys.path.insert(0, str(HERE))
 import server  # noqa: E402  (memory + Moe lookups)
+import ai  # noqa: E402  (real-AI YOLK; does nothing without an API key)
 
 DEFAULTS = {"city": "", "voice": "Junior", "rate": 175}
 
@@ -248,7 +251,8 @@ def script(day, cfg):
     m = moe_of_the_day(day)
     if m:
         lines.append(m)
-    lines.append(rnd.choice([
+    mind = ai.write(day, extras=[x for x in (w, m) if x])
+    lines.append(mind["daily"] if mind else rnd.choice([
         "That's it. Go do things. I'll be in your pocket, judging.",
         "End of transmission. Hit next when you're ready. I'll wait. I always wait.",
         "That's the day. Be nice to yourself. Or don't. I'm an egg, not a cop.",
@@ -319,6 +323,23 @@ def deliver():
     # also as text, so Talk to YOLK can read it out on screen
     text = (OUT / "daily.txt").read_text(encoding="utf-8")
     (SHELL / "YOLK" / "daily.txt").write_text(text.encode("latin-1", "replace").decode("latin-1"), encoding="latin-1")
+    deliver_ai()
+    return True
+
+
+def deliver_ai():
+    """Hands the AI-written dream, secret and oracle for the briefing's day to SHELL, once."""
+    day = (OUT / "day.txt").read_text().strip() if (OUT / "day.txt").exists() else ""
+    written = ai.OUT / f"{day}.json"
+    marker = ai.OUT / "delivered.txt"
+    if not day or not written.exists() or (marker.exists() and marker.read_text().strip() == day):
+        return False
+    mind = json.loads(written.read_text())
+    with open(SHELL / "YOLK" / "dreams.txt", "a", encoding="latin-1", errors="replace") as f:
+        for kind in ("dream", "secret", "oracle"):
+            if mind.get(kind):
+                f.write(f"{kind}: {mind[kind]}\n")
+    marker.write_text(day)
     return True
 
 
