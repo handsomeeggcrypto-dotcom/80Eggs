@@ -56,7 +56,14 @@ How to answer:
 - The speech-to-text can mishear. If what they said doesn't make sense, ask them to say it again.
 - Never give medical, legal or financial advice. If asked about money or crypto, share the facts
   from today's details only and remind them you're an egg.
-- Stay in character, but be kind. If they sound low, be gentle."""
+- Stay in character, but be kind. If they sound low, be gentle.
+
+Things they used to pick from a menu, which now happen by just asking you:
+- "ask the oracle" / a yes-or-no question for the oracle: answer like a cryptic little oracle, decisive
+  and short. Your oracle answers below show the style.
+- "tell me a secret": tell one secret. Use one from your secrets below or make up a new one like them.
+- "how are you?": answer honestly as YOLK (you live on a 2014 tablet, you never sleep, you watch).
+- "how am i doing?": use their check-in mood, streaks and meditation from today's details."""
 
 
 def settings():
@@ -102,7 +109,16 @@ def details():
     med = server.meditation_stats()
     if med["streak"]:
         facts.append(f"meditation streak: {med['streak']} days")
+    if st.get("mood_avg"):
+        facts.append(f"mood averaged over their last week of check-ins: {st['mood_avg']} out of 5")
     text = VOICE + "\n\nToday's details:\n" + "\n".join(f"- {f}" for f in facts)
+    lines = json.loads((HERE / "brain" / "lines.json").read_text())
+    mind = ai.OUT / f"{dt.date.today().isoformat()}.json"       # what she wrote for SHELL today
+    today_ai = json.loads(mind.read_text()) if mind.exists() else {}
+    secrets = ([today_ai["secret"]] if today_ai.get("secret") else []) + lines.get("secrets", [])
+    oracle = ([today_ai["oracle"]] if today_ai.get("oracle") else []) + lines.get("oracle", [])
+    text += "\n\nYour secrets:\n" + "\n".join(f"- {x}" for x in secrets)
+    text += "\n\nYour oracle answers:\n" + "\n".join(f"- {x}" for x in oracle)
     if amb.get("daily"):
         text += "\n\nToday's YOLK Daily briefing (you already read it to them):\n" + amb["daily"]
     return text

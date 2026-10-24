@@ -6,6 +6,7 @@
 faces/<mood>.png      24px, for pages that scale them up with crisp pixels
 faces/big/<mood>.png  240px, already blown up 10x: the tablet's 2015-era
                       Chrome blurs scaled images (no image-rendering: pixelated)
+faces/huge/<mood>.png 480px (20x), for the Station's idle screen
 sounds/bell.wav       a soft singing-bowl tone for meditation
 """
 import math
@@ -35,9 +36,11 @@ def transparent(img):
 
 def faces():
     (STATIC / "faces" / "big").mkdir(parents=True, exist_ok=True)
+    (STATIC / "faces" / "huge").mkdir(parents=True, exist_ok=True)
     for m in MOODS:
         transparent(yolk_face(m, 1)).save(STATIC / "faces" / f"{m}.png")
         transparent(yolk_face(m, 10)).save(STATIC / "faces" / "big" / f"{m}.png")
+        transparent(yolk_face(m, 20)).save(STATIC / "faces" / "huge" / f"{m}.png")
 
 
 def bell(seconds=6.0, rate=22050):

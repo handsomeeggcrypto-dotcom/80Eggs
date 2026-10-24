@@ -37,6 +37,7 @@
   .tier { display: inline-block; padding: 0 8px; color: #0a0806; font-size: 24px; }
   /* faces/big/* are already 240px; shown at exactly that size so old Chrome never blurs them */
   #bigface { width: 240px; height: 240px; }
+  #bigface.huge { width: 480px; height: 480px; }
   #idle { margin-top: 18px; font-size: 30px; color: #8a6410; text-align: center; max-width: 90%; min-height: 2.5em; }
   .tap { font-size: 22px; color: #3a2c0c; margin-top: 10px; }
 
@@ -180,6 +181,10 @@ var L = {}, mem = {}, amb = null, mode = "ambient";
 
 function $(id) { return document.getElementById(id); }
 function big(face) { return "faces/big/" + face + ".png"; }
+// the idle screen gets the 480px faces when there's room (pre-sized, so old Chrome doesn't blur them)
+var portrait = window.innerHeight > window.innerWidth;
+var HUGE = (portrait ? window.innerWidth : Math.min(window.innerWidth * 0.46, window.innerHeight - 180)) >= 500;
+function idleFace(face) { return (HUGE ? "faces/huge/" : "faces/big/") + face + ".png"; }
 function pick(a) { return a[Math.floor(Math.random() * a.length)]; }
 function fill(s) { return s.replace(/\{name\}/g, (mem.name && mem.name !== "nobody") ? mem.name : "you"); }
 
@@ -248,10 +253,10 @@ var blinkT = null;
 function idleLife() {
   if (mode !== "ambient") return;
   var f = moodFace();
-  $("bigface").src = big("blink");
+  $("bigface").src = idleFace("blink");
   setTimeout(function () {
     if (mode !== "ambient") return;
-    $("bigface").src = big(eye.on && Date.now() < eye.glanceUntil ? eye.glance : f);
+    $("bigface").src = idleFace(eye.on && Date.now() < eye.glanceUntil ? eye.glance : f);
   }, 140);
   if (Math.random() < 0.25 && L.station_idle) $("idle").textContent = fill(pick(L.station_idle));
   blinkT = setTimeout(idleLife, 2500 + Math.random() * 4000);
@@ -343,7 +348,8 @@ function sleepNow() {
   idleLife();
 }
 
-var TOPICS = ["talk to me", "meditate", "how are you?", "what's today?", "ask the oracle", "tell me a secret", "how am i doing?", "go back to sleep"];
+// everything else (oracle, secrets, how are you...) lives in "talk to me" now
+var TOPICS = ["talk to me", "meditate", "what's today?", "go to sleep"];
 function menu() {
   say(pick(["what do you want to talk about?", "so.", "anything else?", "i'm listening."]), null, function () {
     choose(TOPICS, function (c) {
@@ -351,23 +357,11 @@ function menu() {
       var t = TOPICS[c];
       if (t === "talk to me") converse(true);
       else if (t === "meditate") say(pick(["ok. let's sit.", "good idea. i'll breathe too. sort of."]), "blink", medPick);
-      else if (t === "how are you?") howAreYou(then);
       else if (t === "what's today?") today(then);
-      else if (t === "ask the oracle") oracle(then);
-      else if (t === "tell me a secret") say(pick(L.secrets), pick(["sus", "ok", "shock"]), then);
-      else if (t === "how am i doing?") progress(then);
       else say(pick(["going back to watching.", "ok. i'll be right here.", "sleep mode. not really. i never sleep."]), "ok",
                function () { setTimeout(sleepNow, 800); });
     });
   });
-}
-
-function howAreYou(cb) {
-  var w = amb && amb.weather;
-  var extra = w ? (w.hi >= 85 ? " it's hot out there. eggs cook at that temperature." :
-                   w.lo <= 32 ? " it's freezing tonight. i'm glad i live indoors." : "") : "";
-  say(pick(["good. i have a big screen now. it's a lot of me.", "fine. watching. waiting. you know.",
-            "i'm an egg on a tablet. honestly? thriving."]) + extra, "good", cb);
 }
 
 function today(cb) {
@@ -375,29 +369,6 @@ function today(cb) {
   if (!text) return say("no briefing yet. plug SHELL into the mac and i'll make one.", "sus", cb);
   var ls = text.split("\n").filter(function (l) { return l.trim(); });
   lines(ls, ["good", "talk"], cb);
-}
-
-function oracle(cb) {
-  say("think of a question. yes or no. hold it in your head. then tap spin.", "sus", function () {
-    var spins = 0, faces = ["sus", "shock", "ok", "talk"];
-    (function loop() {
-      choose(["spin" + new Array((spins % 4) + 1).join("."), "ask now"], function (c) {
-        if (c === 0) { spins++; $("talkface").src = big(faces[spins % 4]); loop(); }
-        else say(pick(L.oracle), pick(["sus", "good", "shock", "ok"]), cb);
-      });
-    })();
-  });
-}
-
-function progress(cb) {
-  get("/api/stats", function (st) {
-    if (!st.entries || !st.entries.length) return say("no check-ins yet. do one on SHELL, then plug it into the mac.", "sus", cb);
-    var best = null;
-    for (var h in st.streaks) if (!best || st.streaks[h] > st.streaks[best]) best = h;
-    var s = "your mood's been averaging " + st.mood_avg + " out of 5.";
-    if (best && st.streaks[best] > 1) s += " best streak: " + best + ", " + st.streaks[best] + " days.";
-    say(s, st.mood_avg >= 3.5 ? "good" : "ok", cb);
-  });
 }
 
 function wake() {
@@ -833,7 +804,7 @@ function glanceAt(cx, cy) {
   var face = cx > 0.6 ? "lookl" : cx < 0.4 ? "lookr" : cy < 0.35 ? "lookup" : "good";
   eye.glance = face;
   eye.glanceUntil = Date.now() + 2500;
-  if (eye.present) $("bigface").src = big(face);
+  if (eye.present) $("bigface").src = idleFace(face);
 }
 
 function setAway(away) {
@@ -851,8 +822,8 @@ function arrived() {
   if (mode !== "ambient") return;
   var line = pick(["oh. you're back.", "there you are.", "i saw you come in. obviously.", "welcome back, {name}."]);
   $("idle").textContent = fill(line);
-  $("bigface").src = big("shock");
-  setTimeout(function () { if (mode === "ambient") $("bigface").src = big("good"); }, 900);
+  $("bigface").src = idleFace("shock");
+  setTimeout(function () { if (mode === "ambient") $("bigface").src = idleFace("good"); }, 900);
   speak(fill(line));   // works once the page has been tapped since it loaded
 }
 
@@ -878,6 +849,7 @@ $("eyebtn").onclick = function (e) {
 // ------------------------------------------------------------ go
 $("yolkspot").onclick = wake;
 $("bigface").onclick = wake;
+if (HUGE) { $("bigface").className = "huge"; $("bigface").src = idleFace("good"); }
 document.addEventListener("click", resetIdle);
 document.addEventListener("click", function () { eye.lastMove = Date.now(); if (!eye.present) setAway(false); });
 get("/api/lines", function (d) { L = d; $("idle").textContent = fill(pick(L.station_idle || ["still here."])); });
