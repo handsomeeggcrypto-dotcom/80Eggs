@@ -338,21 +338,24 @@ function sleepNow() {
   clearInterval(med.timer);
   if (!bed.paused) bed.pause();
   audio.pause();
+  micClose();
   show("ambient");
   idleLife();
 }
 
-var TOPICS = ["meditate", "how are you?", "what's today?", "ask the oracle", "tell me a secret", "how am i doing?", "go back to sleep"];
+var TOPICS = ["talk to me", "meditate", "how are you?", "what's today?", "ask the oracle", "tell me a secret", "how am i doing?", "go back to sleep"];
 function menu() {
   say(pick(["what do you want to talk about?", "so.", "anything else?", "i'm listening."]), null, function () {
     choose(TOPICS, function (c) {
       var then = function () { setTimeout(menu, 300); };
-      if (c === 0) say(pick(["ok. let's sit.", "good idea. i'll breathe too. sort of."]), "blink", medPick);
-      else if (c === 1) howAreYou(then);
-      else if (c === 2) today(then);
-      else if (c === 3) oracle(then);
-      else if (c === 4) say(pick(L.secrets), pick(["sus", "ok", "shock"]), then);
-      else if (c === 5) progress(then);
+      var t = TOPICS[c];
+      if (t === "talk to me") converse(true);
+      else if (t === "meditate") say(pick(["ok. let's sit.", "good idea. i'll breathe too. sort of."]), "blink", medPick);
+      else if (t === "how are you?") howAreYou(then);
+      else if (t === "what's today?") today(then);
+      else if (t === "ask the oracle") oracle(then);
+      else if (t === "tell me a secret") say(pick(L.secrets), pick(["sus", "ok", "shock"]), then);
+      else if (t === "how am i doing?") progress(then);
       else say(pick(["going back to watching.", "ok. i'll be right here.", "sleep mode. not really. i never sleep."]), "ok",
                function () { setTimeout(sleepNow, 800); });
     });
@@ -406,7 +409,118 @@ function wake() {
   clearTimeout(blinkT);
   show("talk");
   post("/api/memory", { station_visits: (parseInt(mem.station_visits || "0", 10) || 0) + 1 }, function (r) { if (r && r.memory) mem = r.memory; });
-  say(pick(L.station_hello || ["oh. hi."]), "good", function () { setTimeout(menu, 300); });
+  var h = new Date().getHours();
+  var hello = h >= 4 && h < 12 ? pick(["good morning, {name}. talk to me if you want.", "morning, {name}. i'm awake. obviously.",
+                                       "good morning. tap talk to me and ask me anything."])
+                               : pick(L.station_hello || ["oh. hi."]);
+  say(hello, "good", function () { setTimeout(menu, 300); });
+}
+
+// ------------------------------------------------------------ talking out loud
+// The mic records you, the Mac turns it into text (Whisper, on the Mac) and Claude
+// answers as YOLK. Old Chrome has no MediaRecorder, so this builds a WAV by hand.
+var mic = { stream: null, ctx: null, node: null };
+
+function micOpen(ok, fail) {
+  if (mic.stream) return ok();
+  var md = navigator.mediaDevices;
+  var got = function (stream) { mic.stream = stream; ok(); };
+  if (md && md.getUserMedia) md.getUserMedia({ audio: true, video: false }).then(got, fail);
+  else if (navigator.webkitGetUserMedia) navigator.webkitGetUserMedia({ audio: true, video: false }, got, fail);
+  else fail({ message: "no mic access on this page" });
+}
+
+function micClose() {
+  if (mic.node) { try { mic.node.disconnect(); } catch (e) {} mic.node = null; }
+  if (mic.stream) {
+    var tracks = mic.stream.getTracks ? mic.stream.getTracks() : [];
+    for (var i = 0; i < tracks.length; i++) tracks[i].stop();
+    mic.stream = null;
+  }
+}
+
+// records until you stop talking (or tap "done"), then hands cb a 16kHz WAV Blob (null if silent)
+function listen(cb) {
+  var AC = window.AudioContext || window.webkitAudioContext;
+  if (!mic.ctx) mic.ctx = new AC();
+  if (mic.ctx.resume) mic.ctx.resume();
+  var ctx = mic.ctx, src = ctx.createMediaStreamSource(mic.stream), node = ctx.createScriptProcessor(4096, 1, 1);
+  var chunks = [], start = Date.now(), lastLoud = 0, floor = 1, heard = false, done = false;
+  function stop() {
+    if (done) return;
+    done = true;
+    node.disconnect(); src.disconnect(); mic.node = null;
+    $("choices").innerHTML = "";
+    cb(heard ? wav(chunks, ctx.sampleRate) : null);
+  }
+  node.onaudioprocess = function (e) {
+    var d = e.inputBuffer.getChannelData(0), sum = 0;
+    chunks.push(new Float32Array(d));
+    for (var i = 0; i < d.length; i++) sum += d[i] * d[i];
+    var rms = Math.sqrt(sum / d.length), now = Date.now();
+    if (now - start < 400) { floor = Math.min(floor, rms); return; }      // learn the room's hum first
+    var loud = rms > Math.max(0.015, floor * 3);
+    if (loud) { heard = true; lastLoud = now; }
+    $("talkface").src = big(loud ? "talk" : "good");
+    if ((heard && now - lastLoud > 1400) || now - start > 20000 || (!heard && now - start > 8000)) stop();
+  };
+  src.connect(node);
+  node.connect(ctx.destination);             // Chrome only runs the processor when it's connected
+  mic.node = node;
+  choose(["done talking"], stop);
+}
+
+function wav(chunks, rate) {
+  var n = 0, i, j;
+  for (i = 0; i < chunks.length; i++) n += chunks[i].length;
+  var ratio = rate / 16000, out = new Int16Array(Math.floor(n / ratio)), all = new Float32Array(n), at = 0;
+  for (i = 0; i < chunks.length; i++) { all.set(chunks[i], at); at += chunks[i].length; }
+  for (i = 0; i < out.length; i++) {          // average down to 16kHz
+    var a = Math.floor(i * ratio), b = Math.min(n, Math.floor((i + 1) * ratio)), sum = 0;
+    for (j = a; j < b; j++) sum += all[j];
+    var v = Math.max(-1, Math.min(1, sum / Math.max(1, b - a)));
+    out[i] = v < 0 ? v * 0x8000 : v * 0x7fff;
+  }
+  var buf = new ArrayBuffer(44 + out.length * 2), dv = new DataView(buf);
+  function str(o, s) { for (var k = 0; k < s.length; k++) dv.setUint8(o + k, s.charCodeAt(k)); }
+  str(0, "RIFF"); dv.setUint32(4, 36 + out.length * 2, true); str(8, "WAVE"); str(12, "fmt ");
+  dv.setUint32(16, 16, true); dv.setUint16(20, 1, true); dv.setUint16(22, 1, true);
+  dv.setUint32(24, 16000, true); dv.setUint32(28, 32000, true); dv.setUint16(32, 2, true); dv.setUint16(34, 16, true);
+  str(36, "data"); dv.setUint32(40, out.length * 2, true);
+  for (i = 0; i < out.length; i++) dv.setInt16(44 + i * 2, out[i], true);
+  return new Blob([dv], { type: "audio/wav" });
+}
+
+function converse(first) {
+  micOpen(function () {
+    $("bubble").textContent = first ? "i'm listening. talk, then stop." : "go ahead.";
+    listen(function (rec) {
+      if (!rec) return say("i didn't hear anything. maybe next time.", "sus", function () { setTimeout(menu, 300); });
+      $("bubble").textContent = "...";
+      $("talkface").src = big("sus");
+      var x = new XMLHttpRequest();
+      x.open("POST", "/api/talk" + (first ? "?new=1" : ""));
+      x.timeout = 60000;
+      x.onload = function () {
+        var r = {};
+        try { r = JSON.parse(x.responseText); } catch (e) {}
+        say(r.reply || "my brain glitched. try again.", "good", function () {
+          choose(["say something else", "that's all"], function (c) { if (c === 0) converse(false); else menu(); });
+        });
+      };
+      x.onerror = x.ontimeout = function () {
+        say("the mac isn't answering. is it awake?", "sus", function () { setTimeout(menu, 300); });
+      };
+      x.send(rec);
+      resetIdle();
+    });
+  }, function (err) {
+    say("i can't hear you. the tablet won't let me use the mic.", "sus", function () {
+      eyeHelp(err && err.name === "NotAllowedError" ? "mic permission was turned down." :
+              (err && (err.name || err.message)) || "no mic access on this page.");
+      setTimeout(menu, 300);
+    });
+  });
 }
 
 // ------------------------------------------------------------ meditation

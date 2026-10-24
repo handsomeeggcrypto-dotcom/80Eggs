@@ -420,6 +420,12 @@ class Handler(BaseHTTPRequestHandler):
         path = self.path.split("?")[0]
         if not self.gate(path):
             return
+        if path == "/api/talk":              # a WAV recording from the Station's mic
+            import chat
+            n = int(self.headers.get("Content-Length", 0) or 0)
+            if not 0 < n <= 5_000_000:
+                return self.send(413, {"error": "recording too long"})
+            return self.send(200, chat.talk(self.rfile.read(n), new="new=1" in self.path))
         data = self.body()
         if path == "/api/pair":
             now = time.time()
