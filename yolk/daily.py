@@ -7,7 +7,10 @@
 
 Settings live in yolk/data/daily.json (made on first run):
   {"city": "Nashville", "voice": "Junior", "rate": 175}
-Weather comes from open-meteo.com (free, no account). Reminders left on the
+Weather comes from open-meteo.com and crypto prices from CoinGecko (both free, no account).
+Optional wallets, by public address only (read-only balance lookups; a Solana
+wallet's other tokens are counted too, priced by Jupiter):
+  "wallets": {"solana": "<address>", "ethereum": "0x...", "bitcoin": "bc1..."} Reminders left on the
 desktop terminal ("remind me tomorrow") are read out once, then cleared.
 """
 import datetime as dt
@@ -97,6 +100,102 @@ def weather(city, day):
     return line
 
 
+COINS = {"bitcoin": ("Bitcoin", "BTC"), "ethereum": ("Ethereum", "ETH"), "solana": ("Solana", "SOL")}
+
+
+def prices():
+    """{"bitcoin": (usd, change_24h_percent), ...} from CoinGecko (free, no account), or {}."""
+    try:
+        q = urllib.parse.urlencode({"ids": ",".join(COINS), "vs_currencies": "usd", "include_24hr_change": "true"})
+        d = get_json("https://api.coingecko.com/api/v3/simple/price?" + q)
+        return {k: (v["usd"], v.get("usd_24h_change") or 0) for k, v in d.items() if k in COINS}
+    except Exception:
+        return {}
+
+
+def post_json(url, payload):
+    req = urllib.request.Request(url, json.dumps(payload).encode(), {"Content-Type": "application/json"})
+    with urllib.request.urlopen(req, timeout=10) as r:
+        return json.loads(r.read())
+
+
+def balance(coin, address):
+    """Coins held at a public address (read-only lookups, no account), or None."""
+    try:
+        if coin == "solana":
+            r = post_json(SOLANA_RPC, {"jsonrpc": "2.0", "id": 1, "method": "getBalance", "params": [address]})
+            return r["result"]["value"] / 1e9
+        if coin == "ethereum":
+            r = post_json("https://eth.drpc.org",
+                          {"jsonrpc": "2.0", "id": 1, "method": "eth_getBalance", "params": [address, "latest"]})
+            return int(r["result"], 16) / 1e18
+        if coin == "bitcoin":
+            s = get_json("https://mempool.space/api/address/" + urllib.parse.quote(address))["chain_stats"]
+            return (s["funded_txo_sum"] - s["spent_txo_sum"]) / 1e8
+    except Exception:
+        return None
+
+
+SOLANA_RPC = "https://api.mainnet-beta.solana.com"
+TOKEN_PROGRAMS = ["TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA", "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb"]
+
+
+def jupiter(path):
+    req = urllib.request.Request("https://lite-api.jup.ag/" + path, headers={"User-Agent": "yolk"})
+    with urllib.request.urlopen(req, timeout=10) as r:
+        return json.loads(r.read())
+
+
+def solana_tokens(address):
+    """[(symbol, usd), ...] for the other tokens in a Solana wallet, priced by Jupiter (free, no account)."""
+    held = {}
+    try:
+        for prog in TOKEN_PROGRAMS:
+            r = post_json(SOLANA_RPC, {"jsonrpc": "2.0", "id": 1, "method": "getTokenAccountsByOwner",
+                                       "params": [address, {"programId": prog}, {"encoding": "jsonParsed"}]})
+            for acct in r["result"]["value"]:
+                info = acct["account"]["data"]["parsed"]["info"]
+                amount = float(info["tokenAmount"]["uiAmountString"])
+                if amount > 0:
+                    held[info["mint"]] = held.get(info["mint"], 0) + amount
+        ids = ",".join(list(held)[:50])
+        price = jupiter("price/v3?ids=" + ids)
+        names = {t["id"]: t.get("symbol") or "a mystery token" for t in jupiter("tokens/v2/search?query=" + ids)}
+    except Exception:
+        return []
+    return [(names.get(m, "a mystery token"), amount * ((price.get(m) or {}).get("usdPrice") or 0))
+            for m, amount in held.items()]
+
+
+def dollars(x):
+    return f"{x:,.0f} dollars" if x >= 100 else f"{x:,.2f} dollars"
+
+
+def crypto(cfg):
+    """Spoken lines: today's prices, then what the wallets in daily.json are worth."""
+    p = prices()
+    if not p:
+        return []
+    parts = []
+    for k, (usd, ch) in p.items():
+        move = "flat" if abs(ch) < 0.5 else f"{'up' if ch > 0 else 'down'} {abs(ch):.0f} percent"
+        parts.append(f"{COINS[k][0]} {dollars(usd)}, {move}")
+    lines = ["Crypto: " + ". ".join(parts) + "."]
+    held = []                           # (name, usd)
+    for k, addr in (cfg.get("wallets") or {}).items():
+        amount = balance(k, addr) if addr and k in p else None
+        if amount is not None:
+            held.append((COINS[k][1], amount * p[k][0]))
+        if addr and k == "solana":
+            held += solana_tokens(addr)
+    held = sorted((h for h in held if h[1] >= 1), key=lambda h: -h[1])   # skip dust and airdrop junk
+    if held:
+        top = ", ".join(f"{name} {dollars(usd)}" for name, usd in held[:3])
+        lines.append(f"Your wallet is worth about {dollars(sum(usd for _, usd in held))}. Biggest: {top}. "
+                     "I don't give financial advice. I'm an egg.")
+    return lines
+
+
 def moe_of_the_day(day):
     n = random.Random(day.toordinal()).randint(1, 5250)
     m = server.moe(n)
@@ -130,6 +229,7 @@ def script(day, cfg):
     w = weather(cfg["city"], day)
     if w:
         lines.append(w)
+    lines += crypto(cfg)
     rem = take_reminders()
     if rem:
         lines.append("You told me to remind you:" if len(rem) > 1 else "You told me to remind you of something.")
