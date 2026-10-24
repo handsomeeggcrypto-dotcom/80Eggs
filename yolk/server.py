@@ -427,6 +427,16 @@ class Handler(BaseHTTPRequestHandler):
                 return self.send(413, {"error": "recording too long"})
             return self.send(200, chat.talk(self.rfile.read(n), new="new=1" in self.path))
         data = self.body()
+        if path == "/api/chat":              # typed conversation from the desktop terminal
+            import chat
+            text = str(data.get("text", "")).strip()[:1000]
+            if not text:
+                return self.send(400, {"error": "empty"})
+            try:
+                return self.send(200, {"reply": chat.reply(text, bool(data.get("new")), where="desk")})
+            except Exception as e:
+                print("YOLK chat failed:", e)
+                return self.send(200, {"reply": "my brain glitched. try again in a second."})
         if path == "/api/pair":
             now = time.time()
             if now < _bad_codes["until"]:

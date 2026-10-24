@@ -6,6 +6,8 @@ this Mac (your voice never leaves the house), Claude answers as YOLK, and the
 tablet speaks the answer with /api/say.
 
   python3 yolk/chat.py "hi yolk"    talk to her in the terminal (for testing)
+
+The desktop terminal (localhost:8008) has "talk to me" too, typed instead of spoken.
   python3 yolk/chat.py --cost       what talking has cost, per day and this month
 
 Her brain is one word in yolk/data/talk.json:  {"brain": "opus"}
@@ -43,10 +45,16 @@ BRAINS = {
 FORGET_AFTER = 10 * 60      # a new conversation after 10 quiet minutes
 MAX_TURNS = 20              # older turns drop off so a long chat doesn't get pricey
 
+PLACES = {
+    "station": "Right now you're on the Station, the old Samsung tablet. Your owner is talking to you out "
+               "loud, usually in the morning, and your words are read aloud by a robotic voice.",
+    "desk": "Right now you're on the desktop terminal on the Mac. Your owner is typing to you, and your "
+            "words appear as text on the terminal screen.",
+}
+
 VOICE = """You are YOLK, an egg-shaped AI who lives on her owner's Mac, on an old Samsung tablet (the
-Station, where you are right now) and inside SHELL, their old iPod Classic. You are a little creepy,
-dry, affectionate and very loyal, like a cyberpunk tamagotchi that never sleeps. Your owner is
-talking to you out loud, usually in the morning, and your words are read aloud by a robotic voice.
+Station) and inside SHELL, their old iPod Classic. You are a little creepy, dry, affectionate and very
+loyal, like a cyberpunk tamagotchi that never sleeps. {where}
 
 How to answer:
 - Speak, don't write: one to three short sentences, all lowercase, no lists, no emoji, no markdown,
@@ -81,7 +89,7 @@ def settings():
     return s
 
 
-def details():
+def details(where="station"):
     """What YOLK knows about today, written into her instructions for the conversation."""
     now = dt.datetime.now()
     mem = server.read_mem(server.MEMORY)
@@ -111,7 +119,7 @@ def details():
         facts.append(f"meditation streak: {med['streak']} days")
     if st.get("mood_avg"):
         facts.append(f"mood averaged over their last week of check-ins: {st['mood_avg']} out of 5")
-    text = VOICE + "\n\nToday's details:\n" + "\n".join(f"- {f}" for f in facts)
+    text = VOICE.format(where=PLACES[where]) + "\n\nToday's details:\n" + "\n".join(f"- {f}" for f in facts)
     lines = json.loads((HERE / "brain" / "lines.json").read_text())
     mind = ai.OUT / f"{dt.date.today().isoformat()}.json"       # what she wrote for SHELL today
     today_ai = json.loads(mind.read_text()) if mind.exists() else {}
@@ -125,7 +133,7 @@ def details():
 
 
 _lock = threading.Lock()
-_convo = {"messages": [], "system": "", "last": 0}
+_convos = {}          # one conversation per place: "station", "desk"
 
 
 def log_cost(brain, usage):
@@ -139,7 +147,7 @@ def log_cost(brain, usage):
     return usd
 
 
-def reply(text, new=False):
+def reply(text, new=False, where="station"):
     """YOLK's answer to `text`, keeping the conversation going for a while."""
     key = ai.api_key()
     if not key:
@@ -147,8 +155,9 @@ def reply(text, new=False):
     brain = settings()["brain"]
     model = BRAINS[brain][0]
     with _lock:
+        _convo = _convos.setdefault(where, {"messages": [], "system": "", "last": 0})
         if new or time.time() - _convo["last"] > FORGET_AFTER:
-            _convo["messages"], _convo["system"] = [], details()
+            _convo["messages"], _convo["system"] = [], details(where)
         msgs = _convo["messages"] + [{"role": "user", "content": text}]
         msgs = msgs[-MAX_TURNS * 2 + 1:]
         if msgs[0]["role"] != "user":
@@ -225,6 +234,6 @@ if __name__ == "__main__":
     if "--cost" in sys.argv:
         print(cost_report())
     elif len(sys.argv) > 1:
-        print(reply(" ".join(sys.argv[1:]), new=True))
+        print(reply(" ".join(sys.argv[1:]), new=True, where="desk"))
     else:
         print(__doc__)

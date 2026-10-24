@@ -180,12 +180,12 @@ function choose(options) {
   });
 }
 
-function ask(placeholder, type = "text") {
+function ask(placeholder, type = "text", max = 120) {
   return new Promise(resolve => {
     const box = $("choices");
     box.innerHTML = "";
     const row = Object.assign(document.createElement("div"), { className: "entry" });
-    const input = Object.assign(document.createElement("input"), { type, placeholder, maxLength: 120 });
+    const input = Object.assign(document.createElement("input"), { type, placeholder, maxLength: max });
     const ok = Object.assign(document.createElement("button"), { textContent: "send" });
     const back = Object.assign(document.createElement("button"), { textContent: "never mind" });
     const go = v => { box.innerHTML = ""; resolve(v); };
@@ -357,6 +357,23 @@ async function aboutShell() {
   if (state.queued) { await say(`i'm holding ${state.queued} dream${state.queued > 1 ? "s" : ""} for SHELL until it plugs in.`, "dream"); await next(); }
 }
 
+// real-AI YOLK (yolk/chat.py), typed; "never mind" or an empty line goes back to the menu
+async function talk() {
+  await say(pick(["ok. type to me. i'm listening.", "go ahead. i read fast.", "talk. i'm all yolk."]), "good");
+  let first = true;
+  while (true) {
+    const text = await ask("say anything to YOLK", "text", 1000);
+    if (!text) { await say(pick(["ok. back to the menu.", "fine. i'll be right here."]), "ok"); return; }
+    $("said").textContent = "YOU> " + text;
+    $("bubble").textContent = "...";
+    setFace("sus");
+    let r;
+    try { r = await api("/api/chat", { text, new: first }); } catch (e) { r = { reply: "the server isn't answering. is it awake?" }; }
+    first = false;
+    await say(r.reply || "my brain glitched. try again.", "good");
+  }
+}
+
 // ------------------------------------------------------------ main
 async function main() {
   L = await api("/api/lines");
@@ -368,21 +385,22 @@ async function main() {
   if (!state.memory.name) await firstMeeting(); else await greet();
   await remember({ desk_visits: num("desk_visits") + 1 });
 
-  const topics = ["how are you?", "how am i doing?", "ask the oracle", "tell me a secret", "let's talk moes",
+  const topics = ["talk to me", "how are you?", "how am i doing?", "ask the oracle", "tell me a secret", "let's talk moes",
                   "leave SHELL a dream", "remind me tomorrow", "edit my habits", "how's SHELL?", "pair a tablet", "bye, yolk"];
   while (true) {
     await say(pick(["what do you want to talk about?", "so.", "anything else?", "i'm listening."]), mood);
     const c = await choose(topics);
-    if (c === 0) await howAreYou();
-    else if (c === 1) await progress();
-    else if (c === 2) await oracle();
-    else if (c === 3) { await say(pick(L.secrets), pick(["sus", "ok", "shock"])); await next(); }
-    else if (c === 4) await moes();
-    else if (c === 5) await dream();
-    else if (c === 6) await remind();
-    else if (c === 7) await editHabits();
-    else if (c === 8) await aboutShell();
-    else if (c === 9) await pairTablet();
+    if (c === 0) await talk();
+    else if (c === 1) await howAreYou();
+    else if (c === 2) await progress();
+    else if (c === 3) await oracle();
+    else if (c === 4) { await say(pick(L.secrets), pick(["sus", "ok", "shock"])); await next(); }
+    else if (c === 5) await moes();
+    else if (c === 6) await dream();
+    else if (c === 7) await remind();
+    else if (c === 8) await editHabits();
+    else if (c === 9) await aboutShell();
+    else if (c === 10) await pairTablet();
     else { await say(pick(L.goodbye), num("affection") >= 10 ? "love" : "ok"); await remember({}); await choose(["wake YOLK again"]); }
     await remember({ affection: num("affection") + 1 });
   }
