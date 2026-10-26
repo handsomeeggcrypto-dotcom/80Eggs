@@ -34,8 +34,6 @@ PROJECTS = [
     {"id": "naptime", "name": "Nap Time", "blurb": "Bedtime story, then play the dream. Every dream has a shadow.",
      "path": "nap_time", "open": "nap_time/", "live": "/nap_time/", "status": "live", "icon": "🌙",
      "server": {"cmd": ["python3", "nap_time/serve.py"], "port": 8177}},
-    {"id": "mechbreak", "name": "Mech Break", "blurb": "Mech pilot on break. Newest game, not on the homepage yet.",
-     "path": "mechbreak", "open": "mechbreak/", "live": None, "status": "local", "icon": "🤖"},
     {"id": "moemode", "name": "MoeMode", "blurb": "What should I do right now? Quests, brain dump, WHAT NOW.",
      "path": "moemode", "open": "moemode/", "live": "/moemode/", "status": "hidden", "icon": "moemode/icon.png"},
     {"id": "yolk", "name": "YOLK", "blurb": "The egg AI. Desktop terminal, Daily, check-ins, tablet Station.",
@@ -61,7 +59,8 @@ started = {}   # id -> Popen, for servers this page started
 
 
 def git(*args):
-    r = subprocess.run(["git", "-C", REPO, *args], capture_output=True, text=True, timeout=10)
+    # read-only: don't take index.lock, or a commit made while the page is polling can fail
+    r = subprocess.run(["git", "--no-optional-locks", "-C", REPO, *args], capture_output=True, text=True, timeout=10)
     return r.stdout.strip()
 
 
