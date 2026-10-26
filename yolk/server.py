@@ -152,7 +152,7 @@ def stats():
         return {"habits": habits(), "entries": [], "streaks": {}, "mood_avg": None}
     last = max(entries)
     recent = [entries.get(d) for d in range(last - 6, last + 1)]
-    moods = [e["mood"] for e in recent if e]
+    moods = [e["mood"] for e in recent if e and e["mood"] > 0]    # 0 = logged a meditation, no mood yet
     return {
         "habits": habits(),
         "entries": [e or {"day": last - 6 + i, "mood": None, "habits": []} for i, e in enumerate(recent)],

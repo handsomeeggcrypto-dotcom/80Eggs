@@ -315,7 +315,7 @@ async function progress() {
   const last = st.entries.length - 1;
   const days = st.entries.map((e, i) => {
     const label = i === last ? "latest" : `-${last - i}`;
-    return `<div class="day">${e.mood ? `<img src="faces/${MOOD_FACE[e.mood]}.png" alt="${MOOD_WORD[e.mood]}">` : `<div class="none"></div>`}${label}</div>`;
+    return `<div class="day">${e.mood > 0 ? `<img src="faces/${MOOD_FACE[e.mood]}.png" alt="${MOOD_WORD[e.mood]}">` : `<div class="none"></div>`}${label}</div>`;
   }).join("");
   const rows = st.habits.map(h => {
     const dots = st.entries.map(e => `<span class="dot${e.habits.includes(h) ? " on" : ""}"></span>`).join("");

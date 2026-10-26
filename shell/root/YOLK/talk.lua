@@ -585,7 +585,8 @@ local function checkin()
     else say(pick({ "check-in time. this is the part where i learn things about you.",
                     "daily check-in. be honest. i'll know if you're not.", "hi. report in." }), "talk") end
 
-    local mood = mood_dial(entry and entry.mood or 3)
+    -- mood 0 = a meditation logged the day before checking in; start the dial at 3
+    local mood = mood_dial((entry and entry.mood > 0) and entry.mood or 3)
     if not mood then return end
     local done = {}
     if entry then for h in pairs(entry.habits) do done[h] = true end end
