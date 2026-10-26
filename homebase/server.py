@@ -5,7 +5,7 @@
 Only listens on this Mac (127.0.0.1). It can start/stop exactly the servers listed in PROJECTS, nothing else.
 The 80Eggs folder is served read-only under /site/ so the static games open without their own server.
 """
-import json, os, socket, subprocess, time
+import json, os, socket, subprocess, sys, time
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import unquote, urlparse
 
@@ -178,5 +178,11 @@ class Handler(SimpleHTTPRequestHandler):
 
 
 if __name__ == "__main__":
+    if "--detach" in sys.argv:   # used by the Desktop app: start in the background and return right away
+        os.makedirs(LOGS, exist_ok=True)
+        subprocess.Popen([sys.executable, os.path.abspath(__file__)], cwd=REPO, stdin=subprocess.DEVNULL,
+                         stdout=open(os.path.join(LOGS, "server.log"), "a"), stderr=subprocess.STDOUT,
+                         start_new_session=True, close_fds=True)
+        sys.exit()
     print(f"80Eggs Home Base on http://localhost:{PORT}")
     ThreadingHTTPServer(("127.0.0.1", PORT), Handler).serve_forever()
