@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>80Eggs Home Base</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #14110d; --panel: #1e1a14; --panel2: #262019; --line: #3a3127;
+    --text: #f3ead9; --dim: #a89a85; --yolk: #ffb81c; --yolk-dim: #4a3510;
+    --green: #6fdc8c; --blue: #7cb8ff; --pink: #ff8fb8; --red: #ff6b5b;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.45 "Space Grotesk", system-ui, sans-serif; }
+  .wrap { max-width: 1180px; margin: 0 auto; padding: 28px 16px 60px; }
+  header { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+  .egg { width: 44px; height: 54px; border-radius: 50% 50% 46% 46% / 58% 58% 42% 42%; background: #fff6e6; position: relative; flex: none; }
+  .egg::after { content: ""; position: absolute; left: 11px; top: 18px; width: 22px; height: 22px; border-radius: 50%; background: var(--yolk); }
+  h1 { margin: 0; font-size: 28px; letter-spacing: .5px; }
+  h1 span { color: var(--yolk); }
+  .sub { color: var(--dim); font-size: 13px; }
+  .clock { margin-left: auto; font: 600 13px "JetBrains Mono", monospace; color: var(--dim); }
+
+  .strip { margin: 22px 0 18px; display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 10px; }
+  .stat { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; }
+  .stat b { display: block; font-size: 22px; }
+  .stat small { color: var(--dim); }
+  .stat.warn { border-color: var(--yolk); background: linear-gradient(var(--panel), var(--yolk-dim)); }
+  .stat.warn b { color: var(--yolk); }
+
+  .bar { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px; }
+  .chip { background: var(--panel); border: 1px solid var(--line); color: var(--dim); border-radius: 99px; padding: 6px 13px; font: inherit; font-size: 13px; cursor: pointer; }
+  .chip.on { background: var(--yolk); color: #1a1205; border-color: var(--yolk); font-weight: 700; }
+
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(310px, 1fr)); gap: 12px; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 14px; display: flex; flex-direction: column; gap: 10px; }
+  .card.running { border-color: var(--green); box-shadow: 0 0 0 1px var(--green) inset; }
+  .top { display: flex; gap: 12px; align-items: center; }
+  .icon { width: 46px; height: 46px; border-radius: 12px; background: var(--panel2); display: grid; place-items: center; font-size: 25px; flex: none; overflow: hidden; }
+  .icon img { width: 100%; height: 100%; object-fit: contain; image-rendering: pixelated; }
+  .name { font-weight: 700; font-size: 17px; }
+  .pills { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 2px; }
+  .pill { font: 600 10.5px "JetBrains Mono", monospace; text-transform: uppercase; letter-spacing: .5px; padding: 2px 7px; border-radius: 6px; border: 1px solid currentColor; }
+  .pill.live { color: var(--green); } .pill.hidden { color: var(--blue); } .pill.local { color: var(--pink); }
+  .pill.changed { color: var(--yolk); } .pill.on { color: var(--green); background: #1d3a24; } .pill.off { color: var(--dim); }
+  .blurb { color: var(--dim); font-size: 13.5px; }
+  .last { font: 12px "JetBrains Mono", monospace; color: var(--dim); border-top: 1px dashed var(--line); padding-top: 9px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .last b { color: var(--text); font-weight: 600; }
+  .btns { display: flex; gap: 6px; flex-wrap: wrap; margin-top: auto; }
+  .btn { background: var(--panel2); border: 1px solid var(--line); color: var(--text); border-radius: 8px; padding: 6px 11px; font: inherit; font-size: 13px; cursor: pointer; text-decoration: none; }
+  .btn:hover { border-color: var(--yolk); }
+  .btn.main { background: var(--yolk); color: #1a1205; border-color: var(--yolk); font-weight: 700; }
+  .btn.stop { color: var(--red); }
+  .btn:disabled { opacity: .5; cursor: wait; }
+
+  .offline { display: none; margin-top: 20px; padding: 16px; border: 1px solid var(--red); border-radius: 12px; color: var(--red); }
+  .toast { position: fixed; bottom: 18px; left: 50%; transform: translateX(-50%); background: var(--yolk); color: #1a1205; font-weight: 700; padding: 9px 16px; border-radius: 10px; opacity: 0; transition: opacity .2s; pointer-events: none; }
+  .toast.show { opacity: 1; }
+  @media (max-width: 520px) { .grid { grid-template-columns: 1fr; } .clock { margin-left: 0; width: 100%; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="egg"></div>
+    <div>
+      <h1>80EGGS <span>HOME BASE</span></h1>
+      <div class="sub">Everything you've built, in one place.</div>
+    </div>
+    <div class="clock" id="clock"></div>
+  </header>
+
+  <div class="strip" id="strip"></div>
+  <div class="bar" id="filters"></div>
+  <div class="grid" id="grid"></div>
+  <div class="offline" id="offline">Home Base server isn't answering. Double-click <b>Open Home Base.command</b> in the homebase folder.</div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+const FILTERS = [["all", "All"], ["recent", "Recently touched"], ["live", "Live"], ["hidden", "Hidden"], ["local", "Only on this Mac"], ["changed", "Has changes"]];
+let filter = "all", data = null;
+
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+function ago(t) {
+  if (!t) return "never";
+  const s = Date.now() / 1000 - t;
+  if (s < 3600) return Math.max(1, Math.round(s / 60)) + "m ago";
+  if (s < 86400) return Math.round(s / 3600) + "h ago";
+  const d = Math.round(s / 86400);
+  return d === 1 ? "yesterday" : d + " days ago";
+}
+function toast(msg) {
+  const el = document.getElementById("toast");
+  el.textContent = msg; el.classList.add("show");
+  clearTimeout(toast.t); toast.t = setTimeout(() => el.classList.remove("show"), 2200);
+}
+
+async function load() {
+  try {
+    data = await (await fetch("/api/status")).json();
+    document.getElementById("offline").style.display = "none";
+    render();
+  } catch {
+    document.getElementById("offline").style.display = "block";
+  }
+}
+
+function render() {
+  const running = data.projects.filter(p => p.server && p.server.running).length;
+  const stats = [
+    data.unpushed
+      ? { warn: true, big: data.unpushed + " commits", small: `waiting to go live · last push ${ago(data.lastPush)}` }
+      : { big: "Up to date", small: `live site matches this Mac · pushed ${ago(data.lastPush)}` },
+    { big: data.changed.length || "Clean", small: data.changed.length ? "files changed, not committed" : "nothing uncommitted", warn: data.changed.length > 0 },
+    { big: data.projects.length, small: "projects" },
+    { big: running, small: running === 1 ? "server running" : "servers running" },
+  ];
+  document.getElementById("strip").innerHTML = stats.map(s =>
+    `<div class="stat${s.warn ? " warn" : ""}"><b>${esc(s.big)}</b><small>${esc(s.small)}</small></div>`).join("");
+
+  document.getElementById("filters").innerHTML = FILTERS.map(([id, label]) =>
+    `<button class="chip${filter === id ? " on" : ""}" data-filter="${id}">${label}</button>`).join("");
+
+  let list = data.projects.slice();
+  if (filter === "recent") list.sort((a, b) => (b.last?.time || 0) - (a.last?.time || 0));
+  else if (filter === "changed") list = list.filter(p => p.changed);
+  else if (filter !== "all") list = list.filter(p => p.status === filter);
+
+  document.getElementById("grid").innerHTML = list.map(card).join("") ||
+    `<div class="blurb">Nothing here.</div>`;
+}
+
+function card(p) {
+  const icon = p.icon.includes(".") ? `<img src="/site/${esc(p.icon)}" alt="">` : esc(p.icon);
+  const statusWord = { live: "live", hidden: "hidden", local: "this mac" }[p.status];
+  const pills = [`<span class="pill ${p.status}">${statusWord}</span>`];
+  if (p.changed) pills.push(`<span class="pill changed">${p.changed} changed</span>`);
+  if (p.server) pills.push(p.server.running ? `<span class="pill on">● running :${p.server.port}</span>` : `<span class="pill off">stopped</span>`);
+  if ("mounted" in p) pills.push(p.mounted ? `<span class="pill on">● plugged in</span>` : `<span class="pill off">not plugged in</span>`);
+
+  const btns = [];
+  if (p.server) {
+    if (p.server.running) {
+      btns.push(`<a class="btn main" href="${p.server.url}" target="_blank">Open</a>`);
+      btns.push(`<button class="btn stop" data-act="stop" data-id="${p.id}">Stop</button>`);
+    } else {
+      btns.push(`<button class="btn main" data-act="start" data-id="${p.id}">Start</button>`);
+    }
+  } else if (p.open) {
+    btns.push(`<a class="btn main" href="/site/${esc(p.open)}" target="_blank">Play</a>`);
+  }
+  if (p.mounted) btns.push(`<button class="btn" data-act="mount" data-id="${p.id}">Open iPod</button>`);
+  if (p.live) btns.push(`<a class="btn" href="${esc(p.live)}" target="_blank">Live site ↗</a>`);
+  btns.push(`<button class="btn" data-act="finder" data-id="${p.id}">Folder</button>`);
+
+  const last = p.last ? `<b>${ago(p.last.time)}</b> · ${esc(p.last.subject)}` : "not committed yet";
+  return `<div class="card${p.server?.running ? " running" : ""}">
+    <div class="top"><div class="icon">${icon}</div>
+      <div><div class="name">${esc(p.name)}</div><div class="pills">${pills.join("")}</div></div></div>
+    <div class="blurb">${esc(p.blurb)}</div>
+    <div class="last" title="${esc(p.last?.subject || "")}">${last}</div>
+    <div class="btns">${btns.join("")}</div>
+  </div>`;
+}
+
+document.addEventListener("click", async e => {
+  const f = e.target.closest("[data-filter]");
+  if (f) { filter = f.dataset.filter; return render(); }
+  const b = e.target.closest("[data-act]");
+  if (!b) return;
+  b.disabled = true;
+  try {
+    const r = await (await fetch(`/api/${b.dataset.act}/${b.dataset.id}`, { method: "POST", headers: { "X-Homebase": "1" } })).json();
+    toast(r.ok || r.error);
+  } catch { toast("Home Base didn't answer"); }
+  await load();
+});
+
+function tick() {
+  document.getElementById("clock").textContent =
+    new Date().toLocaleString(undefined, { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
+}
+tick(); setInterval(tick, 10000);
+load(); setInterval(load, 5000);
+</script>
+</body>
+</html>

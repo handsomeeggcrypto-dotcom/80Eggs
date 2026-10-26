@@ -6,3 +6,6 @@ jack/
 
 # iPod photo dump for the Moekedex (4.5 GB)
 moekedex/ipod_photos/
+
+# Home Base server logs
+homebase/logs/
