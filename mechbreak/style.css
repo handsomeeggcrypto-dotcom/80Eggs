@@ -1,0 +1,229 @@
+/* ============================================================
+   MECH BREAK — style.css
+   EDIT: colors, fonts, HUD layout, button styles
+   ============================================================ */
+
+/* --- EDIT: neon accent colors here --- */
+:root {
+  --pink:   #ff2d9b;
+  --purple: #9b2dca;
+  --dark:   #0a0610;
+  --panel:  rgba(0, 0, 15, 0.88);
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  background: #000;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+  font-family: 'Share Tech Mono', monospace;
+  color: #ccc;
+}
+
+#game-container {
+  position: relative;
+  width: 100vw;
+  height: 100vh;
+}
+
+#gameCanvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+/* ── HUD ─────────────────────────────────────────────────── */
+#hud {
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  padding: 10px 18px;
+  pointer-events: none;
+  background: linear-gradient(to bottom, rgba(0,0,0,.65), transparent);
+}
+
+#hud-left  { display: flex; gap: 16px; }
+#hud-right { text-align: right; }
+
+.hud-box {
+  background: rgba(0,0,0,.55);
+  border: 1px solid rgba(255,45,155,.25);
+  padding: 7px 14px;
+  min-width: 100px;
+}
+
+.hud-label {
+  font-size: 10px;
+  letter-spacing: 2px;
+  color: #666;
+  text-transform: uppercase;
+  margin-bottom: 2px;
+}
+
+.hud-value {
+  font-family: 'Orbitron', sans-serif;
+  font-size: 20px;
+  font-weight: 700;
+  color: #fff;
+}
+
+.neon-pink { color: var(--pink); }
+
+/* Morale bar */
+#hud-center {
+  flex: 1;
+  max-width: 280px;
+  text-align: center;
+}
+
+#hud-center .hud-label {
+  margin-bottom: 5px;
+  color: var(--pink);
+}
+
+#morale-bar-wrap {
+  position: relative;
+  height: 18px;
+  background: rgba(0,0,0,.5);
+  border: 1px solid rgba(255,45,155,.3);
+  display: flex;
+  align-items: center;
+}
+
+#morale-bar {
+  height: 100%;
+  width: 100%;
+  background: linear-gradient(90deg, var(--purple), var(--pink));
+  transition: width .3s, background .5s;
+}
+
+#morale-pct {
+  position: absolute;
+  right: 7px;
+  font-size: 11px;
+  color: #fff;
+}
+
+/* ── MINI-GAME HINT ─────────────────────────────────────── */
+#mg-hint {
+  position: absolute;
+  bottom: 28%;
+  left: 50%;
+  transform: translateX(-50%);
+  white-space: nowrap;
+  font-size: 12px;
+  letter-spacing: 3px;
+  color: rgba(255,255,255,.75);
+  background: rgba(0,0,0,.55);
+  border: 1px solid rgba(255,255,255,.12);
+  padding: 8px 22px;
+  pointer-events: none;
+  animation: fadeOut 3s forwards;
+}
+
+@keyframes fadeOut {
+  0%   { opacity: 1; }
+  70%  { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+/* ── MODAL SCREENS ──────────────────────────────────────── */
+#start-screen,
+#summary-screen {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background: rgba(0, 0, 12, .82);
+  z-index: 20;
+}
+
+.modal-box {
+  text-align: center;
+  width: min(480px, 90vw);
+  padding: 38px 36px;
+  background: var(--panel);
+  border: 1px solid rgba(255,45,155,.4);
+  box-shadow: 0 0 50px rgba(155,45,202,.3), inset 0 0 30px rgba(0,0,0,.4);
+}
+
+.modal-title {
+  font-family: 'Orbitron', sans-serif;
+  font-size: clamp(28px, 6vw, 48px);
+  font-weight: 900;
+  color: var(--pink);
+  text-shadow: 0 0 18px var(--pink), 0 0 40px rgba(255,45,155,.5);
+  letter-spacing: 4px;
+  margin-bottom: 6px;
+}
+
+.modal-sub {
+  color: var(--purple);
+  font-size: 12px;
+  letter-spacing: 3px;
+  margin-bottom: 24px;
+}
+
+.modal-body {
+  color: #999;
+  font-size: 13px;
+  line-height: 2.2;
+  margin-bottom: 28px;
+}
+
+.modal-body .hl { color: var(--pink); font-weight: bold; }
+
+/* Stat rows */
+#summary-stats {
+  margin-bottom: 20px;
+}
+
+.stat-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 9px 0;
+  border-bottom: 1px solid rgba(255,255,255,.07);
+  font-size: 13px;
+  color: #888;
+}
+
+/* ── BUTTON ─────────────────────────────────────────────── */
+.neon-btn {
+  font-family: 'Orbitron', sans-serif;
+  font-size: 13px;
+  letter-spacing: 3px;
+  padding: 13px 30px;
+  background: transparent;
+  border: 2px solid var(--pink);
+  color: var(--pink);
+  cursor: pointer;
+  text-transform: uppercase;
+  transition: background .18s, box-shadow .18s;
+  box-shadow: 0 0 14px rgba(255,45,155,.3);
+  margin-top: 10px;
+}
+
+.neon-btn:hover, .neon-btn:focus {
+  background: rgba(255,45,155,.12);
+  box-shadow: 0 0 28px rgba(255,45,155,.6);
+  outline: none;
+}
+
+/* ── UTILITY ─────────────────────────────────────────────── */
+.hidden { display: none !important; }
+
+/* ── MOBILE ─────────────────────────────────────────────── */
+@media (max-width: 600px) {
+  #hud-center { display: none; }
+  .hud-value { font-size: 15px; }
+  .hud-label { font-size: 9px; }
+  .hud-box   { padding: 5px 10px; min-width: 80px; }
+}
