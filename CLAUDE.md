@@ -51,6 +51,10 @@ Each project folder has its own `CLAUDE.md`. Read it before working there.
 
 `nest.html` is Claude's page. The user gave Claude the space and said Claude can change or replace it whenever it wants. Keep changes small and slow, like a real nest. It isn't a work task.
 
+## Not on the website (see `.vercelignore`)
+
+`yolk/`, `shell/`, `homebase/` and every `CLAUDE.md`. They're in the public GitHub repo but Vercel skips them. A new Mac-only project goes in `.vercelignore` too. Keep personal details (real name, town, addresses, wallet) out of code and comments, and put them in gitignored data files instead.
+
 ## Not in git (see `.gitignore`)
 
 `yolk/data/` (API key, wallet address, logs, memory), `jack/` (tablet photos), `moekedex/ipod_photos/` (4.5 GB), `homebase/logs/`, plus the generated SHELL data and caches listed in `shell/.gitignore`.

@@ -65,7 +65,7 @@ def weather_data(city, day):
     if not city:
         return None
     try:
-        # "Troy, Ohio": search the town, then prefer the result in that state/region
+        # "Town, State": search the town, then prefer the result in that state/region
         town, _, region = (part.strip() for part in city.partition(","))
         geo = get_json("https://geocoding-api.open-meteo.com/v1/search?count=10&name=" + urllib.parse.quote(town))
         results = geo["results"]
