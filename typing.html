@@ -710,6 +710,8 @@ body{
           <div class="opt" data-mode="money">MONEY IQ<span class="d">FINANCIAL</span></div>
           <div class="opt" data-mode="wealth">WEALTH ⚡<span class="d">MEGA MIX</span></div>
           <div class="opt" data-mode="claude">CLAUDE<span class="d">AI MASTERY</span></div>
+          <div class="opt" data-mode="crypto">CRYPTO<span class="d">BLOCKCHAIN</span></div>
+          <div class="opt" data-mode="memecoin">MEME COINS<span class="d">HIGH RISK</span></div>
           <div class="opt" data-mode="braindump">BRAIN DUMP<span class="d">FREE WRITE</span></div>
         </div>
       </div>
@@ -1437,8 +1439,74 @@ const CLAUDE = [
 "have claude research a niche and find the gaps you can fill.",
 "the money comes from shipping and selling, not just generating."
 ];
+const CRYPTO = [
+"blockchain is a shared public ledger that no single party controls.",
+"a wallet holds your keys, not your coins; the coins live on the chain.",
+"your private key is your money, so never share it with anyone.",
+"not your keys, not your coins, so self custody carries real weight.",
+"a seed phrase can restore your wallet, so guard it offline.",
+"bitcoin was the first blockchain and has a capped supply of coins.",
+"ethereum added smart contracts that run code on the blockchain.",
+"gas fees are what you pay to use a blockchain network.",
+"a stablecoin is designed to track the value of a dollar.",
+"exchanges let you buy crypto but they hold your keys for you.",
+"a hardware wallet keeps your keys offline and safer from hackers.",
+"decentralized finance lets people lend and trade without a bank.",
+"a token can represent almost anything built on a blockchain.",
+"mining and staking are two ways networks confirm transactions.",
+"transactions on a public chain are permanent and visible to all.",
+"market cap equals the price times the number of coins in supply.",
+"crypto markets run twenty four hours a day, every single day.",
+"volatility means prices can swing hard in either direction fast.",
+"never invest more in crypto than you can afford to lose.",
+"if a return sounds guaranteed, it is almost certainly a scam.",
+"a single phishing link can drain a wallet in one click.",
+"verify every address before you send, because transfers are final.",
+"open code and a real audit make a project easier to trust.",
+"diversification lowers the risk of any single coin failing.",
+"dollar cost averaging spreads your buys to smooth out timing.",
+"a bull market rises over time and a bear market falls over time.",
+"do your own research before trusting anyone's coin tip.",
+"crypto rules still vary widely from one country to another.",
+"keep records of your trades because taxes may apply to gains.",
+"cold storage means keys kept fully offline for the long term."
+];
+
+const MEMECOIN = [
+"a meme coin has value only from hype and community, not utility.",
+"most meme coins go to zero, so assume you could lose it all.",
+"only risk money that you are fully prepared to lose completely.",
+"a rug pull is when the creators drain the money and vanish.",
+"check that the liquidity is locked before you ever buy in.",
+"if the team is anonymous, the risk goes up, not down.",
+"a honeypot lets you buy but then blocks you from selling.",
+"test with a tiny sell first to confirm that you can exit.",
+"if a few wallets hold most of the supply, that is a red flag.",
+"if one wallet can dump it all, you are the exit liquidity.",
+"hype peaks fast and dumps faster, so plan your exit first.",
+"take profit on the way up, because greed turns gains to losses.",
+"decide your exit price before you enter, never after.",
+"size every position small, since any coin can vanish overnight.",
+"influencer shills are often paid to make you the buyer.",
+"when everyone is euphoric, the smart money is already selling.",
+"new coins launch every minute, so missing one is not a loss.",
+"fear of missing out is the emotion that empties most wallets.",
+"a renounced contract lowers the risk but never removes it.",
+"check that the trading volume is real and not wash traded.",
+"slippage and fees can quietly eat a big chunk of your trade.",
+"never chase a coin that has already pumped hard.",
+"set a stop loss in your mind and actually honor it.",
+"most short term traders lose, and meme coins are the hardest game.",
+"treat it like gambling, not investing, and size it that way.",
+"a coin with no locked liquidity can be pulled at any moment.",
+"profit screenshots are easy to fake, so trust data, not hype.",
+"taxes still apply to crypto gains, even on a quick flip.",
+"scam tokens can be bait, so protect your keys above all.",
+"the edge favors the insiders, so only bet what you can lose."
+];
+
 const WEALTH = [].concat(AFFIRMATIONS, SALES, BUSINESS, MONEY);
-const MODE_POOL={sentences:SENTENCES, affirmations:AFFIRMATIONS, learning:LEARNING, sales:SALES, business:BUSINESS, money:MONEY, wealth:WEALTH, claude:CLAUDE};
+const MODE_POOL={sentences:SENTENCES, affirmations:AFFIRMATIONS, learning:LEARNING, sales:SALES, business:BUSINESS, money:MONEY, wealth:WEALTH, claude:CLAUDE, crypto:CRYPTO, memecoin:MEMECOIN};
 function moreText(){
   if(cfg.mode==='words') return ' '+genWords(120);
   if(cfg.mode==='dialog') return ' '+genPool(DIALOG,3);
@@ -1624,7 +1692,7 @@ function endGame(){
   $('rErr').textContent=errors;
   $('rScore').textContent=score.toLocaleString();
   $('rDur').textContent=fmt(cfg.dur);
-  $('rTag').textContent = ({words:'RANDOM WORDS',sentences:'REAL SENTENCES',dialog:'DIALOG PAGES',affirmations:'AFFIRMATIONS',learning:'LEARNING',sales:'SALES & PERSUASION',business:'BUSINESS PLAYBOOK',money:'MONEY MASTERY',wealth:'WEALTH MEGA MIX',claude:'CLAUDE AI MASTERY'})[cfg.mode]+' // '+fmt(cfg.dur);
+  $('rTag').textContent = ({words:'RANDOM WORDS',sentences:'REAL SENTENCES',dialog:'DIALOG PAGES',affirmations:'AFFIRMATIONS',learning:'LEARNING',sales:'SALES & PERSUASION',business:'BUSINESS PLAYBOOK',money:'MONEY MASTERY',wealth:'WEALTH MEGA MIX',claude:'CLAUDE AI MASTERY',crypto:'CRYPTO BASICS',memecoin:'MEME COIN TRADING'})[cfg.mode]+' // '+fmt(cfg.dur);
 
   // --- commit to persistent records ---
   const g=loadMissed();
@@ -1784,7 +1852,7 @@ function downloadDump(){
   setTimeout(()=>{ URL.revokeObjectURL(a.href); document.body.removeChild(a); },100);
 }
 
-const MODE_LABEL={words:'WORDS',sentences:'SENT',dialog:'DIALOG',affirmations:'AFFIRM',learning:'LEARN',sales:'SALES',business:'BIZ',money:'MONEY',wealth:'WEALTH',claude:'CLAUDE'};
+const MODE_LABEL={words:'WORDS',sentences:'SENT',dialog:'DIALOG',affirmations:'AFFIRM',learning:'LEARN',sales:'SALES',business:'BIZ',money:'MONEY',wealth:'WEALTH',claude:'CLAUDE',crypto:'CRYPTO',memecoin:'MEME'};
 function renderRecords(container, highlight){
   const scores=loadScores().slice(0,10);
   const missed=Object.entries(loadMissed()).sort((a,b)=>b[1]-a[1]).slice(0,5);
