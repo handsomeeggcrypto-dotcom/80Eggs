@@ -286,6 +286,8 @@ def build(print_only=False):
     (OUT / "day.txt").write_text(day.isoformat())
     if rem:
         REMINDERS.write_text("")          # read out once
+    # the morning text (morning.py) repeats them, since they're gone from REMINDERS by then
+    (OUT / "reminders.json").write_text(json.dumps({"day": day.isoformat(), "items": rem}))
     return text, OUT / "YOLK Daily.m4a", day
 
 

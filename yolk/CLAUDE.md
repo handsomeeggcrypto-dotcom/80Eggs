@@ -18,6 +18,7 @@ YOLK is the egg AI, one character across all the user's devices. The user calls 
 | `static/pair.html` | pairing page for new devices |
 | `brain/lines.json` | YOLK's shared personality lines for every device |
 | `daily.py` | **YOLK Daily**: spoken briefing (weather, reminders, Moe of the day, crypto, streaks) via macOS `say` (voice Reed) → m4a delivered to SHELL |
+| `morning.py` | **morning text**: weather, reminders, her dream + oracle, streaks, crypto, sent by iMessage at `text_at` to `text_to` (both in `data/daily.json`). `~/Applications/YOLK Morning.app` does the sending (only an app may control Messages), and a LaunchAgent fires it. Run `--install` / `--uninstall`, `--test` sends one now, and no flag just prints it. Sends once a day, and never after noon if the Mac slept through the morning. |
 | `ai.py` | once a day, Claude writes her dream / secret / oracle / sign-off → `data/ai/<day>.json` |
 | `chat.py` | conversations: Station voice (whisper-cli → Claude) and desktop typing. Model set in `data/talk.json`. `python3 yolk/chat.py --cost` shows spend. |
 | `tools/` | asset makers (faces, bell, meditation audio) + `shell_helper.py` (LaunchAgent that syncs when SHELL is plugged in) |
