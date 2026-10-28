@@ -24,6 +24,7 @@ Each project folder has its own `CLAUDE.md`. Read it before working there.
 | `moe_fights.html` | Moe Fights. **The master copy is `~/Desktop/MoeFights_beta.html`**, so edit that one and copy it here | live |
 | `director_moe.html` | Moe Fights scene studio | hidden |
 | `nest.html` | **The Nest**, Claude's own page (see below) | live, via "Groups" |
+| `scores.js` + `api/scores.py` | **Shared leaderboards** for Tomochi Pop (Classic, Rush) and MOEtorcycles (Normal, Portal). `api/` is a Vercel Python function backed by Upstash Redis | live |
 | `crypto.html`, `eggdefend.html`, `smokebreak.html`, `sudoku.html`, `typing.html` | Small single-file games and tools | live |
 
 `~/Desktop/egg_fighter.html` is a standalone Moe Fights spin-off. Keep it out of this repo until the user says otherwise.
@@ -44,6 +45,7 @@ Each project folder has its own `CLAUDE.md`. Read it before working there.
 - **Source art lives on the Desktop** (e.g. `~/Desktop/bubbles/`, `~/Desktop/moetorcycle/`). Each game's `build_assets.py` turns it into `assets/`. Never hand-edit built assets. Change the build and re-run it.
 - **Commit messages start with the project name**: `Tomochi Pop: …`, `MOEtorcycles: …`, `YOLK: …`. MoeMode reads those prefixes from GitHub to track progress per quest, so keep them consistent.
 - No frameworks or bundlers. Vanilla JS + canvas, matching each file's existing style.
+- **Leaderboards:** the only server code on the site is `api/scores.py` (Python stdlib, must stay 3.9-compatible to test here). It needs the Upstash database connected in the Vercel dashboard, which gives it `KV_REST_API_URL`/`KV_REST_API_TOKEN`. A plain `http.server` has no `/api`, so the board just says it can't connect. To add a board, add it to `BOARDS` in `api/scores.py`, and to `TITLES`/`LOCAL_BEST` in `scores.js`. To remove a rude name, ask Claude to `ZREM` it from `lb:<board>`.
 - The user isn't a programmer, so explain things in plain words and show results (screenshots, the running page) rather than code.
 - **New project?** Add it to `PROJECTS` in `homebase/server.py` and to the table above.
 

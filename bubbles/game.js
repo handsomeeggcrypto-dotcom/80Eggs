@@ -513,7 +513,9 @@ function lose(reason) {
 }
 function saveBest() {
   if (score > best) { best = score; try { localStorage.setItem(bestKey(), best); } catch (e) {} }
+  if (mode().id !== "level") Scores.gameOver(boardId(), score);
 }
+const boardId = () => "tomochi-" + mode().id; // shared leaderboard (../scores.js), Classic and Rush only
 
 // ---- special moves ---------------------------------------------------------
 // TORPEDO: arm it, then shoot — a hamster rockets along the aim line (bouncing off
@@ -1355,6 +1357,7 @@ function menuButtons() {
   }
   return [
     { label: "PLAY AGAIN", act: () => startMode(MODES.indexOf(mode())) },
+    { label: "🏆 LEADERBOARD", act: () => Scores.open(boardId()) },
     { label: "MENU", act: () => setState("title") },
   ];
 }
@@ -1462,6 +1465,8 @@ function drawOverlay() {
   else if (lvl && state === "lose") ctx.fillText(`${mode().name} · ${mode().title}   ·   ${hamstarWord(0)}`, W / 2, 285);
   else if (lvl) ctx.fillText(`${mode().name} · ${mode().title}   ·   Score ${score}`, W / 2, 285);
   else ctx.fillText(`${mode().name}   ·   Score ${score}   ·   Best ${best}`, W / 2, 285);
+  const rank = !lvl && (state === "win" || state === "lose") && Scores.rankText(boardId());
+  if (rank) { ctx.fillStyle = "#9fe3ff"; ctx.fillText(rank, W / 2, 322); ctx.fillStyle = "#fff"; }
   if (state === "win" && lvl) {
     // hamstars pop in one after another
     for (let i = 0; i < 3; i++) {

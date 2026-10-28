@@ -347,6 +347,7 @@ let selMode = Math.max(0, MODES.findIndex((m) => m.id === localStorage.getItem("
 const curMode = () => MODES[selMode].id;
 const modeUnlocked = (i) => !MODES[i].req || MODES[i].req();
 const bestKey = () => curMode() === "portal" ? "moetorcycles_best_portal" : "moetorcycles_best";
+const boardId = () => "moto-" + (curMode() === "portal" ? "portal" : "normal"); // shared leaderboard (../scores.js)
 function setMode(i) {
   selMode = (i + MODES.length) % MODES.length;
   localStorage.setItem("moetorcycles_mode", MODES[selMode].id);
@@ -564,6 +565,7 @@ function handleMenuKey(code) {
   } else if (state === STATE.DEAD) {
     if ((code === "Space" || code === "Enter") && menuCd <= 0) startGame();
     if (code === "Escape") backToSelect();
+    if (code === "KeyL" && curMode() !== "cruise") Scores.open(boardId());
   }
 }
 
@@ -615,6 +617,10 @@ function pointerMenu(e, r) {
     const b = uiHits.deadBack;
     if (b && mx >= b.x && mx <= b.x + b.w && my >= b.y && my <= b.y + b.h) {
       backToSelect(); return;   // back to character/map select
+    }
+    const lb = uiHits.deadBoard;
+    if (lb && mx >= lb.x && mx <= lb.x + lb.w && my >= lb.y && my <= lb.y + lb.h) {
+      Scores.open(boardId()); return;
     }
     startGame(); // tap elsewhere = ride again
   }
@@ -1072,6 +1078,7 @@ function kill() {
   Sound.crash();
   score = Math.floor(score);
   if (curMode() !== "cruise" && score > best) { best = score; localStorage.setItem(bestKey(), best); }
+  if (curMode() !== "cruise") Scores.gameOver(boardId(), score);
   for (let i = 0; i < 40; i++) {
     spawnSpark(PLAYER_X, player.y + PLAYER_H * 0.5,
       ["#ff5bd0","#5bc8ff","#ffe066","#7dff9b","#c78bff"][i % 5]);
@@ -3577,21 +3584,33 @@ function drawDead() {
   centerText(`Score  ${Math.floor(score)}`, H * 0.45, 44, "#fff");
   centerText(`Best  ${best}`, H * 0.535, 24, "#ffe066");
   centerText(`🌟 ${runStars} collected   ·   bank ${bank}`, H * 0.60, 22, "#ffe066");
+  const rank = curMode() !== "cruise" && Scores.rankText(boardId());
+  if (rank) centerText(rank, H * 0.648, 20, "#5bc8ff");
   const pulse = 0.6 + 0.4 * Math.sin(t * 4);
   ctx.globalAlpha = pulse;
   centerText("Press SPACE / Tap to ride again", H * 0.70, 28, "#7dff9b");
   ctx.globalAlpha = 1;
 
-  // tappable back button (mobile has no Esc)
-  const bw = 320, bh = 50, back = { x: W / 2 - bw / 2, y: H * 0.80, w: bw, h: bh };
+  // tappable buttons (mobile has no Esc): back, and the leaderboard (not in cruise)
+  const boards = curMode() !== "cruise";
+  const bw = 320, bh = 50, gap = 20;
+  const back = { x: boards ? W / 2 - bw - gap / 2 : W / 2 - bw / 2, y: H * 0.80, w: bw, h: bh };
+  const lb = boards ? { x: W / 2 + gap / 2, y: back.y, w: bw, h: bh } : null;
   ctx.save();
-  ctx.fillStyle = "rgba(255,91,208,0.18)"; ctx.strokeStyle = "#ff5bd0"; ctx.lineWidth = 2.5;
-  roundRect(back.x, back.y, back.w, back.h, 25, true); ctx.stroke();
-  ctx.fillStyle = "#fff"; ctx.font = "bold 20px Trebuchet MS, sans-serif";
+  ctx.lineWidth = 2.5;
+  ctx.font = "bold 20px Trebuchet MS, sans-serif";
   ctx.textAlign = "center"; ctx.textBaseline = "middle";
-  ctx.fillText("‹ CHANGE CHARACTER / MAP", W / 2, back.y + bh / 2 + 1);
+  for (const [b, label, col, fill] of [[back, "‹ CHANGE CHARACTER / MAP", "#ff5bd0", "rgba(255,91,208,0.18)"],
+                                       [lb, "🏆 LEADERBOARD", "#ffe066", "rgba(255,224,102,0.18)"]]) {
+    if (!b) continue;
+    ctx.fillStyle = fill; ctx.strokeStyle = col;
+    roundRect(b.x, b.y, b.w, b.h, 25, true); ctx.stroke();
+    ctx.fillStyle = "#fff";
+    ctx.fillText(label, b.x + b.w / 2, b.y + bh / 2 + 1);
+  }
   ctx.restore();
   uiHits.deadBack = back;
+  uiHits.deadBoard = lb;
 }
 
 /* ---- text helpers ---- */

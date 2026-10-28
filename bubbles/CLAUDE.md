@@ -36,6 +36,10 @@ Prompt guidance that worked for AI backgrounds: 2:3 portrait, calm middle, **no 
 - A ceiling `drop` on a clear level makes it much harder.
 - Adding a 5th world = append a `WORLDS` entry + 15 levels + its background and map art.
 
+## Leaderboards
+
+Classic and Rush scores go to the shared leaderboard (`../scores.js`, boards `tomochi-classic` / `tomochi-rush`) from `saveBest()`. Levels don't. The end screen has a 🏆 LEADERBOARD button and shows the player's world rank.
+
 ## Saved data (localStorage)
 
 Keys stay `bubblepop_*` on purpose so players keep their progress: `bubblepop_levels`, `bubblepop_best_<mode>`, `bubblepop_tips`, `bubblepop_volume`, `bubblepop_muted`.
