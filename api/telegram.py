@@ -4,8 +4,10 @@ Telegram sends every message the bot sees to this function (/api/telegram,
 set once with the setWebhook link). The bot's token comes from BotFather and
 lives in Vercel as TELEGRAM_BOT_TOKEN, never in this public repo.
 
-  /pop  → menu picture + a "Play Tomochi Pop" button
+  /pop     → menu picture + a "Play Tomochi Pop" button
+  /scores  → top 5 on every leaderboard (from /api/scores) + Play buttons
 """
+import html
 import json
 import os
 import urllib.request
@@ -20,6 +22,40 @@ COMMANDS = {
         "url": SITE + "/bubbles/",
     },
 }
+
+# /scores: one section per leaderboard, same boards as api/scores.py
+BOARDS = [
+    ("tomochi-classic", "🫧 Tomochi Pop · Classic"),
+    ("tomochi-rush", "🫧 Tomochi Pop · Rush"),
+    ("moto-normal", "🏍 MOEtorcycles · Normal"),
+    ("moto-portal", "🌀 MOEtorcycles · Portal"),
+]
+SCORES_SHOWN = 5
+MEDALS = ["🥇", "🥈", "🥉"]
+
+
+def board_top(board):
+    with urllib.request.urlopen(SITE + "/api/scores?board=" + board, timeout=4) as r:
+        return json.loads(r.read()).get("top") or []
+
+
+def scores_text():
+    parts = ["🏆 <b>LEADERBOARDS</b>"]
+    for board, title in BOARDS:
+        lines = ["", "<b>%s</b>" % title]
+        try:
+            top = board_top(board)[:SCORES_SHOWN]
+        except Exception:
+            top = None
+        if top is None:
+            lines.append("  (couldn't load)")
+        elif not top:
+            lines.append("  No scores yet. Be the first!")
+        for i, row in enumerate(top or []):
+            mark = MEDALS[i] if i < len(MEDALS) else "%d." % (i + 1)
+            lines.append("%s %s  <b>%s</b>" % (mark, html.escape(row["name"]), "{:,}".format(row["score"])))
+        parts += lines
+    return "\n".join(parts)
 
 
 def telegram(method, payload):
@@ -59,8 +95,19 @@ class handler(BaseHTTPRequestHandler):
             n = int(self.headers.get("Content-Length") or 0)
             update = json.loads(self.rfile.read(min(n, 20000)) or b"{}")
             msg = update.get("message") or update.get("channel_post") or {}
-            cmd = COMMANDS.get(command_of(msg.get("text")))
-            if cmd:
+            word = command_of(msg.get("text"))
+            cmd = COMMANDS.get(word)
+            if word == "/scores":
+                telegram("sendMessage", {
+                    "chat_id": msg["chat"]["id"],
+                    "text": scores_text(),
+                    "parse_mode": "HTML",
+                    "reply_markup": {"inline_keyboard": [[
+                        {"text": "▶ Tomochi Pop", "url": SITE + "/bubbles/"},
+                        {"text": "▶ MOEtorcycles", "url": SITE + "/moetorcycles/"},
+                    ]]},
+                })
+            elif cmd:
                 telegram("sendPhoto", {
                     "chat_id": msg["chat"]["id"],
                     "photo": cmd["photo"],

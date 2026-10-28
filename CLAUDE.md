@@ -25,7 +25,7 @@ Each project folder has its own `CLAUDE.md`. Read it before working there.
 | `director_moe.html` | Moe Fights scene studio | hidden |
 | `nest.html` | **The Nest**, Claude's own page (see below) | live, via "Groups" |
 | `scores.js` + `api/scores.py` | **Shared leaderboards** for Tomochi Pop (Classic, Rush) and MOEtorcycles (Normal, Portal). `api/` is a Vercel Python function backed by Upstash Redis | live |
-| `api/telegram.py` | **Telegram bot**: `/pop` posts the Tomochi Pop menu picture + a Play button. Token is `TELEGRAM_BOT_TOKEN` in Vercel; webhook points at `/api/telegram`. Add commands to `COMMANDS` | live |
+| `api/telegram.py` | **Telegram bot**: `/pop` posts the Tomochi Pop menu picture + a Play button; `/scores` posts the top 5 of every leaderboard. Token is `TELEGRAM_BOT_TOKEN` in Vercel; webhook points at `/api/telegram`. Add commands to `COMMANDS` | live |
 | `crypto.html`, `eggdefend.html`, `smokebreak.html`, `sudoku.html`, `typing.html` | Small single-file games and tools | live |
 
 `~/Desktop/egg_fighter.html` is a standalone Moe Fights spin-off. Keep it out of this repo until the user says otherwise.
