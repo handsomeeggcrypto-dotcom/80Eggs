@@ -5,7 +5,7 @@ set once with the setWebhook link). The bot's token comes from BotFather and
 lives in Vercel as TELEGRAM_BOT_TOKEN, never in this public repo.
 
   /pop     → menu picture + a "Play Tomochi Pop" button
-  /scores  → top 5 on every leaderboard (from /api/scores) + Play buttons
+  /scores  → top 5 on the Tomochi Pop leaderboards (from /api/scores) + a Play button
 """
 import html
 import json
@@ -23,12 +23,11 @@ COMMANDS = {
     },
 }
 
-# /scores: one section per leaderboard, same boards as api/scores.py
+# /scores: one section per leaderboard. The bot is for the Tomochi Pop group,
+# so only Tomochi Pop's boards (api/scores.py also has MOEtorcycles').
 BOARDS = [
-    ("tomochi-classic", "🫧 Tomochi Pop · Classic"),
-    ("tomochi-rush", "🫧 Tomochi Pop · Rush"),
-    ("moto-normal", "🏍 MOEtorcycles · Normal"),
-    ("moto-portal", "🌀 MOEtorcycles · Portal"),
+    ("tomochi-classic", "🫧 Classic"),
+    ("tomochi-rush", "⚡ Rush"),
 ]
 SCORES_SHOWN = 5
 MEDALS = ["🥇", "🥈", "🥉"]
@@ -40,7 +39,7 @@ def board_top(board):
 
 
 def scores_text():
-    parts = ["🏆 <b>LEADERBOARDS</b>"]
+    parts = ["🏆 <b>TOMOCHI POP LEADERBOARDS</b>"]
     for board, title in BOARDS:
         lines = ["", "<b>%s</b>" % title]
         try:
@@ -103,8 +102,7 @@ class handler(BaseHTTPRequestHandler):
                     "text": scores_text(),
                     "parse_mode": "HTML",
                     "reply_markup": {"inline_keyboard": [[
-                        {"text": "▶ Tomochi Pop", "url": SITE + "/bubbles/"},
-                        {"text": "▶ MOEtorcycles", "url": SITE + "/moetorcycles/"},
+                        {"text": "▶ Play Tomochi Pop", "url": SITE + "/bubbles/"},
                     ]]},
                 })
             elif cmd:
