@@ -2,7 +2,7 @@
 
    Scores.gameOver(board, score)  call when a run ends. Sends the score if the
                                   player has a name, otherwise asks for one once.
-   Scores.open(board)             show the top 10 for a board.
+   Scores.open(board)             show the top 10 for a board, with tabs for the game's other modes.
    Scores.rankText(board)         "🌍 #3 on the leaderboard" after a run, or "".
    Scores.isOpen()                true while the window is up (games ignore input).
 
@@ -62,6 +62,9 @@ const Scores = (() => {
         box-shadow: 0 0 40px rgba(255,91,208,0.45); }
       #eggScores h2 { margin: 0; font-size: 22px; text-align: center; color: #ffe066; }
       #eggScores .sub { margin: 4px 0 12px; font-size: 13px; text-align: center; color: #c9b8ff; letter-spacing: 1px; }
+      #eggScores .tabs { display: flex; gap: 8px; margin: 0 0 12px; }
+      #eggScores .tabs button { padding: 7px; font-size: 14px; border-color: #8f75e6; background: none; color: #c9b8ff; }
+      #eggScores .tabs button.on { background: #8f75e6; color: #fff; }
       #eggScores ol { list-style: none; margin: 0; padding: 0; }
       #eggScores li { display: flex; gap: 10px; padding: 7px 10px; border-radius: 10px; font-size: 17px; font-weight: bold; }
       #eggScores li:nth-child(odd) { background: rgba(255,255,255,0.06); }
@@ -103,7 +106,14 @@ const Scores = (() => {
     const me = ls.get(NAME_KEY);
     const typing = box.querySelector("#eggName");   // keep what's typed when the list arrives
     const typed = typing ? typing.value : me || "";
-    let html = `<div class="card"><h2>🏆 LEADERBOARD</h2><div class="sub">${esc(TITLES[board] || board)}</div>`;
+    const [game] = (TITLES[board] || board).split(" · ");
+    const family = Object.keys(TITLES).filter((k) => k.split("-")[0] === board.split("-")[0]);
+    let html = `<div class="card"><h2>🏆 LEADERBOARD</h2><div class="sub">${esc(state.ask ? TITLES[board] : game)}</div>`;
+    if (!state.ask && family.length > 1) {
+      html += `<div class="tabs">` + family.map((k) =>
+        `<button type="button" data-act="tab" data-board="${k}" class="${k === board ? "on" : ""}">${esc(TITLES[k].split(" · ")[1])}</button>`
+      ).join("") + `</div>`;
+    }
     if (state.ask) {
       html += `<form onsubmit="return false"><p>${state.score ? `You scored <b>${state.score}</b>! ` : ""}Put your name on the board?</p>
         <input id="eggName" maxlength="12" autocomplete="off" autocapitalize="characters" spellcheck="false"
@@ -131,6 +141,7 @@ const Scores = (() => {
         else if (a === "save") saveName();
         else if (a === "skip") { ls.set(ASKED_KEY, "1"); pending = null; show({}); }
         else if (a === "rename") show({ ask: true });
+        else if (a === "tab" && b.dataset.board !== board) { board = b.dataset.board; show({}); }
       });
     });
     const inp = box.querySelector("#eggName");

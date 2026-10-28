@@ -1153,6 +1153,7 @@ const NEXT_POS = { x: W - 70, y: SHOOTER.y + 10 };
 const SOUND_BTN = { x: W - 76, y: 32, r: 18 };
 const PAUSE_BTN = { x: W - 32, y: 32, r: 18 };
 const TITLE_SOUND_BTN = { x: 34, y: 34, r: 17 };
+const TITLE_BOARD_BTN = { x: W - 196, y: 16, w: 180, h: 38 }; // opens the shared leaderboard
 const inCircle = (p, b) => Math.hypot(p.x - b.x, p.y - b.y) < b.r + 6;
 
 function drawRoundButton(b, draw) {
@@ -1442,6 +1443,16 @@ function drawMenu() {
   ctx.fillText("pick how to play", W / 2, 160);
   drawButtons();
   drawSoundButton(TITLE_SOUND_BTN);
+  drawBoardButton(TITLE_BOARD_BTN);
+}
+function drawBoardButton(b) {
+  ctx.fillStyle = "#8f75e6";
+  roundRect(b.x, b.y, b.w, b.h, b.h / 2); ctx.fill();
+  ctx.fillStyle = "#fff";
+  ctx.font = `bold 17px ${FONT}`;
+  ctx.textAlign = "center"; ctx.textBaseline = "middle";
+  ctx.fillText("🏆 LEADERBOARD", b.x + b.w / 2, b.y + b.h / 2 + 1);
+  ctx.textBaseline = "alphabetic";
 }
 
 function drawOverlay() {
@@ -1835,6 +1846,7 @@ canvas.addEventListener("pointerdown", (e) => {
   if (state === "map") { drag = { y0: p.y, s0: mapScroll, moved: false }; return; }
   if (tipActive()) return closeTip();
   if (state === "title" && inCircle(p, TITLE_SOUND_BTN)) return toggleSound();
+  if (state === "title" && inRect(p, TITLE_BOARD_BTN)) return Scores.open("tomochi-classic");
   if (state !== "play") {
     if ((state === "win" || state === "lose") && menuT < 0.6) return; // don't eat the tap that ended the game
     const list = menuButtons();

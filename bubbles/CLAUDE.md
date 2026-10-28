@@ -38,7 +38,7 @@ Prompt guidance that worked for AI backgrounds: 2:3 portrait, calm middle, **no 
 
 ## Leaderboards
 
-Classic and Rush scores go to the shared leaderboard (`../scores.js`, boards `tomochi-classic` / `tomochi-rush`) from `saveBest()`. Levels don't. The end screen has a 🏆 LEADERBOARD button and shows the player's world rank.
+Classic and Rush scores go to the shared leaderboard (`../scores.js`, boards `tomochi-classic` / `tomochi-rush`) from `saveBest()`. Levels don't. The title screen (top-right) and end screen have a 🏆 LEADERBOARD button, and the end screen shows the player's world rank.
 
 ## Saved data (localStorage)
 

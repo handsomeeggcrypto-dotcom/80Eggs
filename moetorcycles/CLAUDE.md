@@ -17,7 +17,7 @@ Run: `python3 -m http.server` from the repo root (or Home Base → Play). Fixed 
 - Hazards stay **on the ground** (jump over, or dash to smash). The user rejected overhead hazards, drones and birds.
 - Stars are the currency (`moetorcycles_bank`). Unlocks are keyed `char:` / `map:` / `tc:<index>` / `ts:`. **Append new trail colors at the END** of `TRAIL_COLORS`, because unlocks are stored by index.
 - Cruise mode earns nothing on purpose. That was the user's call. It has no leaderboard either.
-- Normal and Portal runs go to the shared leaderboard (`../scores.js`, boards `moto-normal` / `moto-portal`) from `kill()`. The crash screen has a 🏆 LEADERBOARD button (or L) and shows the world rank.
+- Normal and Portal runs go to the shared leaderboard (`../scores.js`, boards `moto-normal` / `moto-portal`) from `kill()`. The title and crash screens have a 🏆 LEADERBOARD button (or L), and the crash screen shows the world rank.
 
 ## Adding a character or map
 

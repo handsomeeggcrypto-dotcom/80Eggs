@@ -538,6 +538,7 @@ function handleMenuKey(code) {
   if (state === STATE.PLAY && code === "Escape" && curMode() === "cruise") { backToSelect(); return; }
   if (state === STATE.TITLE) {
     if ((code === "Space" || code === "Enter") && menuCd <= 0) { state = STATE.SELECT; menuCd = 0.3; }
+    if (code === "KeyL") Scores.open("moto-normal");
   } else if (state === STATE.SELECT) {
     if (picker) { pickerKey(code); return; }
     // ←/→ character, 1/2/3 open the map / color / style menus, [ ] map,
@@ -571,7 +572,12 @@ function handleMenuKey(code) {
 
 function pointerMenu(e, r) {
   if (menuCd > 0) return;
-  if (state === STATE.TITLE) { state = STATE.SELECT; menuCd = 0.3; }
+  if (state === STATE.TITLE) {
+    const mx = (e.clientX - r.left) / r.width * W, my = (e.clientY - r.top) / r.height * H;
+    const lb = uiHits.titleBoard;
+    if (lb && mx >= lb.x && mx <= lb.x + lb.w && my >= lb.y && my <= lb.y + lb.h) { Scores.open("moto-normal"); return; }
+    state = STATE.SELECT; menuCd = 0.3;
+  }
   else if (state === STATE.SELECT) {
     const mx = (e.clientX - r.left) / r.width * W;
     const my = (e.clientY - r.top) / r.height * H;
@@ -3083,6 +3089,17 @@ function drawTitle() {
   centerText("Press SPACE / Tap to start", H * 0.66, 30, "#ffe066");
   ctx.globalAlpha = 1;
   centerText("↑/Space jump (x2)   •   Shift/X dash", H * 0.75, 20, "rgba(255,255,255,0.6)");
+
+  // leaderboard button (L) — the rest of the screen still means "start"
+  const bw = 260, bh = 46, lb = { x: W / 2 - bw / 2, y: H * 0.83, w: bw, h: bh };
+  ctx.save();
+  ctx.fillStyle = "rgba(20,0,45,0.78)"; ctx.strokeStyle = "#ffe066"; ctx.lineWidth = 2.5;
+  roundRect(lb.x, lb.y, lb.w, lb.h, 23, true); ctx.stroke();
+  ctx.fillStyle = "#ffe066"; ctx.font = "bold 20px Trebuchet MS, sans-serif";
+  ctx.textAlign = "center"; ctx.textBaseline = "middle";
+  ctx.fillText("🏆 LEADERBOARD", W / 2, lb.y + bh / 2 + 1);
+  ctx.restore();
+  uiHits.titleBoard = lb;
 }
 
 function drawSelect() {
