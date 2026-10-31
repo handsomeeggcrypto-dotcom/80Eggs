@@ -66,6 +66,7 @@ const Sound = (() => {
   const pool = (f) => ({ list: Array.from({ length: 5 }, () => make(f)), next: 0 });
   const sfx = { punch: pool("punch_01.mp3"), kick: pool("kick_01.mp3"), swoosh: pool("swoosh_01.mp3") };
   const tracks = ["1_4_crayons.m4a", "1_5_warhawk.m4a", "1_7_bluu.m4a", "1_3_bradley.m4a"];
+  const players = [];
   let muted = false, music = null, cur = -1;
   try { muted = localStorage.getItem(MUTE_KEY) === "1"; } catch (e) {}
   return {
@@ -79,7 +80,7 @@ const Sound = (() => {
       const i = (d - 1) % tracks.length;
       if (i === cur && music) { if (!muted) music.play().catch(() => {}); return; }
       if (music) music.pause();
-      cur = i; music = make(tracks[i]); music.loop = true; music.volume = 0.32;
+      cur = i; music = players[i] || (players[i] = make(tracks[i])); music.loop = true; music.volume = 0.32;
       if (!muted) music.play().catch(() => {});
     },
     stop() { if (music) music.pause(); },
