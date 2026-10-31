@@ -765,6 +765,8 @@ canvas.addEventListener("pointerdown", (e) => {
     if (p.x >= b.x && p.x <= b.x + b.w && p.y >= b.y && p.y <= b.y + b.h) { b.fn(); return; }
   }
   if (state !== "play") return;
+  release();  // never two at once: a stray earlier grab can't stay stuck to the pointer
+  ptr.down = true;
   const f = findFoe(p.x, p.y);
   if (f) {
     held = f; f.mode = "held"; f.vx = 0; f.vy = 0;
@@ -773,6 +775,8 @@ canvas.addEventListener("pointerdown", (e) => {
   }
 });
 canvas.addEventListener("pointermove", (e) => {
+  // the button is up but we never heard about it (right-click menu, two buttons at once…)
+  if (held && e.pointerType === "mouse" && !(e.buttons & 1)) release();
   const p = toCanvas(e), now = performance.now();
   const dt = Math.max(1, now - (ptr.lastT || now)) / 1000;
   // smoothed, so the throw follows the last moment of the drag
@@ -796,6 +800,9 @@ function release() {
 }
 canvas.addEventListener("pointerup", release);
 canvas.addEventListener("pointercancel", release);
+canvas.addEventListener("lostpointercapture", release);
+canvas.addEventListener("contextmenu", (e) => { e.preventDefault(); release(); });
+addEventListener("blur", release);
 addEventListener("keydown", (e) => {
   if (window.Scores && Scores.isOpen()) return;
   if (e.code === "KeyM") Sound.toggle();
