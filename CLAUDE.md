@@ -15,7 +15,7 @@ Each project folder has its own `CLAUDE.md`. Read it before working there.
 | `index.html` | **MoeSpace**, the homepage (a MySpace parody) | live |
 | `bubbles/` | **Tomochi Pop** bubble shooter (folder name kept from "Bubble Pop") | live |
 | `moetorcycles/` | **MOEtorcycles** endless runner | live |
-| `moecastle/` | **Defend Your LLC**, a Defend Your Castle remake starring the Moe Fights roster. `build_assets.py` makes `assets/` | not linked yet |
+| `moecastle/` | **Defend Your LLC**, a Defend Your Castle remake starring the Moe Fights roster. `build_assets.py` makes `assets/` | live |
 | `moekedex/` | **Moekedex**, a Pokédex for the moemoe LLC NFTs | live |
 | `dreamthings/` | **Dream Things**, a dex for the Yumemono NFTs. `build_data.py` makes `data.js` | live |
 | `nap_time/` | **Nap Time** bedtime-story ARPG | live, behind a password |

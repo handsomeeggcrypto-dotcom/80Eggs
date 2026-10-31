@@ -26,7 +26,7 @@ PROJECTS = [
     {"id": "director", "name": "Director Moe", "blurb": "Scene studio for Moe Fights characters and music.",
      "path": "director_moe.html", "open": "director_moe.html", "live": "/director_moe.html", "status": "hidden", "icon": "🎬"},
     {"id": "moecastle", "name": "Defend Your LLC", "blurb": "Defend Your Castle, but it's Moemoe LLC HQ. Grab the Moe Fights roster and fling them.",
-     "path": "moecastle", "open": "moecastle/", "live": "/moecastle/", "status": "hidden", "icon": "🏰"},
+     "path": "moecastle", "open": "moecastle/", "live": "/moecastle/", "status": "live", "icon": "🏰"},
     {"id": "moetorcycles", "name": "MOEtorcycles", "blurb": "Endless runner. 10 riders, 10 maps, trails, rings, combos.",
      "path": "moetorcycles", "open": "moetorcycles/", "live": "/moetorcycles/", "status": "live", "icon": "🏍️"},
     {"id": "bubbles", "name": "Tomochi Pop", "blurb": "Bubble shooter with character bubbles, 15 levels and hamstars.",

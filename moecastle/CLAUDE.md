@@ -14,4 +14,4 @@ A remake of Defend Your Castle (old Addicting Games flash game). The Moe Fights 
 - A boss comes every 5 days. Score goes to the `llc-defend` board in `api/scores.py`.
 - The HQ picture is `~/Desktop/moecastle/MoemoeLLC Cyberpunk Headquarters.png`. `build_assets.py hq` keys out the white and rebuilds just that. `HQ_K`, `WALL_X` in `game.js` place it. Staff are drawn behind it, so they show through the railing.
 
-Not linked from the homepage yet. Adding it means bumping a Top 8 tile, or adding it to All Frens.
+In the homepage Top 8. Its tile is `icon.png`, made by `build_assets.py hq`.

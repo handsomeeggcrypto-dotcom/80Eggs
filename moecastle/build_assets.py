@@ -52,6 +52,13 @@ def build_hq():
     im = im.resize((HQ_W, int(h * HQ_W / float(w))), Image.LANCZOS)
     os.makedirs(OUT, exist_ok=True)
     im.save(os.path.join(OUT, "hq.webp"), "WEBP", quality=88, method=4)
+    # the homepage tile: the building from the roof down, on the night sky
+    k = HQ_W / float(w)
+    box = (int(38 * k), int(550 * k), HQ_W, int(550 * k) + HQ_W - int(38 * k))
+    tile = Image.new("RGBA", (box[2] - box[0], box[3] - box[1]), (34, 18, 52, 255))
+    crop = im.crop(box)
+    tile.paste(crop, (0, 0), crop)
+    tile.convert("RGB").resize((256, 256), Image.LANCZOS).save(os.path.join(HERE, "icon.png"), optimize=True)
     print("hq", im.size)
 
 build_hq()
