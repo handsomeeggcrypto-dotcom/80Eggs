@@ -435,7 +435,8 @@ draw_main(m, nil, true)
 
 local function go(to)
     if list then                               -- `to` is a place in the list
-        if to < 1 or to > list.count then to = (to - 1) % list.count + 1 end
+        while to < 1 do to = to + list.count end   -- this Lua's % can go negative
+        while to > list.count do to = to - list.count end
         pos = to
         n = list.at(pos)
     else
