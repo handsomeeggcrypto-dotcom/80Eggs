@@ -232,6 +232,8 @@ def sync():
         if new:
             with open(SHELL_MEDITATIONS, "a") as f:
                 f.write("".join(l + "\n" for l in new))
+    import finance
+    finance.deliver(DATA, SHELL)
     if HABITS.exists():
         (SHELL / "habits.txt").write_text(HABITS.read_text(encoding="utf-8"), encoding="latin-1", errors="replace")
     if QUEUE.exists() and QUEUE.read_text().strip():
@@ -409,6 +411,13 @@ class Handler(BaseHTTPRequestHandler):
             if self.client_address[0] not in ("127.0.0.1", "::1"):
                 return self.send(403, {"error": "only on the mac"})
             return self.send(200, {"code": station_config()["code"], "address": lan_address(), "port": PORT})
+        if path in ("/finance", "/api/finance"):      # money stays on this Mac, even for paired tablets
+            if self.client_address[0] not in ("127.0.0.1", "::1"):
+                return self.send(403, {"error": "only on the mac"})
+            if path == "/finance":
+                return self.send(200, (STATIC / "finance.html").read_bytes(), TYPES[".html"])
+            f = DATA / "finance.json"
+            return self.send(200, f.read_bytes() if f.exists() else {})
         if path == "/api/state":
             mem, connected = sync()
             queued = [l for l in QUEUE.read_text(encoding="utf-8").splitlines() if l.strip()] if QUEUE.exists() else []
@@ -446,6 +455,13 @@ class Handler(BaseHTTPRequestHandler):
                 return self.send(413, {"error": "recording too long"})
             return self.send(200, chat.talk(self.rfile.read(n), new="new=1" in self.path))
         data = self.body()
+        if path == "/api/finance":
+            if self.client_address[0] not in ("127.0.0.1", "::1"):
+                return self.send(403, {"error": "only on the mac"})
+            tmp = DATA / "finance.json.tmp"
+            tmp.write_text(json.dumps(data, indent=2))
+            tmp.replace(DATA / "finance.json")
+            return self.send(200, {"ok": True})
         if path == "/api/chat":              # typed conversation from the desktop terminal
             import chat
             text = str(data.get("text", "")).strip()[:1000]

@@ -15,6 +15,11 @@ data: /YOLK/talk.lua
 
 [shortcut]
 type: file
+name: FINANCE
+data: /YOLK/finance.lua
+
+[shortcut]
+type: file
 name: MOETORCYCLES
 data: /YOLK/moto.lua
 

@@ -1,0 +1,830 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NET WORTH // CONSOLE</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@500;700;900&family=VT323&display=swap" rel="stylesheet">
+<style>
+:root{
+  --mono:'Share Tech Mono','Courier New',monospace;
+  --title:'Orbitron','Share Tech Mono',sans-serif;
+}
+*{box-sizing:border-box;}
+html,body{margin:0;padding:0;height:100%;}
+body{
+  background:#000; font-family:var(--mono); color:var(--hud);
+  min-height:100vh; overflow-x:hidden; -webkit-font-smoothing:antialiased;
+}
+
+/* ===================== THEME TOKENS (pulled from typeracer game) ===================== */
+body.theme-mech{
+  --bg:#02060f; --bg2:#061226;
+  --accent:#2b9cff; --accent2:#ff7a1e;
+  --panel:rgba(8,24,48,.55); --border:#2b9cff;
+  --hud:#ff8a2e; --hud2:#5fb6ff;
+  --text-dim:#7a4a1e; --text-on:#fff0dc; --text-glow:#ff9a3c;
+  --error:#ff4d4d; --key-edge:#1d4f86;
+  --sun1:#2b9cff; --sun2:#0a3a6b; --grid:#1d4f86;
+  --title-font:var(--title); --has-sun:none; --has-glass:block; --has-rain:none;
+}
+body.theme-crt80{
+  --bg:#020a04; --bg2:#041206;
+  --accent:#33ff77; --accent2:#9dff5a;
+  --panel:rgba(4,16,8,.5); --border:#1fae4f;
+  --hud:#5dff8e; --hud2:#33ff77;
+  --text-dim:#176b34; --text-on:#d6ffe2; --text-glow:#7dffa4;
+  --error:#ff5a4d; --key-edge:#15622f;
+  --sun1:#33ff77; --sun2:#0c6b2a; --grid:#176b34;
+  --title-font:'VT323',var(--title); --has-sun:none; --has-glass:none; --has-rain:none;
+}
+body.theme-runner{
+  --bg:#04080a; --bg2:#06110f;
+  --accent:#ff7a18; --accent2:#42b9c7;
+  --panel:rgba(4,12,14,.55); --border:#ff7a18;
+  --hud:#ff8a2a; --hud2:#42b9c7;
+  --text-dim:#2c7480; --text-on:#cdf3f7; --text-glow:#6fdfe9;
+  --error:#ff3b3b; --key-edge:#1a5a60;
+  --sun1:#ff7a18; --sun2:#ff3d00; --grid:#1a5a60;
+  --title-font:var(--title); --has-sun:block; --has-glass:none; --has-rain:block;
+}
+body.theme-vice{
+  --bg:#0a0612; --bg2:#160a22;
+  --accent:#ff2d9b; --accent2:#2de2e6;
+  --panel:rgba(10,8,24,.6); --border:#ff2d9b;
+  --hud:#2de2e6; --hud2:#ff2d9b;
+  --text-dim:#1d7e84; --text-on:#7ff7ff; --text-glow:#2de2e6;
+  --error:#ff305f; --key-edge:#19505a;
+  --sun1:#ff2d9b; --sun2:#ff7a3c; --grid:#ff2d9b;
+  --title-font:var(--title); --has-sun:block; --has-glass:none; --has-rain:none;
+}
+
+#app{
+  position:relative; min-height:100vh; width:100%;
+  background:radial-gradient(120% 90% at 50% 8%, var(--bg2), var(--bg) 70%);
+  transition:background .5s ease;
+}
+
+/* ===================== DECORATIVE BACKGROUND ===================== */
+.bg{position:fixed;inset:0;overflow:hidden;pointer-events:none;z-index:0;}
+.bg-sun{
+  position:absolute; top:6%; right:6%; width:340px;height:340px;border-radius:50%;
+  background:radial-gradient(circle at 50% 40%, var(--sun1), var(--sun2) 60%, transparent 72%);
+  filter:blur(2px); opacity:.5; display:var(--has-sun);
+  -webkit-mask-image:repeating-linear-gradient(180deg,#000 0 10px,transparent 10px 16px);
+  mask-image:repeating-linear-gradient(180deg,#000 0 10px,transparent 10px 16px);
+  animation:sunpulse 5s ease-in-out infinite;
+}
+@keyframes sunpulse{0%,100%{opacity:.45;transform:scale(1)}50%{opacity:.65;transform:scale(1.03)}}
+.bg-grid{
+  position:absolute; left:-20%; right:-20%; bottom:-10%; height:55%;
+  background-image:linear-gradient(var(--grid) 1px,transparent 1px),
+                   linear-gradient(90deg,var(--grid) 1px,transparent 1px);
+  background-size:60px 60px;
+  transform:perspective(420px) rotateX(68deg); transform-origin:bottom;
+  opacity:.16; -webkit-mask-image:linear-gradient(transparent,#000 60%); mask-image:linear-gradient(transparent,#000 60%);
+  animation:gridrun 6s linear infinite;
+}
+@keyframes gridrun{0%{background-position:0 0,0 0}100%{background-position:0 60px,0 0}}
+.bg-rain{position:absolute;inset:0;opacity:0;display:var(--has-rain);}
+.bg-rain{opacity:.35; background-image:repeating-linear-gradient(100deg,transparent 0 6px,rgba(120,200,210,.10) 6px 7px);
+  background-size:14px 100%; animation:rain .5s linear infinite;}
+@keyframes rain{to{background-position:-40px 200px}}
+.bg-glass{position:absolute;inset:0;display:var(--has-glass);
+  background:linear-gradient(125deg,transparent 0 30%,rgba(95,182,255,.07) 32% 39%,transparent 41%),
+             linear-gradient(125deg,transparent 0 58%,rgba(95,182,255,.05) 60% 66%,transparent 68%),
+             radial-gradient(80% 60% at 50% 0%,rgba(43,156,255,.12),transparent 60%);
+}
+.bg-scan{position:absolute;inset:0;
+  background:repeating-linear-gradient(180deg,rgba(0,0,0,0) 0 2px,rgba(0,0,0,.2) 2px 4px);
+  opacity:.45; mix-blend-mode:multiply;
+}
+.bg-vignette{position:absolute;inset:0; box-shadow:inset 0 0 180px 40px rgba(0,0,0,.9);}
+body.theme-crt80 .bg-vignette{box-shadow:inset 0 0 220px 70px rgba(0,0,0,.95); animation:flicker 6s steps(60) infinite;}
+@keyframes flicker{0%,100%{opacity:1}97%{opacity:.92}98%{opacity:1}}
+
+/* ===================== THEME SWITCHER ===================== */
+.themebar{display:flex;gap:6px;align-items:center;flex-wrap:wrap;justify-content:center;
+  position:relative;z-index:2; padding:20px 16px 8px;}
+.themebar button{
+  font-family:var(--mono);font-size:11px;letter-spacing:1.5px;cursor:pointer;text-transform:uppercase;
+  padding:8px 14px;border-radius:6px;background:transparent;color:var(--hud2);
+  border:1px solid var(--border);opacity:.6;transition:.2s;
+}
+.themebar button:hover{opacity:1}
+.themebar button.on{opacity:1;background:var(--accent);color:#000;box-shadow:0 0 12px var(--accent)}
+
+.databar{
+  display:flex; gap:10px; align-items:center; justify-content:center; flex-wrap:wrap;
+  position:relative; z-index:2; padding:0 16px 18px;
+}
+.databar button{
+  font-family:var(--mono); font-size:11px; letter-spacing:1px; cursor:pointer; text-transform:uppercase;
+  padding:7px 14px; border-radius:6px; background:transparent; color:var(--hud2);
+  border:1px solid var(--key-edge); opacity:.75; transition:.2s;
+}
+.databar button:hover{opacity:1; border-color:var(--accent2);}
+.databar-msg{font-size:11px; letter-spacing:.5px; color:var(--text-glow); opacity:0; transition:opacity .3s;}
+.databar-msg.show{opacity:1;}
+
+/* ===================== LAYOUT ===================== */
+.wrap{max-width:900px;margin:0 auto;position:relative;z-index:2;padding:8px 16px 80px;}
+
+.header{
+  position:relative; text-align:center; margin-bottom:28px; padding:28px 20px;
+  border:1.5px solid var(--border); border-radius:14px; background:var(--panel);
+  box-shadow:0 0 26px -8px var(--accent), inset 0 0 40px -18px var(--accent);
+}
+.header h1{
+  font-family:var(--title-font); font-size:12px; letter-spacing:4px; text-transform:uppercase;
+  color:var(--hud2); margin:0 0 14px; opacity:.85;
+}
+.header h1::before{content:"> ";}
+.networth-value{
+  font-family:var(--title-font); font-size:clamp(44px,9vw,76px); font-weight:700; margin:0; line-height:1;
+  color:var(--text-on); text-shadow:0 0 10px var(--accent2); transition:color .3s;
+}
+.networth-value.glow{
+  color:var(--text-glow); text-shadow:0 0 10px var(--text-glow),0 0 26px var(--text-glow),0 0 48px var(--text-glow);
+  animation:pulseglow 1.3s ease-in-out infinite;
+}
+@keyframes pulseglow{0%,100%{opacity:1}50%{opacity:.6}}
+.networth-sub{font-size:12px;letter-spacing:1px;color:var(--hud2);opacity:.75;margin-top:10px;}
+
+.panel{
+  position:relative; border:1.5px solid var(--border); border-radius:14px; background:var(--panel);
+  box-shadow:0 0 26px -10px var(--accent), inset 0 0 40px -20px var(--accent);
+  margin-bottom:22px; overflow:hidden;
+}
+body.theme-mech .panel{
+  border-radius:4px;
+  clip-path:polygon(0 0,calc(100% - 20px) 0,100% 20px,100% 100%,20px 100%,0 calc(100% - 20px));
+}
+.panel-head{display:flex;align-items:center;justify-content:space-between;gap:12px;
+  padding:16px 20px; border-bottom:1px solid var(--border);}
+.panel-title{font-family:var(--title-font); font-size:17px; letter-spacing:2px; text-transform:uppercase;
+  margin:0; color:var(--accent); text-shadow:0 0 8px var(--accent);}
+.panel-hint{font-size:11px; letter-spacing:.5px; color:var(--hud2); opacity:.75; margin:4px 0 0;}
+
+.plan-controls{
+  display:flex; align-items:center; gap:10px; flex-wrap:wrap; justify-content:flex-end;
+}
+.strategy-toggle{display:flex; gap:4px; border:1px solid var(--key-edge); border-radius:8px; padding:3px;}
+.strat-btn{
+  font-family:var(--mono); font-size:11px; letter-spacing:.5px; text-transform:uppercase; cursor:pointer;
+  padding:6px 10px; border-radius:6px; background:transparent; color:var(--hud2); opacity:.65; border:none;
+  transition:.15s;
+}
+.strat-btn:hover{opacity:1;}
+.strat-btn.on{opacity:1; background:var(--accent); color:#04060a; box-shadow:0 0 10px var(--accent);}
+.extra-field{
+  display:flex; align-items:center; gap:8px; border:1px solid var(--key-edge); border-radius:8px;
+  padding:6px 12px; background:rgba(255,255,255,.02);
+}
+.extra-label{font-size:10px; letter-spacing:1px; text-transform:uppercase; color:var(--hud2); opacity:.75; white-space:nowrap;}
+.extra-input{
+  width:80px; background:transparent; border:none; color:var(--text-on); font-family:var(--mono);
+  font-size:15px; text-align:right;
+}
+.extra-input:focus{outline:none; text-shadow:0 0 6px var(--accent2);}
+.extra-input::placeholder{color:var(--text-dim);}
+
+.fix-btn{
+  font-family:var(--title-font); font-weight:700; letter-spacing:2px; text-transform:uppercase;
+  font-size:14px; padding:10px 22px; border-radius:10px; cursor:pointer;
+  background:var(--accent); color:#04060a; border:none;
+  box-shadow:0 0 20px var(--accent); transition:.15s;
+}
+.fix-btn:hover{filter:brightness(1.15);}
+.fix-btn:active{transform:translateY(1px);}
+
+table{width:100%;border-collapse:collapse;}
+thead th{
+  text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:1.5px;
+  color:var(--hud2); opacity:.8; font-weight:600; padding:12px 18px; border-bottom:1px solid var(--border);
+}
+tbody td{padding:9px 18px;border-bottom:1px solid var(--key-edge);}
+tbody tr:last-child td{border-bottom:none;}
+input.cell{
+  width:100%;background:transparent;border:none;border-bottom:1px solid transparent;
+  color:var(--text-on);font-family:var(--mono);font-size:15px;padding:6px 4px;transition:border-color .15s;
+}
+input.cell:focus{outline:none;border-bottom:1px solid var(--accent2);text-shadow:0 0 6px var(--accent2);}
+input.cell::placeholder{color:var(--text-dim);}
+td.num{text-align:right;}
+.payoff-val{
+  display:inline-block; font-family:var(--mono); font-size:14px; color:var(--hud2); opacity:.85;
+  transition:color .2s;
+}
+td.actions{width:36px;text-align:center;}
+.row-del{background:none;border:none;color:var(--hud2);opacity:.6;cursor:pointer;font-size:17px;line-height:1;padding:4px;border-radius:4px;}
+.row-del:hover{color:var(--error);opacity:1;}
+
+.add-row{
+  display:flex;align-items:center;gap:10px;padding:12px 18px;cursor:pointer;
+  color:var(--hud2);opacity:.75;font-size:12px;letter-spacing:1.5px;text-transform:uppercase;
+  border-top:1px dashed var(--key-edge);
+}
+.add-row:hover{opacity:1;color:var(--accent2);background:rgba(255,255,255,.02);}
+.add-row .plus{width:20px;height:20px;border-radius:50%;border:1px solid currentColor;
+  display:flex;align-items:center;justify-content:center;font-size:14px;}
+
+tfoot td{padding:13px 18px;font-family:var(--title-font);font-weight:700;letter-spacing:1px;
+  background:rgba(255,255,255,.02); color:var(--hud);}
+tfoot td.num{font-size:18px; text-shadow:0 0 8px var(--accent2);}
+
+.glow-cell{color:var(--text-glow) !important; text-shadow:0 0 8px var(--text-glow),0 0 18px var(--text-glow) !important;
+  animation:pulseglow 1.3s ease-in-out infinite;}
+tr.glow-row td{background:rgba(255,255,255,.05);}
+
+.fix-callout{display:none;margin:0;padding:16px 20px;border-top:1px solid var(--border);
+  font-size:14px;line-height:1.6;background:rgba(255,255,255,.02); color:var(--text-on);}
+.fix-callout.show{display:block;}
+.fix-callout b{color:var(--text-glow); text-shadow:0 0 8px var(--text-glow);}
+
+.edu{
+  border:1px solid var(--key-edge); border-radius:14px; background:var(--panel);
+  padding:18px 22px; font-size:13px; color:var(--hud2); opacity:.85; line-height:1.7; margin-top:10px;
+}
+.edu b{color:var(--text-on); opacity:1;}
+
+@media (max-width:640px){
+  thead th:nth-child(3), tbody td:nth-child(3){display:none;}
+  .panel-head{flex-direction:column;align-items:flex-start;}
+}
+</style>
+</head>
+<body class="theme-vice">
+
+<div class="bg">
+  <div class="bg-sun"></div>
+  <div class="bg-grid"></div>
+  <div class="bg-rain"></div>
+  <div class="bg-glass"></div>
+  <div class="bg-scan"></div>
+  <div class="bg-vignette"></div>
+</div>
+
+<div id="app">
+
+  <div class="themebar">
+    <button data-theme="theme-mech">Mech</button>
+    <button data-theme="theme-crt80">CRT-80</button>
+    <button data-theme="theme-runner">Runner</button>
+    <button data-theme="theme-vice">Vice</button>
+  </div>
+
+  <div class="databar">
+    <button id="exportBtn">Export data</button>
+    <button id="importBtn">Import data</button>
+    <input type="file" id="importFile" accept="application/json" hidden>
+    <span class="databar-msg" id="dataMsg"></span>
+  </div>
+
+  <div class="wrap">
+
+    <div class="header">
+      <h1>Net Worth</h1>
+      <p class="networth-value" id="netWorthValue">$0</p>
+      <p class="networth-sub" id="netWorthSub">ASSETS MINUS DEBTS // THIS IS THE NUMBER TO GROW</p>
+    </div>
+
+    <!-- DEBTS -->
+    <div class="panel" id="debtsPanel">
+      <div class="panel-head">
+        <div>
+          <h2 class="panel-title">Debts</h2>
+          <p class="panel-hint">What you owe, and what it costs you every month.</p>
+        </div>
+        <div class="plan-controls">
+          <div class="strategy-toggle">
+            <button class="strat-btn on" data-strategy="avalanche" title="Highest interest rate first — saves the most money overall">Avalanche</button>
+            <button class="strat-btn" data-strategy="snowball" title="Smallest balance first — fastest wins to keep you motivated">Snowball</button>
+          </div>
+          <div class="extra-field">
+            <span class="extra-label">Extra $/mo</span>
+            <input type="number" id="extraPay" class="extra-input" placeholder="0" min="0">
+          </div>
+          <button class="fix-btn" id="fixBtn">Fix</button>
+        </div>
+      </div>
+      <table>
+        <thead>
+          <tr>
+            <th>Account</th>
+            <th style="text-align:right">Balance</th>
+            <th style="text-align:right">Min. payment / mo</th>
+            <th style="text-align:right">Interest %</th>
+            <th style="text-align:right">Payoff</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="debtsBody"></tbody>
+        <tfoot>
+          <tr>
+            <td>Total</td>
+            <td class="num" id="debtsTotal">$0</td>
+            <td class="num" id="debtsMinTotal">$0</td>
+            <td></td><td></td><td></td>
+          </tr>
+        </tfoot>
+      </table>
+      <div class="add-row" data-add="debts"><span class="plus">+</span> Add a debt</div>
+      <p class="fix-callout" id="fixCallout"></p>
+    </div>
+
+    <!-- INCOME -->
+    <div class="panel" id="incomePanel">
+      <div class="panel-head">
+        <div>
+          <h2 class="panel-title">Income</h2>
+          <p class="panel-hint">Money coming in, per month.</p>
+        </div>
+      </div>
+      <table>
+        <thead><tr><th>Source</th><th style="text-align:right">Amount / mo</th><th></th></tr></thead>
+        <tbody id="incomeBody"></tbody>
+        <tfoot><tr><td>Total</td><td class="num" id="incomeTotal">$0</td><td></td></tr></tfoot>
+      </table>
+      <div class="add-row" data-add="income"><span class="plus">+</span> Add income</div>
+    </div>
+
+    <!-- ASSETS -->
+    <div class="panel" id="assetsPanel">
+      <div class="panel-head">
+        <div>
+          <h2 class="panel-title">Assets</h2>
+          <p class="panel-hint">What you own that's worth money.</p>
+        </div>
+      </div>
+      <table>
+        <thead><tr><th>Asset</th><th style="text-align:right">Value</th><th></th></tr></thead>
+        <tbody id="assetsBody"></tbody>
+        <tfoot><tr><td>Total</td><td class="num" id="assetsTotal">$0</td><td></td></tr></tfoot>
+      </table>
+      <div class="add-row" data-add="assets"><span class="plus">+</span> Add an asset</div>
+    </div>
+
+    <div class="edu">
+      <b>How this works:</b> Net worth = everything you own, minus everything you owe. Growing it is the whole game — pay down debt, especially the expensive kind, and build up savings and things of value. Press <b>Fix</b> any time to see which debt is quietly costing you the most, and what paying it off would do for you.
+    </div>
+
+  </div>
+</div>
+
+<script>
+(function(){
+  const THEMES = ["theme-mech","theme-crt80","theme-runner","theme-vice"];
+  const body = document.body;
+  const themeButtons = document.querySelectorAll('.themebar button');
+
+  const state = {
+    debts: [{name:"",balance:"",min:"",apr:""}],
+    income: [{name:"",amount:""}],
+    assets: [{name:"",amount:""}],
+    theme: "theme-vice",
+    strategy: "avalanche",
+    extra: ""
+  };
+
+  function fmt(n){
+    n = Number(n)||0;
+    return n.toLocaleString('en-US', {style:'currency', currency:'USD', maximumFractionDigits:0});
+  }
+
+  // saved on the Mac through YOLK's server (data/finance.json), and SHELL gets a copy when she plugs in
+  let loaded = false;        // never save over the real numbers if they couldn't be read
+
+  async function loadState(){
+    try{
+      const r = await fetch('/api/finance');
+      if(!r.ok) throw new Error(r.status);
+      Object.assign(state, await r.json());
+      loaded = true;
+    }catch(e){ flashMsg('Could not load your numbers. Is YOLK awake?'); }
+    if(!state.debts.length) state.debts.push({name:"",balance:"",min:"",apr:""});
+    if(!state.income.length) state.income.push({name:"",amount:""});
+    if(!state.assets.length) state.assets.push({name:"",amount:""});
+  }
+
+  async function saveState(){
+    if(!loaded) return;
+    try{
+      await fetch('/api/finance', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(state)});
+    }catch(e){ flashMsg('Could not save. Is YOLK awake?'); }
+  }
+
+  function setTheme(t){
+    state.theme = t;
+    THEMES.forEach(x=>body.classList.remove(x));
+    body.classList.add(t);
+    themeButtons.forEach(b=>b.classList.toggle('on', b.dataset.theme===t));
+    saveState();
+  }
+
+  themeButtons.forEach(b=>{
+    b.addEventListener('click', ()=> setTheme(b.dataset.theme));
+  });
+
+  function makeRow(container, arr, idx, cols, computedCol){
+    const tr = document.createElement('tr');
+    cols.forEach(col=>{
+      const td = document.createElement('td');
+      if(col.num) td.classList.add('num');
+      const input = document.createElement('input');
+      input.className = 'cell';
+      input.placeholder = col.placeholder;
+      input.type = col.type || 'text';
+      if(col.type==='number'){ input.step = col.step || 'any'; input.min = 0; }
+      input.value = arr[idx][col.key] ?? "";
+      input.addEventListener('input', ()=>{
+        arr[idx][col.key] = input.value;
+        renderTotals();
+        saveState();
+        clearFix();
+      });
+      td.appendChild(input);
+      tr.appendChild(td);
+    });
+    if(computedCol){
+      const td = document.createElement('td');
+      td.classList.add('num');
+      const span = document.createElement('span');
+      span.className = computedCol.className;
+      span.textContent = computedCol.render(arr[idx]);
+      td.appendChild(span);
+      tr.appendChild(td);
+    }
+    const tdAct = document.createElement('td');
+    tdAct.className = 'actions';
+    const del = document.createElement('button');
+    del.className = 'row-del';
+    del.innerHTML = '&times;';
+    del.title = 'Remove row';
+    del.addEventListener('click', ()=>{
+      arr.splice(idx,1);
+      if(arr.length===0){
+        const blank = {};
+        cols.forEach(c=>blank[c.key]="");
+        arr.push(blank);
+      }
+      renderAll();
+      saveState();
+    });
+    tdAct.appendChild(del);
+    tr.appendChild(tdAct);
+    tr.dataset.idx = idx;
+    container.appendChild(tr);
+  }
+
+  const debtCols = [
+    {key:'name', placeholder:'e.g. Visa card'},
+    {key:'balance', placeholder:'0', type:'number', num:true},
+    {key:'min', placeholder:'0', type:'number', num:true},
+    {key:'apr', placeholder:'0', type:'number', num:true, step:'0.01'}
+  ];
+  const incomeCols = [
+    {key:'name', placeholder:'e.g. Paycheck'},
+    {key:'amount', placeholder:'0', type:'number', num:true}
+  ];
+  const assetCols = [
+    {key:'name', placeholder:'e.g. Savings account'},
+    {key:'amount', placeholder:'0', type:'number', num:true}
+  ];
+
+  function standaloneMonths(d){
+    const balance = parseFloat(d.balance)||0;
+    const min = parseFloat(d.min)||0;
+    const apr = parseFloat(d.apr)||0;
+    if(balance <= 0) return 0;
+    if(min <= 0) return null;
+    const r = apr/100/12;
+    if(r === 0) return Math.ceil(balance/min);
+    if(min <= balance*r) return null; // payment doesn't even cover interest — never pays off
+    const n = -Math.log(1 - (r*balance)/min) / Math.log(1+r);
+    return Math.ceil(n);
+  }
+
+  function formatMonths(m){
+    if(m === null || m === undefined) return 'Never';
+    if(m === 0) return '—';
+    return m + ' mo';
+  }
+
+  function refreshAllPayoffCells(){
+    const rows = document.querySelectorAll('#debtsBody tr');
+    state.debts.forEach((d,i)=>{
+      const row = rows[i];
+      if(!row) return;
+      const span = row.querySelector('.payoff-val');
+      if(!span) return;
+      span.classList.remove('glow-cell');
+      span.textContent = formatMonths(standaloneMonths(d));
+    });
+  }
+
+  function renderTable(bodyId, arr, cols, computedCol){
+    const tbody = document.getElementById(bodyId);
+    tbody.innerHTML = "";
+    arr.forEach((_, i)=> makeRow(tbody, arr, i, cols, computedCol));
+  }
+
+  function sum(arr, key){
+    return arr.reduce((s,r)=> s + (parseFloat(r[key])||0), 0);
+  }
+
+  function renderTotals(){
+    const debtsTotal = sum(state.debts,'balance');
+    const debtsMin = sum(state.debts,'min');
+    const incomeTotal = sum(state.income,'amount');
+    const assetsTotal = sum(state.assets,'amount');
+    const netWorth = assetsTotal - debtsTotal;
+
+    document.getElementById('debtsTotal').textContent = fmt(debtsTotal);
+    document.getElementById('debtsMinTotal').textContent = fmt(debtsMin);
+    document.getElementById('incomeTotal').textContent = fmt(incomeTotal);
+    document.getElementById('assetsTotal').textContent = fmt(assetsTotal);
+
+    const nwEl = document.getElementById('netWorthValue');
+    nwEl.textContent = fmt(netWorth);
+    document.getElementById('netWorthSub').textContent =
+      netWorth >= 0 ? "ASSETS MINUS DEBTS // THIS IS THE NUMBER TO GROW" :
+      "ASSETS MINUS DEBTS // NEGATIVE RIGHT NOW, AND FIXABLE";
+  }
+
+  function monthlyRate(apr){ return (parseFloat(apr)||0)/100/12; }
+
+  function sortByStrategy(activeDebts, strategy){
+    const copy = activeDebts.slice();
+    if(strategy === 'snowball') copy.sort((a,b)=> a.balance - b.balance);
+    else copy.sort((a,b)=> b.apr - a.apr);
+    return copy;
+  }
+
+  // Simulates monthly payoff. If rollover is true, extra + freed-up minimums from
+  // already-cleared debts cascade to the top-priority debt under the chosen strategy.
+  // Also tracks the month each individual debt (by its original state.debts index) gets paid off.
+  function simulatePayoff(debtsInput, extra, strategy, rollover){
+    let debts = debtsInput.map((d,i)=>({
+      origIdx: i,
+      balance: parseFloat(d.balance)||0,
+      min: parseFloat(d.min)||0,
+      apr: parseFloat(d.apr)||0,
+      paidMonth: null
+    })).filter(d=> d.balance > 0);
+
+    const payoffMonths = {};
+    if(debts.length === 0) return {months:0, totalInterest:0, payoffMonths};
+
+    const CAP = 600; // 50 years safety cap
+    let months = 0, totalInterest = 0;
+
+    while(debts.some(d=> d.balance > 0.01) && months < CAP){
+      months++;
+      debts.forEach(d=>{
+        if(d.balance > 0.01){
+          const interest = d.balance * monthlyRate(d.apr);
+          d.balance += interest;
+          totalInterest += interest;
+        }
+      });
+      debts.forEach(d=>{
+        if(d.balance > 0.01){
+          d.balance -= Math.min(d.min, d.balance);
+        }
+      });
+      let freed = extra;
+      if(rollover){
+        debts.forEach(d=>{ if(d.balance <= 0.01) freed += d.min; });
+      }
+      const order = sortByStrategy(debts.filter(d=> d.balance > 0.01), strategy);
+      for(const d of order){
+        if(freed <= 0) break;
+        const pay = Math.min(freed, d.balance);
+        d.balance -= pay;
+        freed -= pay;
+      }
+      debts.forEach(d=>{
+        if(d.balance <= 0.01 && d.paidMonth === null) d.paidMonth = months;
+      });
+    }
+
+    debts.forEach(d=>{ payoffMonths[d.origIdx] = d.paidMonth; });
+    const done = !debts.some(d=> d.balance > 0.01);
+    return done ? {months, totalInterest, payoffMonths} : {months:null, totalInterest:null, payoffMonths};
+  }
+
+  function monthsToDateStr(months){
+    const d = new Date();
+    d.setMonth(d.getMonth() + months);
+    return d.toLocaleDateString('en-US', {month:'short', year:'numeric'});
+  }
+
+  let planVisible = false;
+
+  function clearFix(){
+    document.querySelectorAll('#debtsBody tr').forEach(tr=> tr.classList.remove('glow-row'));
+    document.querySelectorAll('#debtsBody .glow-cell').forEach(el=> el.classList.remove('glow-cell'));
+    document.getElementById('netWorthValue').classList.remove('glow');
+    const callout = document.getElementById('fixCallout');
+    callout.classList.remove('show');
+    callout.textContent = '';
+    planVisible = false;
+    refreshAllPayoffCells();
+  }
+
+  function runFix(){
+    clearFix();
+    const callout = document.getElementById('fixCallout');
+
+    const validDebts = state.debts.filter(d => (parseFloat(d.balance)||0) > 0);
+    if(validDebts.length === 0){
+      callout.textContent = "No debts entered yet — add one above to get a recommendation.";
+      callout.classList.add('show');
+      return;
+    }
+
+    const extra = parseFloat(state.extra) || 0;
+    const strategy = state.strategy;
+
+    const enriched = validDebts.map(d=>({
+      ...d, i: state.debts.indexOf(d),
+      balance: parseFloat(d.balance)||0, apr: parseFloat(d.apr)||0
+    }));
+    const target = sortByStrategy(enriched, strategy)[0];
+
+    const baseline = simulatePayoff(state.debts, 0, strategy, false);
+    const withExtra = simulatePayoff(state.debts, extra, strategy, true);
+
+    const rows = document.querySelectorAll('#debtsBody tr');
+    const row = rows[target.i];
+    if(row){
+      row.classList.add('glow-row');
+      row.querySelectorAll('input').forEach(inp=> inp.classList.add('glow-cell'));
+    }
+
+    // Pulse each debt's payoff-month figure with the "with extra payment" projection
+    state.debts.forEach((d,i)=>{
+      const bal = parseFloat(d.balance)||0;
+      if(bal <= 0) return;
+      const r = rows[i];
+      if(!r) return;
+      const span = r.querySelector('.payoff-val');
+      if(!span) return;
+      const m = withExtra.payoffMonths ? withExtra.payoffMonths[i] : undefined;
+      span.textContent = formatMonths(m === undefined ? null : m);
+      span.classList.add('glow-cell');
+    });
+
+    const name = target.name || 'this debt';
+    const stratLabel = strategy === 'snowball' ? 'smallest balance' : 'highest interest rate';
+    let msg = `Put your extra payment toward <b>${escapeHtml(name)}</b> — it has the ${stratLabel} among your debts.`;
+
+    if(extra > 0){
+      document.getElementById('netWorthValue').classList.add('glow');
+      if(baseline.months === null || withExtra.months === null){
+        msg += ` At minimum payments alone this debt load won't clear within 50 years — even a modest extra payment meaningfully changes that.`;
+      } else {
+        const monthsSaved = baseline.months - withExtra.months;
+        const interestSaved = baseline.totalInterest - withExtra.totalInterest;
+        if(monthsSaved > 0){
+          const years = Math.floor(monthsSaved/12), rem = monthsSaved%12;
+          const timeStr = years > 0 ? `${years}y ${rem}mo` : `${rem} mo`;
+          msg += ` Debt-free by <b>${monthsToDateStr(withExtra.months)}</b> instead of <b>${monthsToDateStr(baseline.months)}</b> — `+
+                 `<b>${timeStr} faster</b>, saving roughly <b>${fmt(interestSaved)}</b> in interest.`;
+        } else {
+          msg += ` You're already on pace to be debt-free by <b>${monthsToDateStr(baseline.months)}</b>.`;
+        }
+      }
+    } else {
+      msg += ` Add an extra monthly payment above to see exactly how much faster you'd be debt-free.`;
+    }
+
+    callout.innerHTML = msg;
+    callout.classList.add('show');
+    planVisible = true;
+  }
+
+  function escapeHtml(s){
+    const d = document.createElement('div');
+    d.textContent = s;
+    return d.innerHTML;
+  }
+
+  document.getElementById('fixBtn').addEventListener('click', runFix);
+
+  document.querySelectorAll('.strat-btn').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      state.strategy = btn.dataset.strategy;
+      document.querySelectorAll('.strat-btn').forEach(b=> b.classList.toggle('on', b===btn));
+      saveState();
+      if(planVisible) runFix();
+    });
+  });
+
+  document.getElementById('extraPay').addEventListener('input', (e)=>{
+    state.extra = e.target.value;
+    saveState();
+    if(planVisible) runFix();
+  });
+
+  document.querySelectorAll('[data-add]').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      const which = btn.dataset.add;
+      if(which==='debts') state.debts.push({name:"",balance:"",min:"",apr:""});
+      if(which==='income') state.income.push({name:"",amount:""});
+      if(which==='assets') state.assets.push({name:"",amount:""});
+      renderAll();
+      saveState();
+    });
+  });
+
+  function renderAll(){
+    renderTable('debtsBody', state.debts, debtCols, {
+      className: 'payoff-val',
+      render: (d)=> formatMonths(standaloneMonths(d))
+    });
+    renderTable('incomeBody', state.income, incomeCols);
+    renderTable('assetsBody', state.assets, assetCols);
+    renderTotals();
+    clearFix();
+    document.querySelectorAll('.strat-btn').forEach(b=> b.classList.toggle('on', b.dataset.strategy === state.strategy));
+    document.getElementById('extraPay').value = state.extra || '';
+  }
+
+  function flashMsg(text){
+    const el = document.getElementById('dataMsg');
+    el.textContent = text;
+    el.classList.add('show');
+    clearTimeout(flashMsg._t);
+    flashMsg._t = setTimeout(()=> el.classList.remove('show'), 3000);
+  }
+
+  function exportData(){
+    const payload = {
+      debts: state.debts,
+      income: state.income,
+      assets: state.assets,
+      theme: state.theme,
+      strategy: state.strategy,
+      extra: state.extra,
+      exportedAt: new Date().toISOString()
+    };
+    const blob = new Blob([JSON.stringify(payload, null, 2)], {type:'application/json'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    const date = new Date().toISOString().slice(0,10);
+    a.href = url;
+    a.download = `net-worth-console-backup-${date}.json`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+    flashMsg('Exported ✓');
+  }
+
+  function importData(file){
+    const reader = new FileReader();
+    reader.onload = () => {
+      try{
+        const parsed = JSON.parse(reader.result);
+        if(!parsed || typeof parsed !== 'object') throw new Error('bad file');
+        state.debts = Array.isArray(parsed.debts) && parsed.debts.length ? parsed.debts : [{name:"",balance:"",min:"",apr:""}];
+        state.income = Array.isArray(parsed.income) && parsed.income.length ? parsed.income : [{name:"",amount:""}];
+        state.assets = Array.isArray(parsed.assets) && parsed.assets.length ? parsed.assets : [{name:"",amount:""}];
+        if(parsed.strategy === 'snowball' || parsed.strategy === 'avalanche') state.strategy = parsed.strategy;
+        if(typeof parsed.extra !== 'undefined') state.extra = parsed.extra;
+        renderAll();
+        saveState();
+        let importedTheme = parsed.theme;
+        if(importedTheme && !THEMES.includes(importedTheme) && THEMES.includes('theme-'+importedTheme)){
+          importedTheme = 'theme-' + importedTheme; // supports pre-"theme-" prefix exports
+        }
+        if(THEMES.includes(importedTheme)) setTheme(importedTheme);
+        flashMsg('Imported ✓');
+      }catch(e){
+        flashMsg('Could not read that file');
+      }
+    };
+    reader.readAsText(file);
+  }
+
+  document.getElementById('exportBtn').addEventListener('click', exportData);
+  document.getElementById('importBtn').addEventListener('click', ()=> document.getElementById('importFile').click());
+  document.getElementById('importFile').addEventListener('change', (e)=>{
+    const file = e.target.files[0];
+    if(file) importData(file);
+    e.target.value = '';
+  });
+
+  (async function init(){
+    await loadState();
+    setTheme(THEMES.includes(state.theme) ? state.theme : 'theme-vice');
+    renderAll();
+  })();
+})();
+</script>
+</body>
+</html>
