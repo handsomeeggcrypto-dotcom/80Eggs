@@ -83,6 +83,7 @@ def generated_art():
         if not img.is_dir() or sum(1 for _ in img.rglob("*.bmp")) < 5000:
             print(f"   {name} pictures missing, rebuilding (this downloads them again)...")
             run([sys.executable, HERE / script])
+    run([sys.executable, HERE / "gen_dex_index.py"])    # browse lists (rarest, by trait)
 
 
 def latest_backup():

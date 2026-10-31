@@ -1,7 +1,11 @@
 --[[ MOEKADEX // every moemoe LLC Moe, on SHELL
      wheel    browse          left/right   jump 50
      play     random Moe      select       full trait list
-     hold select  type a number           menu         back / exit
+     hold select  type a number           menu         lists / exit
+
+     The menu button opens the lists: rarest first, by trait, and My Moes (marked here,
+     kept in mine.txt). The wheel then moves through that list. tools/gen_dex_index.py
+     builds the lists.
 
      Other collections reuse this file: set a DEX table and dofile it (see
      dreams.lua). Anything DEX leaves out falls back to Moekadex's settings. ]]
@@ -123,8 +127,12 @@ end
 local PX = 10                                  -- where the picture goes
 local PY = 36 + (176 - PIC_H) / 2              -- taller art sits a little higher
 
+local list, pos = nil, 1                       -- the list being browsed, if any
+local mine, is_mine = {}, {}                   -- My Moes
+
 local function draw_main(m, pic, loading)
-    bars(string.format("#%04d", m.n), "spin:browse  >:random  o:traits")
+    bars(list and string.format("%d/%d", pos, list.count) or string.format("#%04d", m.n),
+         "spin:browse  >:random  o:traits")
     -- picture in an accent-coloured frame
     rect(YELLOW, PX - 2, PY - 2, PIC_W + 4, PIC_H + 4)
     rect(NAVY, PX, PY, PIC_W, PIC_H)
@@ -137,13 +145,13 @@ local function draw_main(m, pic, loading)
     -- info panel
     local x = PX + PIC_W + 14
     local cols = math.floor((W - x - 6) / CW)
-    text(YELLOW, ITEM .. " #" .. m.n, x, 36)
+    text(YELLOW, ITEM .. " #" .. m.n .. (is_mine[m.n] and " *" or ""), x, 36)
     local tcol = TIER[m.tier] or WHITE
     local tw = rb.font_getstringsize(" " .. m.tier .. " ", UI)
     rect(tcol, x, 56, tw, CH + 2)
     text(NAVY, " " .. m.tier .. " ", x, 57)
     text(WHITE, "RANK " .. m.rank, x, 80)
-    text(DIM, "of " .. N, x, 96)
+    text(DIM, list and fit(list.name, cols) or ("of " .. N), x, 96)
     text(DIM, "RAREST", x, 124)
     for i = 1, 2 do
         local t = m.traits[i]
@@ -228,6 +236,162 @@ local function jump_screen(n)
     end
 end
 
+---------------------------------------------------------------- lists
+local PLURAL = ITEM:lower() .. "s"             -- "moes", "dreams"
+local IDX = DIR .. "index/"
+local MINE = DIR .. "mine.txt"
+local rarest_file = io.open(IDX .. "rarest.txt", "rb")
+local moes_file = io.open(IDX .. "moes.txt", "rb")
+local values_file = io.open(IDX .. "values.txt", "rb")
+local value_len, types = 0, {}
+do
+    local f = io.open(IDX .. "types.txt", "r")
+    if f then
+        value_len = tonumber(f:read("*l")) or 0
+        for line in f:lines() do
+            local t = split(line, "|")
+            types[#types + 1] = { name = t[1], first = tonumber(t[2]), count = tonumber(t[3]) }
+        end
+        f:close()
+    end
+end
+
+local function num_at(f, i)                    -- the i-th (from 0) "nnnn\n" record
+    f:seek("set", i * 5)
+    return tonumber(f:read(4)) or 1
+end
+
+local function value_at(i)                     -- the i-th (from 0) record of values.txt
+    values_file:seek("set", i * value_len)
+    local t = split((values_file:read(value_len - 1) or ""):gsub("%s+$", ""), "|")
+    return { name = t[1] or "?", pct = t[2] or "", count = tonumber(t[3]) or 0, first = tonumber(t[4]) or 0 }
+end
+
+local function load_mine()
+    local f = io.open(MINE, "r")
+    if not f then return end
+    for line in f:lines() do
+        local v = tonumber(line)
+        if v and v >= 1 and v <= N and not is_mine[v] then
+            is_mine[v] = true
+            mine[#mine + 1] = v
+        end
+    end
+    f:close()
+    table.sort(mine)
+end
+
+local function toggle_mine(v)
+    if is_mine[v] then
+        is_mine[v] = nil
+        for i = #mine, 1, -1 do if mine[i] == v then table.remove(mine, i) end end
+    else
+        is_mine[v] = true
+        mine[#mine + 1] = v
+        table.sort(mine)
+    end
+    local f = io.open(MINE, "w")
+    if f then
+        for _, x in ipairs(mine) do f:write(x .. "\n") end
+        f:close()
+    end
+end
+
+local function mine_list()
+    return { name = "my " .. PLURAL, count = #mine, at = function(i) return mine[i] end }
+end
+
+-- a scrolling list; returns the picked row, or nil for the menu button
+local function picker(right, hint, count, row)
+    local sel, top = 1, 1
+    local rows = math.floor((H - 23 - 34) / (CH + 8))
+    while true do
+        if sel < top then top = sel elseif sel >= top + rows then top = sel - rows + 1 end
+        bars(right, hint)
+        for i = 0, rows - 1 do
+            local r = top + i
+            if r <= count then
+                local y = 34 + i * (CH + 8)
+                local left, tail = row(r)
+                tail = tail or ""
+                if r == sel then rect(YELLOW, 6, y - 2, W - 16, CH + 6) end
+                local cols = math.floor((W - 34) / CW) - #tail - 1
+                text(r == sel and NAVY or WHITE, fit(left, cols), 12, y)
+                if tail ~= "" then text(r == sel and NAVY or YELLOW, tail, 0, y, "right", W - 16) end
+            end
+        end
+        if count > rows then
+            local track = H - 23 - 34 - 4
+            local h = math.max(8, track * rows / count)
+            rect(BLUE, W - 6, 34, 3, track)
+            rect(YELLOW, W - 6, 34 + (track - h) * (top - 1) / (count - rows), 3, h)
+        end
+        rb.lcd_update()
+        local a = rb.get_plugin_action(-1)
+        if a == A.PLA_SCROLL_FWD or a == A.PLA_SCROLL_FWD_REPEAT then
+            sel = sel % count + 1
+        elseif a == A.PLA_SCROLL_BACK or a == A.PLA_SCROLL_BACK_REPEAT then
+            sel = (sel + count - 2) % count + 1
+        elseif a == A.PLA_SELECT_REL then
+            return sel
+        elseif a == A.PLA_UP or a == A.PLA_CANCEL or a == A.PLA_EXIT then
+            return nil
+        end
+    end
+end
+
+-- trait type, then value; returns a list of the Moes that have it, or nil
+local function pick_trait()
+    while true do
+        local t = picker("traits", "spin:pick  o:open  menu:back", #types,
+                         function(r) return types[r].name, tostring(types[r].count) end)
+        if not t then return nil end
+        local ty = types[t]
+        local v = picker(fit(ty.name, 18), "spin:pick  o:open  menu:back", ty.count, function(r)
+            local x = value_at(ty.first + r - 1)
+            return x.name, x.pct
+        end)
+        if v then
+            local x = value_at(ty.first + v - 1)
+            return { name = x.name, count = x.count, at = function(i) return num_at(moes_file, x.first + i - 1) end }
+        end
+    end
+end
+
+-- the menu button. Returns "leave", a list, "all", or nil to carry on as you were
+local function lists_menu(n)
+    while true do
+        local items, acts = {}, {}
+        local function add(label, tail, act) items[#items + 1] = { label, tail }; acts[#acts + 1] = act end
+        add("keep browsing", nil, "back")
+        if list then add("all " .. PLURAL, tostring(N), "all") end
+        if rarest_file then add("rarest first", nil, "rarest") end
+        if #types > 0 and values_file and moes_file then add("by trait", nil, "trait") end
+        add("my " .. PLURAL, tostring(#mine), "mine")
+        add((is_mine[n] and "remove #" or "add #") .. n .. (is_mine[n] and " from mine" or " to mine"), nil, "toggle")
+        local c = picker("menu", "spin:pick  o:go  menu:leave", #items,
+                         function(r) return items[r][1], items[r][2] end)
+        if not c then return "leave" end
+        local act = acts[c]
+        if act == "back" then return nil
+        elseif act == "all" then return "all"
+        elseif act == "rarest" then
+            return { name = "rarest first", count = N, at = function(i) return num_at(rarest_file, i - 1) end }
+        elseif act == "trait" then
+            local l = pick_trait()
+            if l then return l end
+        elseif act == "mine" then
+            if #mine > 0 then return mine_list() end
+            picker("my " .. PLURAL, "menu:back", 2, function(r)
+                return r == 1 and ("none yet. pick add #" .. n) or "in this menu to mark one"
+            end)
+        else
+            toggle_mine(n)
+            return "toggled"
+        end
+    end
+end
+
 ---------------------------------------------------------------- splash
 local function splash()
     local s = rb.read_bmp_file(DIR .. "splash.bmp", false, false)
@@ -261,6 +425,7 @@ end
 splash()
 math.randomseed(rb.current_tick() + (os.time and os.time() or 0))
 
+load_mine()
 local n = load_last()
 YOLK_ON_USB = function() save_last(n) end  -- remember your place if you plug in mid-browse
 local m = moe(n)
@@ -269,8 +434,14 @@ local need_pic = true
 draw_main(m, nil, true)
 
 local function go(to)
-    if to < 1 then to = to + N elseif to > N then to = to - N end
-    n = to
+    if list then                               -- `to` is a place in the list
+        if to < 1 or to > list.count then to = (to - 1) % list.count + 1 end
+        pos = to
+        n = list.at(pos)
+    else
+        if to < 1 then to = to + N elseif to > N then to = to - N end
+        n = to
+    end
     m = moe(n)
     pic = nil
     collectgarbage()
@@ -282,25 +453,39 @@ while true do
     -- while the wheel is spinning only the text updates; the picture loads
     -- once it settles, so browsing stays quick
     local a = rb.get_plugin_action(need_pic and HZ / 6 or -1)
+    local here = list and pos or n
     if a == A.PLA_SCROLL_FWD or a == A.PLA_SCROLL_FWD_REPEAT then
-        go(n + 1)
+        go(here + 1)
     elseif a == A.PLA_SCROLL_BACK or a == A.PLA_SCROLL_BACK_REPEAT then
-        go(n - 1)
+        go(here - 1)
     elseif a == A.PLA_RIGHT or a == A.PLA_RIGHT_REPEAT then
-        go(n + 50)
+        go(here + 50)
     elseif a == A.PLA_LEFT or a == A.PLA_LEFT_REPEAT then
-        go(n - 50)
+        go(here - 50)
     elseif a == A.PLA_DOWN then
-        go(math.random(1, N))
+        go(math.random(1, list and list.count or N))
     elseif a == A.PLA_SELECT_REL then
         traits_screen(m)
         draw_main(m, pic, need_pic)
     elseif a == A.PLA_SELECT_REPEAT then
-        go(jump_screen(n))
+        local to = jump_screen(n)
+        if to ~= n then list = nil end         -- a typed number means the whole dex again
+        if list then draw_main(m, pic, need_pic) else go(to) end
         -- swallow the select release from the long press
         rb.get_plugin_action(HZ / 4)
     elseif a == A.PLA_UP or a == A.PLA_CANCEL or a == A.PLA_EXIT then
-        break
+        local r = lists_menu(n)
+        if r == "leave" then break
+        elseif r == "all" then list = nil; go(n)
+        elseif r == "toggled" then
+            if list and list.name == "my " .. PLURAL then   -- the list you're in just changed
+                if #mine == 0 then list = nil; go(n)
+                else list = mine_list(); go(math.min(pos, #mine)) end
+            else
+                draw_main(m, pic, need_pic)
+            end
+        elseif r then list = r; go(1)
+        else draw_main(m, pic, need_pic) end
     elseif need_pic then
         pic = rb.read_bmp_file(picture_path(n), false, false)
         need_pic = false
@@ -309,5 +494,5 @@ while true do
 end
 
 save_last(n)
-if data then data:close() end
+for _, f in ipairs({ data, rarest_file, moes_file, values_file }) do f:close() end
 rb.lcd_set_drawmode(3)  -- DRMODE_SOLID
