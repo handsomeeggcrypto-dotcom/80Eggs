@@ -3,7 +3,12 @@
 
   python3 tools/restore_shell.py /Volumes/<card> [--dry-run]
 
-The card must already be formatted FAT32 (MS-DOS FAT, Master Boot Record).
+The card must already be in the iPod and formatted through Apple's disk mode. Do NOT
+format it in a card reader or erase the whole disk: bootloader 1.0 then says "No
+partition found". Boot into disk mode once (Apple writes its own partition table), then
+  diskutil eraseVolume "MS-DOS FAT32" SHELL diskNs1
+which must leave the partition at block 63 (258048 bytes) in disk mode's view.
+Run this restore in disk mode too.
 Nothing is ever erased: files are only added or replaced. In order:
 
   1. Rockbox itself + fonts      the exact build SHELL ran (tools/cache/rockbox)
@@ -170,7 +175,7 @@ def main():
         print(f"   {name} pictures: {n}")
     music = sum(1 for p in (target / "Music").rglob("*") if p.is_file() and not p.name.startswith("._")) if (target / "Music").is_dir() else 0
     print(f"   music files: {music}")
-    print("\ndone. eject the card, put it in the iFlash, and SHELL should boot straight into YOLK.")
+    print("\ndone. eject her and restart (Menu + Select): SHELL should boot straight into YOLK.")
 
 
 if __name__ == "__main__":
