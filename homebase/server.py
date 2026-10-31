@@ -29,6 +29,8 @@ PROJECTS = [
      "path": "moetorcycles", "open": "moetorcycles/", "live": "/moetorcycles/", "status": "live", "icon": "🏍️"},
     {"id": "bubbles", "name": "Tomochi Pop", "blurb": "Bubble shooter with character bubbles, 15 levels and hamstars.",
      "path": "bubbles", "open": "bubbles/", "live": "/bubbles/", "status": "live", "icon": "bubbles/icon.png"},
+    {"id": "dreamthings", "name": "Dream Things", "blurb": "Dex for all 5,200 Yumemono NFTs, with rarity ranks.",
+     "path": "dreamthings", "open": "dreamthings/", "live": "/dreamthings/", "status": "live", "icon": "dreamthings/icon.png"},
     {"id": "moekedex", "name": "Moekedex", "blurb": "Pokédex for all 5,250 moemoe LLC NFTs, with rarity ranks.",
      "path": "moekedex", "open": "moekedex/", "live": "/moekedex/", "status": "live", "icon": "moekedex/icon.png"},
     {"id": "naptime", "name": "Nap Time", "blurb": "Bedtime story, then play the dream. Every dream has a shadow.",

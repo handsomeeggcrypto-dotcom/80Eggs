@@ -16,6 +16,7 @@ Each project folder has its own `CLAUDE.md`. Read it before working there.
 | `bubbles/` | **Tomochi Pop** bubble shooter (folder name kept from "Bubble Pop") | live |
 | `moetorcycles/` | **MOEtorcycles** endless runner | live |
 | `moekedex/` | **Moekedex**, a Pokédex for the moemoe LLC NFTs | live |
+| `dreamthings/` | **Dream Things**, a dex for the Yumemono NFTs. `build_data.py` makes `data.js` | live |
 | `nap_time/` | **Nap Time** bedtime-story ARPG | live, behind a password |
 | `moemode/` | **MoeMode** "what should I do right now?" app | hidden |
 | `yolk/` | **YOLK**, the egg AI's home on the Mac (server, Station tablet, Daily, Claude) | this Mac only |

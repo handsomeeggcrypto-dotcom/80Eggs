@@ -1,0 +1,233 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dream Things</title>
+<meta name="description" content="A dex for every Yumemono: 5200 angels dreamt from latent space.">
+<link rel="icon" href="icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=VT323&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --night: #1b1640; --deep: #120e2e; --dusk: #5c4aaa; --pink: #ffb3d9; --cloud: #faf4ff; --dim: #b0a0e6;
+    --mythic: #ff3d6e; --legendary: #ffc21a; --epic: #be6eff; --rare: #3df5ff; --common: #96a0be;
+  }
+  * { box-sizing: border-box; }
+  html { background: var(--deep); }
+  body {
+    margin: 0; min-height: 100vh; color: var(--cloud); font: 22px/1.25 "VT323", ui-monospace, Menlo, monospace;
+    background: radial-gradient(ellipse at 50% -10%, #3b2f7d 0, var(--night) 45%, var(--deep) 100%) fixed;
+  }
+  a { color: var(--pink); }
+  button, select, input { font: inherit; color: var(--cloud); }
+  .wrap { max-width: 900px; margin: 0 auto; padding: 16px; }
+  header { display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 14px; border-bottom: 2px solid var(--pink); padding-bottom: 8px; }
+  h1 { margin: 0; font-size: 44px; font-weight: normal; color: var(--pink); letter-spacing: .04em; }
+  .tag { color: var(--dim); flex: 1; }
+  .home { white-space: nowrap; }
+
+  .tools { display: flex; flex-wrap: wrap; gap: 8px; margin: 14px 0; }
+  .btn, select, input {
+    background: var(--night); border: 2px solid var(--dusk); padding: 4px 10px; min-height: 40px; border-radius: 0;
+  }
+  .btn { cursor: pointer; }
+  .btn:hover, select:hover { border-color: var(--pink); }
+  .btn.on { background: var(--pink); border-color: var(--pink); color: var(--deep); }
+  :focus-visible { outline: 2px solid var(--rare); outline-offset: 2px; }
+  select { max-width: 100%; min-width: 0; }
+  #num { width: 110px; }
+
+  #listbar { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 14px; padding: 4px 4px 4px 12px; background: var(--dusk); }
+  #listbar[hidden] { display: none; }
+  #listbar .btn { background: transparent; border-color: var(--cloud); min-height: 34px; padding: 0 10px; }
+  #listname { overflow-wrap: anywhere; }
+
+  main { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 6fr); gap: 20px; }
+  .frame { border: 3px solid var(--pink); background: var(--deep); aspect-ratio: 3 / 4; position: relative; }
+  .frame img { width: 100%; height: 100%; display: block; object-fit: cover; image-rendering: pixelated; }
+  #loading { position: absolute; inset: 0; display: grid; place-items: center; color: var(--dim); text-align: center; padding: 16px; }
+  #loading[hidden] { display: none; }
+  .steps { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-top: 10px; }
+  .steps .btn { width: 100%; }
+
+  h2 { margin: 0; font-size: 38px; font-weight: normal; color: var(--pink); }
+  .badges { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; margin: 4px 0 12px; }
+  #tier { padding: 0 8px; color: var(--deep); }
+  #rank { color: var(--dim); }
+  .traits { list-style: none; margin: 0; padding: 0; }
+  .traits button {
+    width: 100%; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 0 12px; text-align: left; cursor: pointer;
+    background: transparent; border: 0; border-bottom: 1px solid var(--dusk); padding: 5px 4px;
+  }
+  .traits button:hover { background: var(--night); }
+  .traits .v { overflow-wrap: anywhere; }
+  .traits .p { color: var(--pink); }
+  .traits .t { grid-column: 1 / -1; color: var(--dim); font-size: 18px; }
+  .note { color: var(--dim); font-size: 18px; margin-top: 18px; }
+
+  @media (max-width: 640px) {
+    h1 { font-size: 36px; }
+    main { grid-template-columns: minmax(0, 1fr); }
+    .frame { max-width: 420px; margin: 0 auto; width: 100%; }
+    .tools select { flex: 1 1 40%; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>DREAM THINGS</h1>
+    <span class="tag">5200 angels dreamt from latent space</span>
+    <a class="home" href="../index.html">back to MoeSpace</a>
+  </header>
+
+  <div class="tools">
+    <form id="jump"><input id="num" type="number" min="1" max="5200" placeholder="1-5200" aria-label="Dream number"> <button class="btn">go</button></form>
+    <button class="btn" id="rarest">rarest first</button>
+    <select id="type" aria-label="Trait type"></select>
+    <select id="value" aria-label="Trait value" disabled></select>
+  </div>
+
+  <div id="listbar" hidden>
+    <span id="listname"></span>
+    <button class="btn" id="clear">all dreams</button>
+  </div>
+
+  <main>
+    <div>
+      <div class="frame">
+        <img id="pic" alt="">
+        <div id="loading">dreaming...</div>
+      </div>
+      <div class="steps">
+        <button class="btn" id="prev" aria-label="Previous">&lt; prev</button>
+        <button class="btn" id="random">random</button>
+        <button class="btn" id="next" aria-label="Next">next &gt;</button>
+      </div>
+    </div>
+    <section>
+      <h2 id="name"></h2>
+      <div class="badges"><span id="tier"></span><span id="rank"></span></div>
+      <ul class="traits" id="traits"></ul>
+      <p class="note">Tap a trait to browse every dream that has it. Arrow keys work too.</p>
+    </section>
+  </main>
+</div>
+
+<script src="data.js"></script>
+<script>
+const D = window.DREAMS, N = D.rank.length, $ = id => document.getElementById(id);
+const GIF = new Set(D.gif);
+const pct = c => { const p = c / N * 100; return p < 1 ? p.toFixed(2) + "%" : p.toFixed(1) + "%"; };
+const tierOf = r => { const f = r / N; return f <= .01 ? "mythic" : f <= .05 ? "legendary" : f <= .15 ? "epic" : f <= .4 ? "rare" : "common"; };
+const RAREST = Array.from({ length: N }, (_, i) => i + 1).sort((a, b) => D.rank[a - 1] - D.rank[b - 1]);
+
+let n = 1, list = null, pos = 0;      // list: { name, ids }
+
+function traitsOf(id) {
+  const f = D.tokens[id - 1], out = [];
+  for (let i = 0; i < f.length; i += 2) out.push({ t: f[i], v: f[i + 1], c: D.counts[f[i]][f[i + 1]] });
+  return out.sort((a, b) => a.c - b.c);
+}
+function withTrait(t, v) {
+  const ids = [];
+  for (let i = 0; i < N; i++) {
+    const f = D.tokens[i];
+    for (let j = 0; j < f.length; j += 2) if (f[j] === t && f[j + 1] === v) { ids.push(i + 1); break; }
+  }
+  return ids.sort((a, b) => D.rank[a - 1] - D.rank[b - 1]);
+}
+
+function show(id) {
+  n = id;
+  const url = `https://metadata.yumemono.com/images/${id}.${GIF.has(id) ? "gif" : "png"}`;
+  $("loading").hidden = false;
+  $("loading").textContent = "dreaming...";
+  $("pic").alt = `Yumemono #${id}`;
+  $("pic").src = url;
+  $("name").textContent = `DREAM #${id}`;
+  const r = D.rank[id - 1], tier = tierOf(r);
+  $("tier").textContent = tier.toUpperCase();
+  $("tier").style.background = `var(--${tier})`;
+  $("rank").textContent = `rank ${r} of ${N}`;
+  $("num").value = id;
+  $("traits").replaceChildren(...traitsOf(id).map(x => {
+    const li = document.createElement("li"), b = document.createElement("button");
+    b.innerHTML = '<span class="v"></span><span class="p"></span><span class="t"></span>';
+    b.children[0].textContent = D.values[x.t][x.v];
+    b.children[1].textContent = pct(x.c);
+    b.children[2].textContent = `${D.types[x.t]} . ${x.c} dreams`;
+    b.onclick = () => pickTrait(x.t, x.v);
+    li.append(b);
+    return li;
+  }));
+  $("listbar").hidden = !list;
+  if (list) $("listname").textContent = `${list.name}: ${pos + 1} of ${list.ids.length}`;
+  $("rarest").classList.toggle("on", !!list && list.ids === RAREST);
+  history.replaceState(null, "", "#" + id);
+  // the next one is probably next, so have it ready
+  const after = list ? list.ids[(pos + 1) % list.ids.length] : id % N + 1;
+  new Image().src = `https://metadata.yumemono.com/images/${after}.${GIF.has(after) ? "gif" : "png"}`;
+}
+$("pic").onload = () => { $("loading").hidden = true; };
+$("pic").onerror = () => { $("loading").hidden = false; $("loading").textContent = "this dream won't load right now."; };
+
+function step(d) {
+  if (list) { pos = (pos + d + list.ids.length) % list.ids.length; show(list.ids[pos]); }
+  else show((n - 1 + d + N) % N + 1);
+}
+function useList(name, ids, at) { list = { name, ids }; pos = at || 0; show(ids[pos]); }
+function clearList() {
+  list = null;
+  $("type").value = "";
+  fillValues();
+  show(n);
+}
+function pickTrait(t, v) {
+  $("type").value = t;
+  fillValues();
+  $("value").value = v;
+  const ids = withTrait(t, v);
+  useList(`${D.types[t]}: ${D.values[t][v]}`, ids, Math.max(0, ids.indexOf(n)));
+}
+function fillValues() {
+  const sel = $("value"), t = $("type").value;
+  sel.replaceChildren(new Option(t === "" ? "then a trait" : "pick one", ""));
+  sel.disabled = t === "";
+  if (t !== "") D.values[t].forEach((v, i) => sel.add(new Option(`${v} (${pct(D.counts[t][i])})`, i)));
+}
+
+$("type").add(new Option("browse by trait", ""));
+D.types.forEach((t, i) => $("type").add(new Option(t, i)));
+fillValues();
+$("type").onchange = fillValues;
+$("value").onchange = e => { if (e.target.value !== "") pickTrait(+$("type").value, +e.target.value); };
+$("rarest").onclick = () => { if (list && list.ids === RAREST) clearList(); else useList("rarest first", RAREST); };
+$("clear").onclick = clearList;
+$("prev").onclick = () => step(-1);
+$("next").onclick = () => step(1);
+$("random").onclick = () => {
+  if (list) { pos = Math.floor(Math.random() * list.ids.length); show(list.ids[pos]); }
+  else show(1 + Math.floor(Math.random() * N));
+};
+$("jump").onsubmit = e => {
+  e.preventDefault();
+  const v = Math.min(N, Math.max(1, parseInt($("num").value, 10) || n));
+  list = null; $("type").value = ""; fillValues(); show(v);
+};
+document.addEventListener("keydown", e => {
+  if (/INPUT|SELECT/.test(e.target.tagName)) return;
+  if (e.key === "ArrowLeft") step(-1);
+  if (e.key === "ArrowRight") step(1);
+});
+
+addEventListener("hashchange", () => {
+  const v = parseInt(location.hash.slice(1), 10);
+  if (v >= 1 && v <= N && v !== n) { list = null; $("type").value = ""; fillValues(); show(v); }
+});
+const start = parseInt(location.hash.slice(1), 10);
+show(start >= 1 && start <= N ? start : 1 + Math.floor(Math.random() * N));
+</script>
+</body>
+</html>
