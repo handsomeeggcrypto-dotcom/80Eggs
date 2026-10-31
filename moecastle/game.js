@@ -3,7 +3,10 @@ const canvas = document.getElementById("game");
 const ctx = canvas.getContext("2d");
 const W = 1280, H = 720;
 const GROUND = 620;      // where feet touch
-const WALL_X = 1010;     // front of the HQ
+const WALL_X = 905;      // front of the HQ
+// where the HQ picture sits: its source is 1024x1536, wall at x=38, roof deck at y=668
+const HQ_K = 0.385, HQ_X = WALL_X - 38 * HQ_K, HQ_Y = GROUND + 4 - 1536 * HQ_K;
+const ROOF_Y = HQ_Y + 668 * HQ_K;
 const PIT_X = 690, PIT_W = 150;
 const GRAVITY = 1500;
 const SAFE_FALL = 620;   // landing slower than this does no damage
@@ -40,6 +43,7 @@ const img = {};
 let manifest = {};
 const ARENA_ORDER = [7, 13, 12, 9, 14, 15, 3, 23, 19, 10, 11, 25];  // one backdrop per day, then round again
 const ARENAS = [];
+let hqImg = null;
 function load(src) {
   return new Promise((ok) => { const i = new Image(); i.onload = () => ok(i); i.onerror = () => ok(null); i.src = src; });
 }
@@ -51,6 +55,7 @@ async function boot() {
     for (const [f] of manifest[c]) jobs.push(load(`assets/sprites/${c}_${f}.webp`).then((i) => { img[c][f] = i; }));
   }
   ARENA_ORDER.forEach((n, i) => jobs.push(load(`assets/arenas/arena${n}.webp`).then((a) => { ARENAS[i] = a; })));
+  jobs.push(load("assets/hq.webp").then((i) => { hqImg = i; }));
   await Promise.all(jobs);
   state = "title";
 }
@@ -352,7 +357,7 @@ function runStaff(dt) {
     if (staffT.intern <= 0 && targets.length) {
       staffT.intern = 1.5;
       const f = targets[Math.floor(Math.random() * Math.min(3, targets.length))];
-      const sx = WALL_X + 40, sy = 330;
+      const sx = WALL_X + 40, sy = ROOF_Y - 30;
       const flight = Math.max(0.5, (sx - f.x) / 700);
       shots.push({ x: sx, y: sy, vx: (f.x + f.speed * flight * (f.mode === "walk" ? 1 : 0) - sx) / flight,
         vy: (f.y - f.size / 2 - sy) / flight - GRAVITY * 0.225 * flight, a: 0, dmg: 0.34, kind: "crayon" });
@@ -439,59 +444,21 @@ function drawPit() {
 }
 
 function drawCastle() {
-  const X = WALL_X, top = 300, R = W + 20;
-  const damage = 1 - hp / maxHp;
   const jig = wallHit > 0 ? rand(-2, 2) : 0;
   ctx.save(); ctx.translate(jig, 0);
-  ctx.lineWidth = 5; ctx.strokeStyle = "#1b1026"; ctx.lineJoin = "round";
-
-  // back tower with the flag
-  ctx.fillStyle = "#c9a8e6"; ctx.fillRect(X + 130, 170, 120, 140); ctx.strokeRect(X + 130, 170, 120, 140);
-  for (let i = 0; i < 3; i++) { ctx.fillRect(X + 134 + i * 42, 148, 28, 26); ctx.strokeRect(X + 134 + i * 42, 148, 28, 26); }
-  ctx.fillStyle = "#1b1026"; ctx.fillRect(X + 188, 70, 5, 80);
-  const wave = Math.sin(t * 4) * 5;
-  ctx.fillStyle = "#ff5fa8";
-  ctx.beginPath(); ctx.moveTo(X + 193, 72); ctx.quadraticCurveTo(X + 225, 72 + wave, X + 255, 84); ctx.lineTo(X + 193, 112); ctx.closePath(); ctx.fill(); ctx.stroke();
-  heart(X + 212, 90, 9, "#fff");
-
-  // main wall
-  ctx.fillStyle = "#e4d3f2"; ctx.fillRect(X, top, R - X, GROUND - top); ctx.strokeRect(X, top, R - X, GROUND - top);
-  ctx.fillStyle = "#e4d3f2";
-  for (let i = 0; i < 6; i++) { ctx.fillRect(X - 2 + i * 50, top - 34, 32, 36); ctx.strokeRect(X - 2 + i * 50, top - 34, 32, 36); }
-  // stones
-  ctx.strokeStyle = "rgba(90,60,120,.35)"; ctx.lineWidth = 3;
-  for (let r = 0; r < 7; r++) for (let c = 0; c < 7; c++) {
-    if ((r * 7 + c * 3) % 4) continue;
-    ctx.strokeRect(X + 12 + c * 44 + (r % 2) * 20, top + 20 + r * 42, 34, 20);
-  }
-  // sign
-  ctx.strokeStyle = "#1b1026"; ctx.lineWidth = 5;
-  roundRect(X + 34, top + 30, 200, 76, 10); ctx.fillStyle = "#ffd23c"; ctx.fill(); ctx.stroke();
-  text("moemoe", X + 134, top + 54, 30, "#1b1026", "center", null);
-  text("LLC  HQ", X + 134, top + 84, 22, "#c2185b", "center", null);
-  // door
-  ctx.fillStyle = "#6a3f2a";
-  ctx.beginPath(); ctx.moveTo(X + 90, GROUND); ctx.lineTo(X + 90, GROUND - 90); ctx.arc(X + 134, GROUND - 90, 44, Math.PI, 0); ctx.lineTo(X + 178, GROUND); ctx.closePath(); ctx.fill(); ctx.stroke();
-  heart(X + 134, GROUND - 74, 14, "#ff5fa8");
+  if (hqImg) ctx.drawImage(hqImg, HQ_X, HQ_Y, 1024 * HQ_K, 1536 * HQ_K);
 
   // cracks grow with damage
-  ctx.strokeStyle = "#2a1a35"; ctx.lineWidth = 4;
+  const damage = 1 - hp / maxHp;
+  ctx.strokeStyle = "#1b1026"; ctx.lineWidth = 4; ctx.lineJoin = "round";
   const cracks = Math.floor(damage * 9);
   for (let i = 0; i < cracks; i++) {
-    let x = X + 4 + (i * 83) % 240, y = top + 20 + (i * 131) % 270;
+    let x = WALL_X + 8 + (i * 83) % 330, y = ROOF_Y + 30 + (i * 131) % 230;
     ctx.beginPath(); ctx.moveTo(x, y);
     for (let j = 1; j < 5; j++) { x += ((i + j) % 2 ? 16 : -10); y += 16; ctx.lineTo(x, y); }
     ctx.stroke();
   }
   ctx.restore();
-}
-
-function heart(x, y, s, color) {
-  ctx.fillStyle = color;
-  ctx.beginPath(); ctx.moveTo(x, y + s);
-  ctx.bezierCurveTo(x - s * 1.6, y - s * 0.2, x - s * 0.7, y - s * 1.2, x, y - s * 0.3);
-  ctx.bezierCurveTo(x + s * 0.7, y - s * 1.2, x + s * 1.6, y - s * 0.2, x, y + s);
-  ctx.fill();
 }
 
 // employees stand on the battlements, facing the invaders
@@ -501,14 +468,14 @@ function drawStaff() {
   for (const job of ["intern", "legal", "fixer"]) for (let n = 0; n < staff[job]; n++) order.push(job);
   for (const job of order) {
     const who = roster[i];
-    const x = WALL_X + 30 + (i % 7) * 40, base = 268 - Math.floor(i / 7) * 10;
+    const x = WALL_X + 24 + (i % 6) * 36 + Math.floor(i / 6) * 14, base = ROOF_Y + 2 - Math.floor(i / 6) * 8;
     const im = frame(who, "idle_01");
     if (im) {
       const h = 66, k = h / im.height;
       ctx.drawImage(im, x - im.width * k / 2, base - h + Math.sin(t * 3 + i) * 1.5, im.width * k, h);
     }
     ctx.fillStyle = job === "intern" ? "#ff7fc8" : job === "legal" ? "#8ad7ff" : "#ffd23c";
-    ctx.beginPath(); ctx.arc(x, base + 8, 5, 0, 7); ctx.fill();
+    ctx.beginPath(); ctx.arc(x, base - 74, 5, 0, 7); ctx.fill();
     i++;
   }
 }
@@ -589,8 +556,8 @@ function drawWorld() {
   if (shake > 0) ctx.translate(rand(-shake, shake), rand(-shake, shake));
   drawBackdrop();
   drawPit();
+  drawStaff();   // behind the HQ, so they stand behind the railing
   drawCastle();
-  drawStaff();
   const order = foes.slice().sort((a, b) => (a === held) - (b === held) || a.y - b.y);
   for (const f of order) drawFoe(f);
   drawShots();
@@ -624,7 +591,7 @@ function drawTitle() {
 }
 
 function drawShop() {
-  drawBackdrop(); drawPit(); drawCastle(); drawStaff();
+  drawBackdrop(); drawPit(); drawStaff(); drawCastle();
   ctx.fillStyle = "rgba(20,10,35,.72)"; ctx.fillRect(0, 0, W, H);
   text(`DAY ${day} SURVIVED`, W / 2, 44, 44, "#ffd23c");
   text(`$${money}`, W / 2, 92, 34, "#ffe066");

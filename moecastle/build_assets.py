@@ -3,7 +3,7 @@
 
 Source is ~/Desktop/MoeFights_beta.html (the Moe Fights master copy). Re-run after new fighters land.
 """
-import base64, io, json, os, re
+import base64, io, json, os, re, sys
 from PIL import Image
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -13,6 +13,50 @@ FRAMES = ["walk_01", "walk_02", "walk_03", "hit_01", "koed_01", "punch_02", "idl
 SPRITE_H = 260   # drawn at most ~200px tall
 ARENA_W = 1280
 ARENA_PICKS = {7, 13, 12, 9, 14, 15, 3, 23, 19, 10, 11, 25}  # keep in step with ARENA_ORDER in game.js
+
+HQ_SRC = os.path.expanduser("~/Desktop/moecastle/MoemoeLLC Cyberpunk Headquarters.png")
+HQ_ROOF = 665        # source pixels: the roof deck. Above it, white pockets (railing, tower) are see-through
+HQ_FLAG = (800, 120, 1015, 290)   # ...except on the flag, whose eyes have white in them
+HQ_W = 800
+
+def build_hq():
+    """The HQ picture: white background keyed out, shrunk to about twice its size on screen."""
+    im = Image.open(HQ_SRC).convert("RGBA")
+    w, h = im.size
+    px = im.load()
+    white = lambda p: min(p[0], p[1], p[2]) > 222
+    gone = bytearray(w * h)
+    def fill(sx, sy):
+        stack = [(sx, sy)]
+        while stack:
+            x, y = stack.pop()
+            if x < 0 or y < 0 or x >= w or y >= h or gone[y * w + x] or not white(px[x, y]):
+                continue
+            gone[y * w + x] = 1
+            stack += [(x + 1, y), (x - 1, y), (x, y + 1), (x, y - 1)]
+    for x in range(w):
+        fill(x, 0)
+        fill(x, h - 1)
+    for y in range(h):
+        fill(0, y)
+        fill(w - 1, y)
+    fx0, fy0, fx1, fy1 = HQ_FLAG
+    for y in range(HQ_ROOF):
+        for x in range(w):
+            if not (fx0 <= x < fx1 and fy0 <= y < fy1):
+                fill(x, y)
+    for y in range(h):
+        for x in range(w):
+            if gone[y * w + x]:
+                px[x, y] = (0, 0, 0, 0)
+    im = im.resize((HQ_W, int(h * HQ_W / float(w))), Image.LANCZOS)
+    os.makedirs(OUT, exist_ok=True)
+    im.save(os.path.join(OUT, "hq.webp"), "WEBP", quality=88, method=4)
+    print("hq", im.size)
+
+build_hq()
+if "hq" in sys.argv:   # just the HQ: ./build_assets.py hq
+    sys.exit()
 
 html = open(SRC, encoding="utf-8").read()
 
