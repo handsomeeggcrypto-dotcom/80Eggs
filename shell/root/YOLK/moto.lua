@@ -285,7 +285,6 @@ local function draw_world()
 end
 
 local bob_t = 0
-local fps, fps_frames, fps_since = 0, 0, 0
 local function draw_player()
     local img
     if not p.alive then img = ride.crash
@@ -311,7 +310,6 @@ local function draw_hud()
     local ready = p.dash_cd == 0
     rect(C.dirt_dark, 60, 9, 42, 6)
     rect(ready and C.dash or C.lip, 61, 10, ready and 40 or 40 - 40 * p.dash_cd / DASH_CD, 4)
-    text(C.dirt_top, fps .. "fps", 120, 4)
     blit(star_img, W - 52, 6)
     text(C.yolk, tostring(got_stars), W - 38, 4)
     -- YOLK's commentary, just under the strip
@@ -419,8 +417,6 @@ local function run()
         draw_player()
         draw_hud()
         rb.lcd_update()
-        fps_frames = fps_frames + 1
-        if now - fps_since >= HZ then fps, fps_frames, fps_since = fps_frames, 0, now end
 
         if not p.alive and p.dead_t > HZ then return game_over() end
         -- ~30 frames a second

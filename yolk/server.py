@@ -163,10 +163,12 @@ def stats():
 
 
 # ------------------------------------------------------------------ meditation
-# Sessions from the Station: "unixtime|minutes". SHELL's sessions show up as "meditate"
-# in its check-ins (no minutes). They only count from the day its clock was set: before
-# that its day numbers don't match real days.
+# Sessions from the Station: "unixtime|minutes". SHELL keeps its own in /YOLK/med/sessions.txt
+# ("day|time|minutes", the length picked, logged when a session starts), copied here on
+# sync. They only count from the day its clock was set: before that its day numbers
+# don't match real days.
 MEDITATIONS = DATA / "meditations.txt"
+SHELL_MEDITATIONS = DATA / "shell_meditations.txt"
 SHELL_CLOCK_RIGHT_FROM = 20757      # 2026-10-31
 
 
@@ -183,13 +185,20 @@ def meditation_stats():
                 sessions.append((int(m[1]), int(m[2])))
     days = {local_day(t) for t, _ in sessions}
     days |= {d for d, e in read_log(LOG).items() if d >= SHELL_CLOCK_RIGHT_FROM and "meditate" in e["habits"]}
+    sessions = [(local_day(t), m) for t, m in sessions]
+    if SHELL_MEDITATIONS.exists():
+        for line in SHELL_MEDITATIONS.read_text().splitlines():
+            m = re.match(r"^(\d+)\|\d+\|(\d+)$", line)
+            if m and int(m[1]) >= SHELL_CLOCK_RIGHT_FROM:
+                sessions.append((int(m[1]), int(m[2])))
+                days.add(int(m[1]))
     today = local_day(time.time())
     d = today if today in days else today - 1          # today not done yet doesn't break it
     streak = 0
     while d in days:
         streak += 1
         d -= 1
-    week = sum(mins for t, mins in sessions if local_day(t) > today - 7)
+    week = sum(mins for d, mins in sessions if d > today - 7)
     return {"streak": streak, "today": today in days, "sessions": len(sessions),
             "minutes_week": week, "minutes_total": sum(m for _, m in sessions)}
 
@@ -216,6 +225,13 @@ def sync():
     if log:
         write_log(LOG, log)
         write_log(SHELL / "log.txt", log)
+    med = SHELL / "med" / "sessions.txt"
+    if med.exists():
+        known = set(SHELL_MEDITATIONS.read_text().splitlines()) if SHELL_MEDITATIONS.exists() else set()
+        new = [l for l in med.read_text().splitlines() if l.strip() and l not in known]
+        if new:
+            with open(SHELL_MEDITATIONS, "a") as f:
+                f.write("".join(l + "\n" for l in new))
     if HABITS.exists():
         (SHELL / "habits.txt").write_text(HABITS.read_text(encoding="utf-8"), encoding="latin-1", errors="replace")
     if QUEUE.exists() and QUEUE.read_text().strip():
