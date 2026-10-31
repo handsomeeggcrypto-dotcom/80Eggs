@@ -9,9 +9,11 @@ Music/YOLK Radio/ with a playlist, and SHELL's radio.lua hands it to the music p
 No API key or any error: there's just no new show.
 """
 import json
+import os
 import random
 import re
 import sys
+import unicodedata
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
@@ -127,6 +129,38 @@ def build(day, speak, voice, rate, extras=()):
         return False
 
 
+def on_drive(shell, path):
+    """`path` as it's actually spelled on SHELL (accents can be stored either way), or None."""
+    cur, out = shell, []
+    for part in path.strip("/").split("/"):
+        want = unicodedata.normalize("NFC", part)
+        try:
+            found = next((n for n in os.listdir(cur) if unicodedata.normalize("NFC", n) == want), None)
+        except OSError:
+            return None
+        if found is None:
+            return None
+        cur = cur / found
+        out.append(found)
+    return "/" + "/".join(out)
+
+
+def playlist_for(shell, lines):
+    """Spells songs the way SHELL does. A missing song goes, along with the intro before it."""
+    out = []
+    for line in lines:
+        if line.startswith("/Music/YOLK Radio/"):
+            out.append(line)
+            continue
+        real = on_drive(shell, line)
+        if real:
+            out.append(real)
+        else:
+            ai.log(f"radio: not on SHELL, dropped: {line}")
+            out.pop()
+    return out
+
+
 def deliver(shell):
     """Puts the latest show on SHELL (the drive's root), once per show."""
     day_file = OUT / "day.txt"
@@ -143,7 +177,8 @@ def deliver(shell):
     for clip in sorted(OUT.glob("*.m4a")):
         (music / clip.name).write_bytes(clip.read_bytes())
     marker.parent.mkdir(exist_ok=True)
-    (shell / "YOLK" / "radio" / "today.m3u8").write_bytes((OUT / "today.m3u8").read_bytes())
+    lines = playlist_for(shell, (OUT / "today.m3u8").read_text(encoding="utf-8").splitlines())
+    (shell / "YOLK" / "radio" / "today.m3u8").write_text("\n".join(lines) + "\n", encoding="utf-8")
     marker.write_text(day)
     return True
 
