@@ -1,0 +1,7 @@
+{
+  "functions": {
+    "api/*.py": {
+      "excludeFiles": "{*.html,*.png,bubbles/**,dreamthings/**,moecastle/**,moekedex/**,moemode/**,moetorcycles/**,nap_time/**,yolk/**,shell/**,homebase/**}"
+    }
+  }
+}
