@@ -29,7 +29,7 @@ YOLK is the egg AI, one character across all the user's devices. The user calls 
 - The crypto wallet in `data/daily.json` is a **public address only**. Never ask for a seed phrase or private key.
 - Claude API: model `claude-opus-5-5` by default. The SDK is `anthropic` 0.125.0 installed with `pip --user` for `/usr/bin/python3` 3.9 (1.x needs Python 3.10+).
 - Env vars `YOLK_DATA` and `YOLK_SHELL` point at test folders, so tests never touch the real data or iPod.
-- Meditation days are stored in `data/meditations.txt` by local day. SHELL's check-in log uses SHELL's clock (wrong until its battery is replaced), so the two aren't merged yet. A mood of `0` means "logged a meditation, no mood yet" and is skipped in mood stats.
+- Meditation days are stored in `data/meditations.txt` by local day. SHELL's check-in log uses SHELL's clock, which is right from `SHELL_CLOCK_RIGHT_FROM` in `server.py` on. The meditation streak joins both from that day, counted by day. Sessions and minutes are Station-only, since SHELL's log has no minutes. A mood of `0` means "logged a meditation, no mood yet" and is skipped in mood stats.
 - YOLK's eye (Station camera) is motion-only. Nothing is stored or sent. Keep it that way.
 
 ## Ideas parked for later
