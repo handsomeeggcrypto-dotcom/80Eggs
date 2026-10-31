@@ -163,9 +163,11 @@ def stats():
 
 
 # ------------------------------------------------------------------ meditation
-# Sessions from the Station: "unixtime|minutes". Kept apart from SHELL's
-# check-ins until SHELL's clock is right (its day numbers don't match real days).
+# Sessions from the Station: "unixtime|minutes". SHELL's sessions show up as "meditate"
+# in its check-ins (no minutes). They only count from the day its clock was set: before
+# that its day numbers don't match real days.
 MEDITATIONS = DATA / "meditations.txt"
+SHELL_CLOCK_RIGHT_FROM = 20757      # 2026-10-31
 
 
 def local_day(t):
@@ -180,6 +182,7 @@ def meditation_stats():
             if m:
                 sessions.append((int(m[1]), int(m[2])))
     days = {local_day(t) for t, _ in sessions}
+    days |= {d for d, e in read_log(LOG).items() if d >= SHELL_CLOCK_RIGHT_FROM and "meditate" in e["habits"]}
     today = local_day(time.time())
     d = today if today in days else today - 1          # today not done yet doesn't break it
     streak = 0
