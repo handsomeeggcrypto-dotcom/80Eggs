@@ -17,6 +17,7 @@
 ## Rockbox Lua gotchas (learned the hard way)
 
 - Lua 5.1, **integers only**: no `0.5`, `math.sqrt` or `//`.
+- `%` keeps the sign of the left side (`-1 % 5` is `-1`), so wrapping backwards needs a loop or adding first.
 - `os.date` returns nil, so compute dates from `os.time()`. `rb.font_load` fails (no memory), so use `rb.FONT_UI` + pre-rendered title BMPs. `rb.font_getstringsize` returns (width, w, h).
 - Rockbox system events (negative numbers from `get_plugin_action`, a burst at power-on) aren't button presses. Whitelist `PLA_*` buttons in any "press to skip" check.
 - **Lua can't play audio**: the plugin takes the whole audio buffer. To play something, write a one-track `.m3u8` + `/.rockbox/.playlist_control`, reset `global_status` resume fields, then `os.exit(rb.PLUGIN_GOTO_WPS)` (see `meditate.lua`).
