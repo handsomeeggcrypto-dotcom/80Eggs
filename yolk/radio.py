@@ -130,12 +130,12 @@ def build(day, speak, voice, rate, extras=()):
 
 
 def on_drive(shell, path):
-    """`path` as it's actually spelled on SHELL (accents can be stored either way), or None."""
+    """`path` as it's actually spelled on SHELL (accents and capitals can differ), or None."""
     cur, out = shell, []
     for part in path.strip("/").split("/"):
-        want = unicodedata.normalize("NFC", part)
+        want = unicodedata.normalize("NFC", part).lower()       # the card ignores upper/lower case too
         try:
-            found = next((n for n in os.listdir(cur) if unicodedata.normalize("NFC", n) == want), None)
+            found = next((n for n in os.listdir(cur) if unicodedata.normalize("NFC", n).lower() == want), None)
         except OSError:
             return None
         if found is None:
