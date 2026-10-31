@@ -5,7 +5,7 @@
 ## Layout
 
 - `root/` **mirrors the iPod drive**: `.rockbox/` (theme `yolk.cfg`, `wps/yolk.wps|sbs` skins, `shortcuts.txt`) and `YOLK/` (the Lua apps).
-- Apps in `root/YOLK/`: `boot.lua` (power-on animation), `talk.lua` (Talk to YOLK + check-ins; `checkin.lua` runs it in check-in-only mode), `moekadex.lua` (Moe lookup; `dreams.lua` reuses it for **Dream Things**, the Yumemono dex), `moto.lua` (MOEtorcycles Mini), `meditate.lua`, `usb.lua`.
+- Apps in `root/YOLK/`: `boot.lua` (power-on animation), `talk.lua` (Talk to YOLK + check-ins; `checkin.lua` runs it in check-in-only mode), `moekadex.lua` (Moe lookup; `dreams.lua` reuses it for **Dream Things**, the Yumemono dex), `moto.lua` (MOEtorcycles Mini), `meditate.lua`, `finance.lua`, `radio.lua`, `usb.lua`.
 - `tools/`: generators (`gen_art.py`, `gen_moekadex.py`, `gen_dreams.py`, `gen_dex_index.py`, `gen_moto.py`), `backup_shell.py` / `restore_shell.py`, and `sim/` (Rockbox simulator).
 - `backup/`: snapshots of the real drive (gitignored).
 - Generated Moekadex/Dream Things data and images are gitignored (431MB+). Rebuild with the `gen_*.py` scripts.
@@ -16,6 +16,7 @@
 
 ## Rockbox Lua gotchas (learned the hard way)
 
+- A Lua function can use at most 30 outside variables (upvalues). Split big ones.
 - Lua 5.1, **integers only**: no `0.5`, `math.sqrt` or `//`.
 - `%` keeps the sign of the left side (`-1 % 5` is `-1`), so wrapping backwards needs a loop or adding first.
 - `os.date` returns nil, so compute dates from `os.time()`. `rb.font_load` fails (no memory), so use `rb.FONT_UI` + pre-rendered title BMPs. `rb.font_getstringsize` returns (width, w, h).

@@ -463,6 +463,20 @@ local function today()
     say("it's also in your music, under YOLK Daily, if you'd rather listen.", "good")
 end
 
+-- this week's note, written by Claude on the Mac (yolk/ai.py), one sentence at a time
+local function my_week()
+    local f = io.open(DIR .. "review.txt", "r")
+    if not f then
+        say("no review yet. do a check-in, then plug me into the mac.", "sus")
+        return
+    end
+    local text = f:read("*a") or ""
+    f:close()
+    for sentence in (text .. " "):gmatch("(.-[%.%?!]+)%s+") do
+        if not say(sentence, "good") then return end
+    end
+end
+
 
 ---------------------------------------------------------------- check-in
 -- One entry per day in /YOLK/log.txt: "day|time|mood|habit,habit".
@@ -648,19 +662,20 @@ end
 
 if not mem.name then intro() else greet() end
 
-local topics = { "check in", "how are you?", "what's today?", "ask the oracle", "tell me a secret",
+local topics = { "check in", "how are you?", "what's today?", "my week", "ask the oracle", "tell me a secret",
                  "what am i listening to?", "let's talk moes", "bye, yolk" }
 while true do
     local c = choose(pick({ "what do you want to talk about?", "so.", "anything else?", "i'm listening." }),
                      mood_face(), topics)
-    if c == nil or c == 8 then goodbye(); break
+    if c == nil or c == 9 then goodbye(); break
     elseif c == 1 then checkin()
     elseif c == 2 then how_are_you()
     elseif c == 3 then today()
-    elseif c == 4 then oracle()
-    elseif c == 5 then say(pick(SECRETS), pick({ "sus", "ok", "shock" }))
-    elseif c == 6 then music()
-    elseif c == 7 then moes() end
+    elseif c == 4 then my_week()
+    elseif c == 5 then oracle()
+    elseif c == 6 then say(pick(SECRETS), pick({ "sus", "ok", "shock" }))
+    elseif c == 7 then music()
+    elseif c == 8 then moes() end
     mem.affection = num("affection") + 1
 end
 

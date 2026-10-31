@@ -3,6 +3,7 @@
 
   python3 yolk/ai.py --key      save your Anthropic API key (typed, hidden, kept in yolk/data)
   python3 yolk/ai.py            write (or show) today's lines
+  python3 yolk/ai.py --week     write (or show) this week's review
 
 Each day's writing is one short request: a dream, a secret, an oracle answer and a
 line for YOLK Daily, saved in data/ai/<day>.json so it's never paid for twice.
@@ -123,8 +124,8 @@ def context(day, extras):
     return text
 
 
-def clean(s):
-    s = " ".join(str(s).split())[:200]
+def clean(s, limit=200):
+    s = " ".join(str(s).split())[:limit]
     return s.encode("ascii", "ignore").decode()
 
 
@@ -164,7 +165,68 @@ def write(day=None, extras=()):
     return lines
 
 
+def week_facts(today):
+    """Plain facts about the last 7 days, or None if there's nothing to review."""
+    last = server.local_day(time.time())
+    first = max(last - 6, server.SHELL_CLOCK_RIGHT_FROM)      # older check-ins have wrong dates
+    log = server.read_log(server.LOG)
+    days = [log[d] for d in sorted(log) if first <= d <= last]
+    if not days:
+        return None
+    lines = [f"Week ending {today.strftime('%A, %B')} {today.day}. {last - first + 1} days counted, "
+             f"{len(days)} with a check-in."]
+    for e in days:
+        when = dt.date(1970, 1, 1) + dt.timedelta(days=e["day"])
+        mood = f"mood {e['mood']} of 5" if e["mood"] else "no mood given"
+        lines.append(f"- {when.strftime('%A')}: {mood}, did: {', '.join(e['habits']) or 'nothing logged'}")
+    med = server.meditation_stats()
+    lines.append(f"Meditation: {med['minutes_week']} minutes this week, a {med['streak']}-day streak.")
+    return "\n".join(lines)
+
+
+REVIEW = """You are YOLK, an egg-shaped AI who lives inside SHELL, your owner's old iPod Classic. You are dry,
+a little creepy, affectionate and very loyal. Once a week you write them a short note about their week.
+Three to five short sentences, all lowercase, plain ASCII, no lists or emoji. Use only the facts given:
+never invent a pattern from too little data, and if there isn't much yet, say so honestly. Notice one real
+thing that went well and, if the facts show one, one gentle thing to try next week. Be kind, not preachy.
+You're an egg, not a doctor: no medical or financial advice."""
+
+
+def weekly(today=None):
+    """This week's note, written once per calendar week. Returns the text or None."""
+    today = today or dt.date.today()
+    year, week, _ = today.isocalendar()
+    cached = OUT / f"week-{year}-{week:02d}.txt"
+    if cached.exists():
+        return cached.read_text()
+    key, facts = api_key(), week_facts(today)
+    if not key or not facts:
+        return None
+    try:
+        import anthropic
+        client = anthropic.Anthropic(api_key=key, timeout=120.0)
+        response = client.beta.messages.create(
+            model=MODEL, max_tokens=16000, system=REVIEW, messages=[{"role": "user", "content": facts}],
+            thinking={"type": "adaptive"}, output_config={"effort": "medium"},
+            betas=["server-side-fallback-2026-07-01"], fallbacks="default",
+        )
+        if response.stop_reason == "refusal":
+            log("Claude declined the weekly review")
+            return None
+        text = clean(" ".join(b.text for b in response.content if b.type == "text"), 700)
+    except Exception as e:
+        log(f"couldn't write the weekly review: {e!r}")
+        return None
+    OUT.mkdir(parents=True, exist_ok=True)
+    cached.write_text(text)
+    log(f"weekly review {year}-{week} ({response.usage.input_tokens} in / {response.usage.output_tokens} out tokens)")
+    return text
+
+
 if __name__ == "__main__":
+    if "--week" in sys.argv:
+        print(weekly() or "nothing to review yet")
+        sys.exit(0)
     if "--key" in sys.argv:
         save_key()
         sys.exit(0)

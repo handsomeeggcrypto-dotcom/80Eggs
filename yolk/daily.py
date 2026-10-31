@@ -36,6 +36,7 @@ SHELL = Path("/Volumes/SHELL")
 sys.path.insert(0, str(HERE))
 import server  # noqa: E402  (memory + Moe lookups)
 import ai  # noqa: E402  (real-AI YOLK; does nothing without an API key)
+import radio  # noqa: E402  (YOLK Radio; same)
 
 DEFAULTS = {"city": "", "voice": "Junior", "rate": 175}
 
@@ -286,6 +287,8 @@ def build(print_only=False):
     (OUT / "day.txt").write_text(day.isoformat())
     if rem:
         REMINDERS.write_text("")          # read out once
+    radio.build(day, speak, cfg["voice"], cfg["rate"])
+    ai.weekly(day)
     # the morning text (morning.py) repeats them, since they're gone from REMINDERS by then
     (OUT / "reminders.json").write_text(json.dumps({"day": day.isoformat(), "items": rem}))
     return text, OUT / "YOLK Daily.m4a", day
@@ -326,6 +329,10 @@ def deliver():
     text = (OUT / "daily.txt").read_text(encoding="utf-8")
     (SHELL / "YOLK" / "daily.txt").write_text(text.encode("latin-1", "replace").decode("latin-1"), encoding="latin-1")
     deliver_ai()
+    radio.deliver(SHELL)
+    review = ai.weekly(target_day())
+    if review:
+        (SHELL / "YOLK" / "review.txt").write_text(review.encode("latin-1", "replace").decode("latin-1"), encoding="latin-1")
     return True
 
 
