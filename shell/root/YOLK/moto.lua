@@ -1,6 +1,7 @@
---[[ MOETORCYCLES MINI // the Eggs ride on Countryside, for SHELL
+--[[ MOETORCYCLES MINI // 3 rides and 5 maps from the full game, for SHELL
+     on the title screen: wheel picks the ride, left/right picks the map
      select   jump (tap again to double jump, let go early for a short hop)
-     play     dash (smash hay bales)
+     play     dash (smash what's in the road)
      menu     pause / quit
 
      Same floaty feel as the full game, at 1/3 scale for the 320x240 screen.
@@ -42,18 +43,53 @@ local C = {
 local function bmp(name, transparent)
     return rb.read_bmp_file(DIR .. name .. ".bmp", false, transparent)
 end
-local back = bmp("back", false)
-local front = bmp("front", true)
-local ride = {}
-for _, p in ipairs({ "ride", "wheelie", "air", "land", "crash" }) do ride[p] = bmp("ride_" .. p, true) end
-local hay = { [22] = bmp("hay22", true), [26] = bmp("hay26", true), [30] = bmp("hay30", true) }
+-- `drop` = rows below the tyres in that ride's art; `road` = body, top edge, glow, ruts, lip
+local RIDES = {
+    { id = "eggs", name = "eggs", drop = 1 },
+    { id = "crayons", name = "crayons", drop = 4 },
+    { id = "poki", name = "poki", drop = 0 },
+}
+local function colors(t) local o = {}; for i, c in ipairs(t) do o[i] = rb.lcd_rgbpack(c[1], c[2], c[3]) end; return o end
+local MAPS = {
+    { id = "eggs", name = "countryside", noun = "hay", best = "best.txt",
+      road = colors({ { 138, 98, 52 }, { 165, 121, 63 }, { 92, 125, 51 }, { 106, 74, 38 }, { 74, 51, 27 } }) },
+    { id = "crayons", name = "neon city", noun = "crayon", best = "best_crayons.txt",
+      road = colors({ { 36, 18, 56 }, { 255, 91, 208 }, { 199, 139, 255 }, { 91, 200, 255 }, { 12, 6, 24 } }) },
+    { id = "moemoe", name = "moemoe land", noun = "emoji", best = "best_moemoe.txt",
+      road = colors({ { 26, 21, 3 }, { 255, 225, 77 }, { 255, 210, 63 }, { 42, 107, 255 }, { 5, 4, 0 } }) },
+    { id = "glitch", name = "glitch city", noun = "cone", best = "best_glitch.txt",
+      road = colors({ { 20, 16, 33 }, { 0, 229, 255 }, { 255, 43, 214 }, { 255, 43, 214 }, { 4, 3, 10 } }) },
+    { id = "miami", name = "miami beach", noun = "umbrella", best = "best_miami.txt",
+      road = colors({ { 18, 52, 72 }, { 60, 224, 255 }, { 255, 59, 160 }, { 11, 34, 51 }, { 5, 10, 20 } }) },
+}
+local ride_i, map_i = 1, 1
+local back, front, ride, haz = nil, nil, {}, {}
+local map = MAPS[1]
 local star_img, ring_img, title = bmp("star", true), bmp("ring", true), bmp("title", true)
 local yolk = {}
 for _, m in ipairs({ "great", "good", "ok", "sus", "shock", "love", "dying" }) do yolk[m] = bmp("yolk_" .. m, true) end
 
 local FRONT_Y = 160   -- the see-through strip only covers the bottom of the screen (gen_moto.py)
-local BACK_W = back and back:width() or W
-local FRONT_W = front and front:width() or W
+local BACK_W, FRONT_W = W, W
+
+-- only the chosen art stays in memory
+local function load_map()
+    map = MAPS[map_i]
+    back, front, haz = nil, nil, {}
+    collectgarbage()
+    local d = "maps/" .. map.id .. "/"
+    back = bmp(d .. "back", false)
+    front = bmp(d .. "front", true)
+    for _, h in ipairs({ 22, 26, 30 }) do haz[h] = bmp(d .. "haz" .. h, true) end
+    BACK_W = back and back:width() or W
+    FRONT_W = front and front:width() or W
+end
+local function load_ride()
+    ride = {}
+    collectgarbage()
+    local d = "rides/" .. RIDES[ride_i].id .. "/"
+    for _, p in ipairs({ "ride", "wheelie", "air", "land", "crash" }) do ride[p] = bmp(d .. p, true) end
+end
 
 ---------------------------------------------------------------- helpers
 local function rect(c, x, y, w, h) rb.lcd_set_foreground(c); rb.lcd_fillrect(x, y, w, h) end
@@ -80,13 +116,13 @@ local function scroll_layer(img, imgw, off, transparent, y)
 end
 
 local function load_best()
-    local f = io.open(DIR .. "best.txt", "r")
+    local f = io.open(DIR .. map.best, "r")
     local b = f and tonumber(f:read("*l")) or 0
     if f then f:close() end
     return b
 end
 local function save_best(b)
-    local f = io.open(DIR .. "best.txt", "w")
+    local f = io.open(DIR .. map.best, "w")
     if f then f:write(b .. "\n"); f:close() end
 end
 
@@ -185,7 +221,7 @@ local function crash(why)
     if not p.alive then return end
     p.alive = false
     p.vy = -100 * FP
-    say(why or pick({ "rip.", "i felt that.", "that hay came out of nowhere.", "the eggs are fine. probably." }), "shock")
+    say(why or pick({ "rip.", "i felt that.", "that " .. map.noun .. " came out of nowhere.", "the egg is fine. probably." }), "shock")
 end
 
 local function update(dt)  -- dt in ticks
@@ -225,7 +261,7 @@ local function update(dt)  -- dt in ticks
             if not hz.dead and wx + 18 > hz.x and wx - 14 < hz.x + hz.w and feet > hz.top - hz.h + 4 then
                 if p.dash > 0 or p.boost > 0 then
                     hz.dead = true; score = score + 25
-                    say(pick({ "BONK.", "hay everywhere.", "smash." }), "great")
+                    say(pick({ "BONK.", map.noun .. " everywhere.", "smash." }), "great")
                 else
                     crash()
                 end
@@ -256,13 +292,14 @@ local function draw_road(s, sx)
     local top = s.top
     local bot = top + 44
     if bot > H - 27 then bot = H end
-    rect(C.dirt, sx, top, s.w, bot - top)
-    rect(C.dirt_top, sx, top, s.w, 3)
-    rect(C.grass, sx, top - 1, s.w, 2)
+    local c = map.road
+    rect(c[1], sx, top, s.w, bot - top)
+    rect(c[2], sx, top, s.w, 3)
+    rect(c[3], sx, top - 1, s.w, 2)
     -- ruts scroll with the road
-    rect(C.dirt_dark, sx, top + 9, s.w, 1)
-    rect(C.dirt_dark, sx, top + 17, s.w, 1)
-    if bot < H then rect(C.lip, sx, bot - 2, s.w, 2) end
+    rect(c[4], sx, top + 9, s.w, 1)
+    rect(c[4], sx, top + 17, s.w, 1)
+    if bot < H then rect(c[5], sx, bot - 2, s.w, 2) end
 end
 
 local function draw_world()
@@ -280,7 +317,7 @@ local function draw_world()
         if not s.got then blit(star_img, s.x - d - 5, s.y - 5) end
     end
     for _, hz in ipairs(hazards) do
-        if not hz.dead then blit(hay[hz.h], hz.x - d, hz.top - hz.h) end
+        if not hz.dead then blit(haz[hz.h], hz.x - d, hz.top - hz.h) end
     end
 end
 
@@ -294,7 +331,7 @@ local function draw_player()
     if not img then return end
     local bob = (p.alive and p.ground and (bob_t / 6) % 2 == 0) and 1 or 0
     local x = PX - img:width() / 2
-    local y = p.y / FP + 50 - img:height() + 1 + bob
+    local y = p.y / FP + 50 - img:height() + 1 + bob + RIDES[ride_i].drop
     if p.dash > 0 or p.boost > 0 then
         -- speed lines behind the bike
         local c = p.boost > 0 and C.yolk or C.dash
@@ -333,28 +370,68 @@ local function wait_choice()
     end
 end
 
+-- remembers your ride and map between visits
+local function load_choice()
+    local f = io.open(DIR .. "choice.txt", "r")
+    if not f then return end
+    local line = f:read("*l") or ""
+    f:close()
+    local r, m = line:match("^(%d+)|(%d+)")
+    r, m = tonumber(r), tonumber(m)
+    if r and RIDES[r] then ride_i = r end
+    if m and MAPS[m] then map_i = m end
+end
+local function save_choice()
+    local f = io.open(DIR .. "choice.txt", "w")
+    if f then f:write(ride_i .. "|" .. map_i .. "\n"); f:close() end
+end
+
+-- art loads once you stop spinning, so picking stays quick
+local ride_loaded, changed = nil, nil
+local function settle()
+    if not changed then return end
+    if map.id ~= MAPS[map_i].id then load_map(); best = load_best() end
+    if ride_loaded ~= ride_i then load_ride(); ride_loaded = ride_i end
+    save_choice()
+    changed = nil
+end
+
+local function draw_title(t)
+    local c = map.road
+    scroll_layer(back, BACK_W, t / 4, false)
+    scroll_layer(front, FRONT_W, t, true, FRONT_Y)
+    rect(c[1], 0, GROUND, W, H - GROUND); rect(c[2], 0, GROUND, W, 3); rect(c[3], 0, GROUND - 1, W, 2)
+    if title then blit(title, (W - title:width()) / 2, 18) end
+    center(C.white, "MINI . for SHELL", 56)
+    local img = ride.ride
+    if img then blit(img, PX - img:width() / 2, GROUND - img:height() + 1 + ((t / 6) % 2) + RIDES[ride_loaded].drop) end
+    rect(C.shade, 164, 80, 148, 100)
+    shadow_text(C.yolk, RIDES[ride_i].name, 170, 84)
+    shadow_text(C.white, "spin: rider", 170, 100)
+    shadow_text(C.yolk, MAPS[map_i].name, 170, 122)
+    shadow_text(C.white, "< >: map", 170, 138)
+    shadow_text(C.white, changed and "best ..." or ("best " .. best), 170, 160)
+    rect(C.shade, 0, H - 28, W, 28)
+    blit(yolk.good, 4, H - 26)
+    text(C.yolk, "o ride . menu quit", 34, H - 22)
+    rb.lcd_update()
+end
+
 local function title_screen()
     rb.get_plugin_action(HZ / 4)
     local t = 0
     while true do
-        scroll_layer(back, BACK_W, t / 4, false)
-        scroll_layer(front, FRONT_W, t, true, FRONT_Y)
-        rect(C.dirt, 0, GROUND, W, H - GROUND); rect(C.dirt_top, 0, GROUND, W, 3); rect(C.grass, 0, GROUND - 1, W, 2)
-        if title then blit(title, (W - title:width()) / 2, 18) end
-        center(C.white, "MINI . for SHELL", 56)
-        local img = ride.ride
-        if img then blit(img, PX - img:width() / 2, GROUND - img:height() + 1 + ((t / 6) % 2)) end
-        shadow_text(C.yolk, "o  ride", 186, 120)
-        shadow_text(C.white, "menu  quit", 186, 140)
-        shadow_text(C.white, "best " .. best, 186, 166)
-        rect(C.shade, 0, H - 28, W, 28)
-        blit(yolk.good, 4, H - 26)
-        text(C.yolk, "o jump . > dash . hold on.", 34, H - 22)
-        rb.lcd_update()
+        draw_title(t)
         t = t + 2
         local a = rb.get_plugin_action(HZ / 25)
-        if a == A.PLA_SELECT_REL or a == A.PLA_DOWN then return true end
-        if a == A.PLA_UP or a == A.PLA_CANCEL or a == A.PLA_EXIT then return false end
+        if a == A.PLA_SELECT_REL or a == A.PLA_DOWN then settle(); return true end
+        if a == A.PLA_UP or a == A.PLA_CANCEL or a == A.PLA_EXIT then settle(); return false end
+        local n = #RIDES
+        if a == A.PLA_SCROLL_FWD then ride_i = ride_i % n + 1; changed = rb.current_tick()
+        elseif a == A.PLA_SCROLL_BACK then ride_i = (ride_i + n - 2) % n + 1; changed = rb.current_tick()
+        elseif a == A.PLA_RIGHT then map_i = map_i % #MAPS + 1; changed = rb.current_tick()
+        elseif a == A.PLA_LEFT then map_i = (map_i + #MAPS - 2) % #MAPS + 1; changed = rb.current_tick()
+        elseif changed and rb.current_tick() - changed > HZ / 3 then settle() end
     end
 end
 
@@ -426,8 +503,12 @@ local function run()
 end
 
 math.randomseed(rb.current_tick() + (os.time and os.time() or 0))
+load_choice()
+load_map()
+load_ride()
+ride_loaded = ride_i
 best = load_best()
-if title_screen() then
+while title_screen() do
     while run() do end
 end
 rb.lcd_set_drawmode(3)  -- DRMODE_SOLID

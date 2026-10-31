@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Shrinks MOEtorcycles art (Eggs ride + Countryside) for SHELL's 320x240 screen.
+"""Shrinks MOEtorcycles art (3 rides, 5 maps) for SHELL's 320x240 screen.
 
   python3 tools/gen_moto.py  -> root/YOLK/moto/
 
@@ -16,10 +16,10 @@ GAME = Path.home() / "80Eggs" / "moetorcycles" / "assets"
 sys.path.insert(0, str(HERE))
 from gen_art import title, yolk_face, PINK, YOLK  # noqa: E402
 
-RIDE = "eggs"
-MAP = "eggs"
 SCALE = 3          # the full game is 3x taller than SHELL's screen
-RIDE_H = 80        # 150 * 1.58 / 3, the Eggs ride's drawn height in the game
+RIDES = {"eggs": 80, "crayons": 68, "poki": 48}     # 150 * the ride's scale / 3, its height in the game
+MAPS = ["eggs", "crayons", "moemoe", "glitch", "miami"]
+STRIP_MAPS = ["eggs", "crayons"]   # their foreground is low enough to keep as a moving strip
 
 
 def to_bmp(rgba):
@@ -37,30 +37,35 @@ def to_bmp(rgba):
     return out
 
 
-def layer(name, h=240):
-    im = Image.open(GAME / "bg" / f"{MAP}_{name}.png").convert("RGBA")
+def layer(m, name, h=240):
+    im = Image.open(GAME / "bg" / f"{m}_{name}.png").convert("RGBA")
     return im.resize((round(im.width * h / im.height), h), Image.LANCZOS)
 
 
-FRONT_TOP = 160   # the near layer (fences, flowers) only has content below this row
+FRONT_TOP = 160   # the see-through strip starts at this row
 
 
-def backgrounds():
+def backgrounds(m, out):
     # see-through layers are slow to draw on SHELL, so sky + far + mid are baked into
-    # one solid layer, and only the bottom strip of the near layer stays see-through
-    back = layer("sky")
-    back.alpha_composite(layer("far"))
-    back.alpha_composite(layer("mid"))
-    back.convert("RGB").save(OUT / "back.bmp", "BMP")
-    front = layer("near")
-    to_bmp(front.crop((0, FRONT_TOP, front.width, front.height))).save(OUT / "front.bmp", "BMP")
+    # one solid layer, and only a bottom strip of the near layer stays see-through.
+    # The other maps' foregrounds (palms, cats, bus stops) are too tall for a strip,
+    # so they're baked in too.
+    back = layer(m, "sky")
+    back.alpha_composite(layer(m, "far"))
+    back.alpha_composite(layer(m, "mid"))
+    front = layer(m, "near")
+    if m in STRIP_MAPS:
+        to_bmp(front.crop((0, FRONT_TOP, front.width, front.height))).save(out / "front.bmp", "BMP")
+    else:
+        back.alpha_composite(front)
+    back.convert("RGB").save(out / "back.bmp", "BMP")
 
 
-def ride():
+def ride(r, h, out):
     for pose in ["ride", "wheelie", "air", "land", "crash"]:
-        im = Image.open(GAME / f"player_{RIDE}_{pose}.png").convert("RGBA")
-        w = round(im.width * RIDE_H / im.height)
-        to_bmp(im.resize((w, RIDE_H), Image.LANCZOS)).save(OUT / f"ride_{pose}.bmp", "BMP")
+        im = Image.open(GAME / f"player_{r}_{pose}.png").convert("RGBA")
+        w = round(im.width * h / im.height)
+        to_bmp(im.resize((w, h), Image.LANCZOS)).save(out / f"{pose}.bmp", "BMP")
 
 
 def hay(h):
@@ -74,6 +79,62 @@ def hay(h):
     for x in (7, w - 8):                              # twine
         d.line([(x, 1), (x, h - 2)], fill=(36, 16, 18), width=2)
     return img
+
+
+def crayon(h):
+    w = 26
+    img = Image.new("RGB", (w, h), PINK)
+    d = ImageDraw.Draw(img)
+    tip = 8
+    d.polygon([(13, 0), (19, tip), (7, tip)], fill=(255, 77, 109), outline=(18, 3, 10))
+    d.rectangle([7, tip, 19, h - 1], fill=(255, 77, 109), outline=(18, 3, 10))
+    d.rectangle([8, tip + 4, 18, h - 5], fill=(255, 210, 63))
+    d.line([(8, tip + 4), (18, tip + 4)], fill=(18, 3, 10))
+    d.line([(8, h - 5), (18, h - 5)], fill=(18, 3, 10))
+    return img
+
+
+def emoji(h):
+    """A stack of heart-eyes faces with a red ring so it reads against the emoji sky."""
+    w = 26
+    img = Image.new("RGB", (w, h), PINK)
+    d = ImageDraw.Draw(img)
+    n = 2
+    size = h // n
+    for i in range(n):
+        y = h - size * (i + 1)
+        x0, x1 = (w - size) // 2, (w + size) // 2 - 1
+        d.ellipse([x0, y, x1, y + size - 1], fill=(245, 182, 12), outline=(255, 42, 70))
+        cx = (x0 + x1) // 2
+        for ex in (cx - 3, cx + 3):
+            d.rectangle([ex - 1, y + 3, ex + 1, y + 5], fill=(255, 42, 70))
+        d.line([(cx - 2, y + size - 4), (cx + 2, y + size - 4)], fill=(90, 61, 0))
+    return img
+
+
+def cone(h):
+    w = 26
+    img = Image.new("RGB", (w, h), PINK)
+    d = ImageDraw.Draw(img)
+    d.polygon([(13, 0), (21, h - 5), (5, h - 5)], fill=(255, 122, 26), outline=(58, 21, 0))
+    y1, y2 = h * 35 // 100, h * 55 // 100
+    d.polygon([(13 - (y1 * 8 // h), y1), (13 + (y1 * 8 // h), y1), (13 + (y2 * 8 // h), y2), (13 - (y2 * 8 // h), y2)], fill=(255, 255, 255))
+    d.rectangle([1, h - 5, 25, h - 1], fill=(199, 74, 0), outline=(58, 21, 0))
+    return img
+
+
+def umbrella(h):
+    w = 26
+    img = Image.new("RGB", (w, h), PINK)
+    d = ImageDraw.Draw(img)
+    d.rectangle([12, 8, 14, h - 1], fill=(122, 83, 39))
+    d.pieslice([0, 0, 25, 24], 180, 360, fill=(255, 59, 92), outline=(58, 13, 28))
+    d.pieslice([8, 0, 17, 24], 180, 360, fill=(255, 242, 224), outline=(58, 13, 28))
+    d.rectangle([9, h - 3, 17, h - 1], fill=(255, 210, 63), outline=(58, 13, 28))
+    return img
+
+
+HAZARDS = {"eggs": hay, "crayons": crayon, "moemoe": emoji, "glitch": cone, "miami": umbrella}
 
 
 def star():
@@ -98,10 +159,16 @@ def ring():
 
 if __name__ == "__main__":
     OUT.mkdir(parents=True, exist_ok=True)
-    backgrounds()
-    ride()
-    for h in (22, 26, 30):
-        hay(h).save(OUT / f"hay{h}.bmp", "BMP")
+    for m in MAPS:
+        out = OUT / "maps" / m
+        out.mkdir(parents=True, exist_ok=True)
+        backgrounds(m, out)
+        for h in (22, 26, 30):
+            HAZARDS[m](h).save(out / f"haz{h}.bmp", "BMP")
+    for r, h in RIDES.items():
+        out = OUT / "rides" / r
+        out.mkdir(parents=True, exist_ok=True)
+        ride(r, h, out)
     star().save(OUT / "star.bmp", "BMP")
     ring().save(OUT / "ring.bmp", "BMP")
     title("MOETORCYCLES", 32, YOLK).save(OUT / "title.bmp", "BMP")
