@@ -6,7 +6,7 @@
    Scores.rankText(board)         "🌍 #3 on the leaderboard" after a run, or "".
    Scores.isOpen()                true while the window is up (games ignore input).
 
-   Boards: tomochi-classic, tomochi-rush, moto-normal, moto-portal.
+   Boards: tomochi-classic, tomochi-rush, moto-normal, moto-portal, llc-defend.
    The player's name lives in localStorage ("eggs_name"), shared by every game. */
 const Scores = (() => {
   const API = "/api/scores";
@@ -14,6 +14,7 @@ const Scores = (() => {
   const TITLES = {
     "tomochi-classic": "TOMOCHI POP · CLASSIC", "tomochi-rush": "TOMOCHI POP · RUSH",
     "moto-normal": "MOETORCYCLES · NORMAL", "moto-portal": "MOETORCYCLES · PORTAL",
+    "llc-defend": "DEFEND YOUR LLC",
   };
   const ls = {
     get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } },
@@ -23,6 +24,7 @@ const Scores = (() => {
   const LOCAL_BEST = {
     "tomochi-classic": "bubblepop_best_classic", "tomochi-rush": "bubblepop_best_rush",
     "moto-normal": "moetorcycles_best", "moto-portal": "moetorcycles_best_portal",
+    "llc-defend": "moecastle_best",
   };
   const last = {};   // board → { rank, score } from this visit's last send
   let box = null, open = false, board = null, pending = null;

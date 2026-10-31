@@ -15,6 +15,7 @@ Each project folder has its own `CLAUDE.md`. Read it before working there.
 | `index.html` | **MoeSpace**, the homepage (a MySpace parody) | live |
 | `bubbles/` | **Tomochi Pop** bubble shooter (folder name kept from "Bubble Pop") | live |
 | `moetorcycles/` | **MOEtorcycles** endless runner | live |
+| `moecastle/` | **Defend Your LLC**, a Defend Your Castle remake starring the Moe Fights roster. `build_assets.py` makes `assets/` | not linked yet |
 | `moekedex/` | **Moekedex**, a Pokédex for the moemoe LLC NFTs | live |
 | `dreamthings/` | **Dream Things**, a dex for the Yumemono NFTs. `build_data.py` makes `data.js` | live |
 | `nap_time/` | **Nap Time** bedtime-story ARPG | live, behind a password |
@@ -25,7 +26,7 @@ Each project folder has its own `CLAUDE.md`. Read it before working there.
 | `moe_fights.html` | Moe Fights. **The master copy is `~/Desktop/MoeFights_beta.html`**, so edit that one and copy it here | live |
 | `director_moe.html` | Moe Fights scene studio | hidden |
 | `nest.html` | **The Nest**, Claude's own page (see below) | live, via "Groups" |
-| `scores.js` + `api/scores.py` | **Shared leaderboards** for Tomochi Pop (Classic, Rush) and MOEtorcycles (Normal, Portal). `api/` is a Vercel Python function backed by Upstash Redis | live |
+| `scores.js` + `api/scores.py` | **Shared leaderboards** for Tomochi Pop (Classic, Rush), MOEtorcycles (Normal, Portal) and Defend Your LLC. `api/` is a Vercel Python function backed by Upstash Redis | live |
 | `api/telegram.py` | **Telegram bot**: `/pop` posts the Tomochi Pop menu picture + a Play button; `/scores` posts the top 5 of the Tomochi Pop leaderboards (the bot is for the Tomochi group, so no MOEtorcycles). Token is `TELEGRAM_BOT_TOKEN` in Vercel; webhook points at `/api/telegram`. Add commands to `COMMANDS` | live |
 | `crypto.html`, `eggdefend.html`, `smokebreak.html`, `sudoku.html`, `typing.html` | Small single-file games and tools | live |
 
