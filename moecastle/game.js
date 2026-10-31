@@ -1,6 +1,6 @@
 // DEFEND YOUR LLC: grab the invaders, fling them, keep Moemoe LLC HQ standing.
 const canvas = document.getElementById("game");
-const ctx = canvas.getContext("2d");
+const ctx = canvas.getContext("2d", { alpha: false });
 const W = 1280, H = 720;
 const GROUND = 620;      // where feet touch
 const WALL_X = 905;      // front of the HQ
@@ -43,7 +43,8 @@ const img = {};
 let manifest = {};
 const ARENA_ORDER = [7, 13, 12, 9, 14, 15, 3, 23, 19, 10, 11, 25];  // one backdrop per day, then round again
 const ARENAS = [];
-let hqImg = null;
+let hqImg = null, hqLayer = null;
+let backLayer = null, backFor = -1;
 function load(src) {
   return new Promise((ok) => { const i = new Image(); i.onload = () => ok(i); i.onerror = () => ok(null); i.src = src; });
 }
@@ -57,7 +58,40 @@ async function boot() {
   ARENA_ORDER.forEach((n, i) => jobs.push(load(`assets/arenas/arena${n}.webp`).then((a) => { ARENAS[i] = a; })));
   jobs.push(load("assets/hq.webp").then((i) => { hqImg = i; }));
   await Promise.all(jobs);
+  prepareArt();
   state = "title";
+}
+function makeCanvas(w, h) {
+  const c = document.createElement("canvas");
+  c.width = Math.max(1, Math.ceil(w)); c.height = Math.max(1, Math.ceil(h));
+  return c;
+}
+// Shrinking a picture on every frame is slow, so each fighter pose is shrunk once and kept.
+const spriteCache = new Map();
+function sprite(who, name, size) {
+  const key = who + "|" + name + "|" + size;
+  let sp = spriteCache.get(key);
+  if (sp !== undefined) return sp;
+  const im = frame(who, name), base = frame(who, "walk_01");
+  sp = null;
+  if (im && base) {
+    const k = size / base.height, w = im.width * k, h = im.height * k;
+    const c = makeCanvas(w, h), g = c.getContext("2d");
+    g.imageSmoothingQuality = "high";
+    g.drawImage(im, 0, 0, c.width, c.height);
+    sp = { c, w: c.width, h: c.height };
+  }
+  spriteCache.set(key, sp);
+  return sp;
+}
+function prepareArt() {
+  for (const T of Object.values(TYPES)) for (const who of T.who) for (const [name] of manifest[who] || []) sprite(who, name, T.size);
+  if (hqImg) {
+    hqLayer = makeCanvas(1024 * HQ_K, 1536 * HQ_K);
+    const g = hqLayer.getContext("2d");
+    g.imageSmoothingQuality = "high";
+    g.drawImage(hqImg, 0, 0, hqLayer.width, hqLayer.height);
+  }
 }
 function frame(c, name) {
   const s = img[c] || {};
@@ -67,20 +101,29 @@ function frame(c, name) {
 // ---- sound ------------------------------------------------------------------
 const Sound = (() => {
   const make = (f) => { const a = new Audio(`assets/audio/${f}`); a.preload = "auto"; return a; };
-  // a few players per sound, reused: browsers cap how many can exist at once
-  const pool = (f) => ({ list: Array.from({ length: 5 }, () => make(f)), next: 0 });
-  const sfx = { punch: pool("punch_01.mp3"), kick: pool("kick_01.mp3"), swoosh: pool("swoosh_01.mp3") };
+  // effects are decoded up front and mixed by Web Audio, which never holds up a frame
+  const AC = window.AudioContext || window.webkitAudioContext;
+  const ac = AC ? new AC() : null;
+  const sfx = {}, lastPlayed = {};
+  if (ac) for (const [n, f] of [["punch", "punch_01.mp3"], ["kick", "kick_01.mp3"], ["swoosh", "swoosh_01.mp3"]]) {
+    fetch(`assets/audio/${f}`).then((r) => r.arrayBuffer()).then((b) => ac.decodeAudioData(b)).then((d) => { sfx[n] = d; }).catch(() => {});
+  }
   const tracks = ["1_4_crayons.m4a", "1_5_warhawk.m4a", "1_7_bluu.m4a", "1_3_bradley.m4a"];
   const players = [];
   let muted = false, music = null, cur = -1;
   try { muted = localStorage.getItem(MUTE_KEY) === "1"; } catch (e) {}
   return {
     play(n, vol = 0.6) {
-      if (muted) return;
-      const p = sfx[n], a = p.list[p.next];
-      p.next = (p.next + 1) % p.list.length;
-      a.currentTime = 0; a.volume = vol; a.play().catch(() => {});
+      if (muted || !ac || !sfx[n]) return;
+      const now = performance.now();
+      if (now - (lastPlayed[n] || 0) < 55) return;  // a crowd doesn't need the same thud 20 times at once
+      lastPlayed[n] = now;
+      const src = ac.createBufferSource(), gain = ac.createGain();
+      src.buffer = sfx[n]; gain.gain.value = vol;
+      src.connect(gain); gain.connect(ac.destination);
+      src.start();
     },
+    unlock() { if (ac && ac.state === "suspended") ac.resume().catch(() => {}); },
     day(d) {
       const i = (d - 1) % tracks.length;
       if (i === cur && music) { if (!muted) music.play().catch(() => {}); return; }
@@ -117,6 +160,9 @@ const cost = (it) => it.base + it.grow * lvl(it.id);
 const perk = () => 1 + 0.25 * lvl("perk");
 const pick = (a) => a[Math.floor(Math.random() * a.length)];
 const rand = (a, b) => a + Math.random() * (b - a);
+// how many people the company can employ: 2 to start, one more opening every 3 days
+const hireCap = () => Math.min(12, 2 + Math.floor((day - 1) / 3));
+const nextOpeningDay = () => 3 * (hireCap() - 1) + 1;
 const idleStaff = () => roster.length - staff.intern - staff.legal - staff.fixer;
 
 function newGame() {
@@ -246,8 +292,10 @@ function update(dt) {
 
   for (const b of bits) { b.vy += 900 * dt; b.x += b.vx * dt; b.y += b.vy * dt; b.life -= dt; }
   bits = bits.filter((b) => b.life > 0);
+  if (bits.length > 140) bits.splice(0, bits.length - 140);
   for (const p of popups) { p.life -= dt; p.y -= 40 * dt; }
   popups = popups.filter((p) => p.life > 0);
+  if (popups.length > 14) popups.splice(0, popups.length - 14);
 
   if (hp <= 0) return bankrupt();
   if (!toSpawn.length && !foes.length) endDay();
@@ -279,7 +327,7 @@ function updateFoe(f, dt) {
     }
     case "held": {
       // the fighter trails the pointer a bit; big ones lag more
-      const k = Math.min(1, dt * 22 / f.mass);
+      const k = Math.min(1, dt * 60 / f.mass);
       f.x += (ptr.x - f.x) * k;
       f.y += (ptr.y + f.size * 0.45 - f.y) * k;
       f.angle = Math.max(-0.7, Math.min(0.7, ptr.vx / 1600));
@@ -315,7 +363,10 @@ function updateFoe(f, dt) {
 function land(f) {
   const impact = f.vy;
   f.y = GROUND; f.angle = 0;
-  if (lvl("pit") && f.x > PIT_X - PIT_W / 2 && f.x < PIT_X + PIT_W / 2 && !f.T.boss) return hire(f);
+  if (lvl("pit") && f.x > PIT_X - PIT_W / 2 && f.x < PIT_X + PIT_W / 2 && !f.T.boss) {
+    if (roster.length < hireCap()) return hire(f);
+    popups.push({ x: f.x, y: GROUND - 90, text: "NO OPENINGS", life: 1, max: 1, size: 26, color: "#ffd23c" });
+  }
   const power = 1 + 0.3 * lvl("grip");
   const dmg = Math.max(0, (impact - SAFE_FALL) / 620) * power;
   if (dmg > 0) {
@@ -395,12 +446,28 @@ function bankrupt() {
 }
 
 // ---- drawing ----------------------------------------------------------------
+// Outlined text is slow to draw, so each label is drawn once and kept.
+const textCache = new Map();
+function textImage(s, size, color, stroke) {
+  const key = s + "|" + size + "|" + color + "|" + stroke;
+  let t = textCache.get(key);
+  if (t) return t;
+  if (textCache.size > 400) textCache.clear();
+  const font = `900 ${size}px ${FONT}`;
+  ctx.font = font;
+  const pad = Math.ceil(size / 4) + 3;
+  const c = makeCanvas(ctx.measureText(s).width + pad * 2, size * 1.5 + pad * 2), g = c.getContext("2d");
+  g.font = font; g.textAlign = "center"; g.textBaseline = "middle"; g.lineJoin = "round";
+  if (stroke) { g.lineWidth = Math.max(3, size / 6); g.strokeStyle = stroke; g.strokeText(s, c.width / 2, c.height / 2); }
+  g.fillStyle = color; g.fillText(s, c.width / 2, c.height / 2);
+  t = { c, pad };
+  textCache.set(key, t);
+  return t;
+}
 function text(s, x, y, size, color = "#fff", align = "center", stroke = "#1b1026") {
-  ctx.font = `900 ${size}px ${FONT}`;
-  ctx.textAlign = align; ctx.textBaseline = "middle";
-  ctx.lineJoin = "round";
-  if (stroke) { ctx.lineWidth = Math.max(3, size / 6); ctx.strokeStyle = stroke; ctx.strokeText(s, x, y); }
-  ctx.fillStyle = color; ctx.fillText(s, x, y);
+  const t = textImage(s, size, color, stroke), w = t.c.width;
+  const dx = align === "left" ? x - t.pad : align === "right" ? x - w + t.pad : x - w / 2;
+  ctx.drawImage(t.c, Math.round(dx), Math.round(y - t.c.height / 2));
 }
 function roundRect(x, y, w, h, r) {
   ctx.beginPath(); ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r);
@@ -416,17 +483,24 @@ function button(label, x, y, w, h, fn, opts = {}) {
 }
 
 function drawBackdrop() {
-  const a = ARENAS.length ? ARENAS[(day - 1) % ARENAS.length] : null;
-  if (a) {
-    const k = Math.max(W / a.width, H / a.height);
-    ctx.drawImage(a, (W - a.width * k) / 2, H - a.height * k, a.width * k, a.height * k);
-  } else { ctx.fillStyle = "#7fb7e0"; ctx.fillRect(0, 0, W, H); }
-  // the ground everyone walks on
-  ctx.fillStyle = "#4d3a2a"; ctx.fillRect(0, GROUND - 4, W, H - GROUND + 4);
-  ctx.fillStyle = "#6fa13f"; ctx.fillRect(0, GROUND - 8, W, 16);
-  ctx.fillStyle = "#39501f"; ctx.fillRect(0, GROUND + 8, W, 4);
-  ctx.fillStyle = "#3d2d20";
-  for (let i = 0; i < 26; i++) ctx.fillRect((i * 173) % W, GROUND + 30 + (i * 37) % 60, 26 + (i * 13) % 30, 6);
+  // the backdrop and ground only change between days, so they're painted once per day
+  const i = ARENAS.length ? (day - 1) % ARENAS.length : 0;
+  if (!backLayer || backFor !== i) {
+    backLayer = backLayer || makeCanvas(W, H);
+    backFor = i;
+    const g = backLayer.getContext("2d"), a = ARENAS[i];
+    g.imageSmoothingQuality = "high";
+    if (a) {
+      const k = Math.max(W / a.width, H / a.height);
+      g.drawImage(a, (W - a.width * k) / 2, H - a.height * k, a.width * k, a.height * k);
+    } else { g.fillStyle = "#7fb7e0"; g.fillRect(0, 0, W, H); }
+    g.fillStyle = "#4d3a2a"; g.fillRect(0, GROUND - 4, W, H - GROUND + 4);
+    g.fillStyle = "#6fa13f"; g.fillRect(0, GROUND - 8, W, 16);
+    g.fillStyle = "#39501f"; g.fillRect(0, GROUND + 8, W, 4);
+    g.fillStyle = "#3d2d20";
+    for (let n = 0; n < 26; n++) g.fillRect((n * 173) % W, GROUND + 30 + (n * 37) % 60, 26 + (n * 13) % 30, 6);
+  }
+  ctx.drawImage(backLayer, 0, 0);
 }
 
 function drawPit() {
@@ -439,14 +513,15 @@ function drawPit() {
   ctx.strokeStyle = "#1b1026"; ctx.lineWidth = 2; ctx.strokeRect(x - 12, GROUND - 6, PIT_W + 24, 9);
   ctx.save();
   ctx.translate(PIT_X, GROUND + 40);
-  text("HIRING", 0, 0, 20, "#9dff6e");
+  const full = roster.length >= hireCap();
+  text(full ? "FULL" : `HIRING ${roster.length}/${hireCap()}`, 0, 0, 20, full ? "#ffd23c" : "#9dff6e");
   ctx.restore();
 }
 
 function drawCastle() {
   const jig = wallHit > 0 ? rand(-2, 2) : 0;
   ctx.save(); ctx.translate(jig, 0);
-  if (hqImg) ctx.drawImage(hqImg, HQ_X, HQ_Y, 1024 * HQ_K, 1536 * HQ_K);
+  if (hqLayer) ctx.drawImage(hqLayer, HQ_X, HQ_Y);
 
   // cracks grow with damage
   const damage = 1 - hp / maxHp;
@@ -469,11 +544,8 @@ function drawStaff() {
   for (const job of order) {
     const who = roster[i];
     const x = WALL_X + 24 + (i % 6) * 36 + Math.floor(i / 6) * 14, base = ROOF_Y + 2 - Math.floor(i / 6) * 8;
-    const im = frame(who, "idle_01");
-    if (im) {
-      const h = 66, k = h / im.height;
-      ctx.drawImage(im, x - im.width * k / 2, base - h + Math.sin(t * 3 + i) * 1.5, im.width * k, h);
-    }
+    const sp = sprite(who, "idle_01", 66);
+    if (sp) ctx.drawImage(sp.c, x - sp.w / 2, base - sp.h + Math.sin(t * 3 + i) * 1.5);
     ctx.fillStyle = job === "intern" ? "#ff7fc8" : job === "legal" ? "#8ad7ff" : "#ffd23c";
     ctx.beginPath(); ctx.arc(x, base - 74, 5, 0, 7); ctx.fill();
     i++;
@@ -489,11 +561,8 @@ function drawFoe(f) {
     const walk = ["walk_01", "walk_02", "walk_03", "walk_02"];
     name = walk[Math.floor(f.phase * Math.max(5, f.speed / 12)) % 4];
   }
-  const im = frame(f.who, name);
-  if (!im) return;
-  const base = frame(f.who, "walk_01");
-  const k = f.size / base.height;
-  const w = im.width * k, h = im.height * k;
+  const sp = sprite(f.who, name, f.size);
+  if (!sp) return;
 
   // shadow, shrinks as they go up: it tells you how high they are
   if (f.mode !== "ko") {
@@ -507,7 +576,7 @@ function drawFoe(f) {
   if (f.mode === "ko") ctx.globalAlpha = Math.min(1, f.timer * 2);
   ctx.translate(f.x, f.y);
   if (f.angle) { ctx.translate(0, -f.size / 2); ctx.rotate(f.angle); ctx.translate(0, f.size / 2); }
-  ctx.drawImage(im, -w / 2, -h, w, h);
+  ctx.drawImage(sp.c, -sp.w / 2, -sp.h);
   ctx.restore();
 
   if (f.T.bomb && f.mode !== "ko") {
@@ -579,10 +648,8 @@ function drawTitle() {
   text("Everyone wants a refund. Nobody gets one.", W / 2 - 110, 225, 28);
   const lineup = ["egg", "hawky", "slothulu", "qosha", "parrot", "bradley"];
   lineup.forEach((c, i) => {
-    const im = frame(c, ["walk_01", "walk_02", "walk_03"][Math.floor(t * 6 + i) % 3]);
-    if (!im) return;
-    const h = c === "bradley" ? 170 : 110, base = frame(c, "walk_01"), k = h / base.height;
-    ctx.drawImage(im, 60 + i * 148 - im.width * k / 2, GROUND - im.height * k, im.width * k, im.height * k);
+    const sp = sprite(c, ["walk_01", "walk_02", "walk_03"][Math.floor(t * 6 + i) % 3], c === "bradley" ? 170 : 110);
+    if (sp) ctx.drawImage(sp.c, 60 + i * 148 - sp.w / 2, GROUND - sp.h);
   });
   text("Grab them. Fling them. Let gravity handle the paperwork.", W / 2 - 110, 300, 24, "#fff");
   button("OPEN FOR BUSINESS", W / 2 - 280, 345, 340, 72, () => newGame(), { size: 28 });
@@ -628,7 +695,7 @@ function drawShop() {
   panel(650, 120, 590, 300);
   text("EMPLOYEES", 672, 148, 24, "#fff", "left");
   const free = idleStaff();
-  text(lvl("pit") ? `${roster.length} hired · ${free} with no job` : "Buy the Hiring Pit to get staff", 1218, 148, 18, free ? "#9dff6e" : "#cfc4dd", "right", null);
+  text(lvl("pit") ? `${roster.length} of ${hireCap()} hired · ${free} with no job` : "Buy the Hiring Pit to get staff", 1218, 148, 18, free ? "#9dff6e" : "#cfc4dd", "right", null);
   Object.keys(JOBS).forEach((id, i) => {
     const y = 180 + i * 78, J = JOBS[id];
     text(J.name, 672, y + 18, 21, "#fff", "left");
@@ -648,6 +715,7 @@ function drawShop() {
     "Drop anyone but a boss into the Hiring Pit and they work for you.",
   ];
   wrap(tips[(day - 1) % tips.length], 672, 492, 546, 22);
+  if (lvl("pit") && hireCap() < 12) text(`New job opening on Day ${nextOpeningDay()}`, 672, 572, 18, "#9dff6e", "left", null);
 
   button(`START DAY ${day + 1}`, 650, 612, 590, 80, () => { day++; startDay(); }, { size: 34, color: "#ff5fa8" });
 }
@@ -725,6 +793,7 @@ function findFoe(x, y) {
 }
 canvas.addEventListener("pointerdown", (e) => {
   e.preventDefault();
+  Sound.unlock();
   if (window.Scores && Scores.isOpen()) return;
   try { canvas.setPointerCapture(e.pointerId); } catch (err) {}
   const p = toCanvas(e);
