@@ -31,11 +31,12 @@ const JOBS = {
   legal:  { name: "Legal Dept",    desc: "Launches invaders with lawsuits" },
   fixer:  { name: "Maintenance",   desc: "Repairs the HQ all day" },
 };
+const REPAIR_PER_HP = 0.7;
 const SHOP = [
-  { id: "wall", name: "Thicker Walls", desc: "+60 max HQ health", base: 60, grow: 45, max: 8 },
-  { id: "grip", name: "Heavier Landings", desc: "Falls hurt 30% more", base: 80, grow: 70, max: 5 },
-  { id: "pit",  name: "Hiring Pit", desc: "Drop invaders in. They work for you now", base: 120, grow: 0, max: 1 },
-  { id: "perk", name: "Better Perks", desc: "Your employees work 25% faster", base: 150, grow: 120, max: 4 },
+  { id: "wall", name: "Thicker Walls", desc: "+60 max HQ health", base: 120, grow: 90, max: 8 },
+  { id: "grip", name: "Heavier Landings", desc: "Falls hurt 30% more", base: 180, grow: 140, max: 5 },
+  { id: "pit",  name: "Hiring Pit", desc: "Drop invaders in. They work for you now", base: 350, grow: 0, max: 1, fromDay: 5 },
+  { id: "perk", name: "Better Perks", desc: "Your employees work 15% faster", base: 350, grow: 250, max: 4 },
 ];
 
 // ---- art --------------------------------------------------------------------
@@ -157,7 +158,7 @@ try { best = +localStorage.getItem(BEST_KEY) || 0; } catch (e) {}
 
 const lvl = (id) => levels[id] || 0;
 const cost = (it) => it.base + it.grow * lvl(it.id);
-const perk = () => 1 + 0.25 * lvl("perk");
+const perk = () => 1 + 0.15 * lvl("perk");
 const pick = (a) => a[Math.floor(Math.random() * a.length)];
 const rand = (a, b) => a + Math.random() * (b - a);
 // how many people the company can employ: 2 to start, one more opening every 3 days
@@ -398,7 +399,7 @@ function damageWall(n) {
 
 function runStaff(dt) {
   const speed = perk();
-  hp = Math.min(maxHp, hp + staff.fixer * 1.3 * speed * dt);
+  hp = Math.min(maxHp, hp + staff.fixer * 0.8 * speed * dt);
   const targets = foes.filter((f) => f.mode !== "ko" && f !== held && f.x > 20);
   // nearest to the wall first
   targets.sort((a, b) => b.x - a.x);
@@ -406,12 +407,12 @@ function runStaff(dt) {
   if (staff.intern) {
     staffT.intern -= dt * staff.intern * speed;
     if (staffT.intern <= 0 && targets.length) {
-      staffT.intern = 1.5;
+      staffT.intern = 2;
       const f = targets[Math.floor(Math.random() * Math.min(3, targets.length))];
       const sx = WALL_X + 40, sy = ROOF_Y - 30;
       const flight = Math.max(0.5, (sx - f.x) / 700);
       shots.push({ x: sx, y: sy, vx: (f.x + f.speed * flight * (f.mode === "walk" ? 1 : 0) - sx) / flight,
-        vy: (f.y - f.size / 2 - sy) / flight - GRAVITY * 0.225 * flight, a: 0, dmg: 0.34, kind: "crayon" });
+        vy: (f.y - f.size / 2 - sy) / flight - GRAVITY * 0.225 * flight, a: 0, dmg: 0.2, kind: "crayon" });
     }
   }
   if (staff.legal) {
@@ -419,9 +420,9 @@ function runStaff(dt) {
     if (staffT.legal <= 0) {
       const ground = targets.filter((f) => f.mode === "walk" || f.mode === "hit");
       if (ground.length) {
-        staffT.legal = 5;
+        staffT.legal = 10;
         const f = ground[0];
-        launch(f, rand(-160, 60), -900);
+        launch(f, rand(-160, 60), -700);
         popups.push({ x: f.x, y: f.y - f.size - 10, text: "SUED!", life: 0.9, max: 0.9, size: 28, color: "#8ad7ff" });
         burst(f.x, GROUND - 6, "#8ad7ff", 12);
         Sound.play("swoosh", 0.5);
@@ -665,14 +666,14 @@ function drawShop() {
 
   // repairs
   const missing = Math.ceil(maxHp - hp);
-  const repairCost = Math.ceil(missing * 0.35);
+  const repairCost = Math.ceil(missing * REPAIR_PER_HP);
   panel(40, 120, 590, 96);
   text(`HQ ${Math.ceil(hp)} / ${maxHp}`, 62, 148, 24, "#fff", "left");
   text("Fix the place up", 62, 186, 18, "#cfc4dd", "left", null);
   const part = Math.min(money, repairCost);
   button(missing === 0 ? "ALL FIXED" : `REPAIR $${part}`, 380, 138, 230, 60, () => {
     const pay = Math.min(money, repairCost);
-    money -= pay; hp = Math.min(maxHp, hp + pay / 0.35);
+    money -= pay; hp = Math.min(maxHp, hp + pay / REPAIR_PER_HP);
     Sound.play("punch", 0.4);
   }, { disabled: missing === 0 || money <= 0, color: "#3fae5a" });
 
@@ -684,11 +685,13 @@ function drawShop() {
     text(it.name + (it.max > 1 ? `  ${lv}/${it.max}` : ""), 62, y + 26, 22, "#fff", "left");
     text(it.desc, 62, y + 58, 17, "#cfc4dd", "left", null);
     const c = cost(it);
-    button(done ? "OWNED" : `$${c}`, 450, y + 13, 160, 56, () => {
+    // the shop after Day 4 is the first that sells it, ready for Day 5
+    const locked = it.fromDay && day + 1 < it.fromDay;
+    button(done ? "OWNED" : locked ? `DAY ${it.fromDay}` : `$${c}`, 450, y + 13, 160, 56, () => {
       money -= c; levels[it.id] = lv + 1;
       if (it.id === "wall") { maxHp += 60; hp += 60; }
       Sound.play("swoosh", 0.5);
-    }, { disabled: done || money < c, color: "#ff5fa8" });
+    }, { disabled: done || locked || money < c, color: "#ff5fa8" });
   });
 
   // employees

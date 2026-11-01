@@ -10,7 +10,7 @@ A remake of Defend Your Castle (old Addicting Games flash game). The Moe Fights 
 ## How it plays
 
 - Damage comes from landing speed (`SAFE_FALL`), so height is what kills. Flung bodies bowl over others.
-- Hiring Pit (bought in the shop): anyone but a boss who lands in it joins `roster`, then gets a job on the shop screen. `hireCap()` limits staff: 2, plus one every 3 days, up to 12.
+- Hiring Pit (on sale from the shop after Day 4, `fromDay` in `SHOP`): anyone but a boss who lands in it joins `roster`, then gets a job on the shop screen. `hireCap()` limits staff: 2, plus one every 3 days, up to 12.
 - Speed: fighters, labels, the backdrop and the HQ are each drawn once into a kept canvas (`sprite`, `textImage`, `drawBackdrop`, `prepareArt`). Keep it that way when adding art.
 - A boss comes every 5 days. Score goes to the `llc-defend` board in `api/scores.py`.
 - The HQ picture is `~/Desktop/moecastle/MoemoeLLC Cyberpunk Headquarters.png`. `build_assets.py hq` keys out the white and rebuilds just that. `HQ_K`, `WALL_X` in `game.js` place it. Staff are drawn behind it, so they show through the railing.
