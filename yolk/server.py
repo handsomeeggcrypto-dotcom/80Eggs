@@ -48,7 +48,9 @@ def station_config():
     if "code" not in cfg:
         cfg["code"] = f"{secrets.randbelow(1000000):06d}"
         cfg["token"] = secrets.token_hex(16)
-        STATION.write_text(json.dumps(cfg, indent=2))
+    if "watch_key" not in cfg:          # the Apple Watch Shortcut sends this instead of a cookie
+        cfg["watch_key"] = secrets.token_hex(16)
+    STATION.write_text(json.dumps(cfg, indent=2))
     return cfg
 
 
@@ -411,9 +413,16 @@ class Handler(BaseHTTPRequestHandler):
         token = station_config()["token"]
         return f"yolk_pair={token}" in (self.headers.get("Cookie") or "")
 
+    def watch_ok(self):
+        """The Apple Watch Shortcut can't keep a cookie, so it sends its own key in a header."""
+        key = self.headers.get("X-YOLK-Key") or ""
+        return secrets.compare_digest(key.strip(), station_config()["watch_key"])
+
     def gate(self, path):
         """True if the request may continue; otherwise answers it with the pairing page."""
         if self.trusted() or path in self.PUBLIC:
+            return True
+        if path == "/api/watch" and self.watch_ok():
             return True
         if path.startswith("/api/"):
             self.send(403, {"error": "pair first"})
@@ -446,6 +455,10 @@ class Handler(BaseHTTPRequestHandler):
             if self.client_address[0] not in ("127.0.0.1", "::1"):
                 return self.send(403, {"error": "only on the mac"})
             return self.send(200, {"code": station_config()["code"], "address": lan_address(), "port": PORT})
+        if path == "/api/watchkey":          # for setting up the Apple Watch Shortcut; this Mac only
+            if self.client_address[0] not in ("127.0.0.1", "::1"):
+                return self.send(403, {"error": "only on the mac"})
+            return self.send(200, {"key": station_config()["watch_key"], "address": lan_address(), "port": PORT})
         if path in ("/finance", "/api/finance"):      # money stays on this Mac, even for paired tablets
             if self.client_address[0] not in ("127.0.0.1", "::1"):
                 return self.send(403, {"error": "only on the mac"})
@@ -490,6 +503,23 @@ class Handler(BaseHTTPRequestHandler):
         path = self.path.split("?")[0]
         if not self.gate(path):
             return
+        if path == "/api/watch":             # the Apple Watch Shortcut: plain text in, plain text out
+            import chat
+            n = int(self.headers.get("Content-Length", 0) or 0)
+            raw = self.rfile.read(min(n, 20000)).decode("utf-8", "replace").strip()
+            try:                             # a bare sentence, or {"text": "..."}
+                raw = str(json.loads(raw).get("text", ""))
+            except (ValueError, AttributeError):
+                pass
+            text = raw.strip()[:1000]
+            if not text:
+                return self.send(200, "...you said nothing. i heard it anyway.", "text/plain; charset=utf-8")
+            try:
+                answer = chat.reply(text, where="watch")
+            except Exception as e:
+                print("YOLK watch chat failed:", e)
+                answer = "my brain glitched. try again in a second."
+            return self.send(200, answer, "text/plain; charset=utf-8")
         if path == "/api/talk":              # a WAV recording from the Station's mic
             import chat
             n = int(self.headers.get("Content-Length", 0) or 0)

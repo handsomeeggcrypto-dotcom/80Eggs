@@ -33,7 +33,7 @@ MAX_NOTES = 200          # about 5,000 words; the oldest go first past this
 NOTE_LEN = 110           # short enough for SHELL's speech bubble
 FOR_SHELL = 15           # newest notes copied to SHELL
 NOTE_MODEL = "claude-haiku-5-5"
-PLACES = {"desk": "the mac", "station": "the station", "shell": "shell"}
+PLACES = {"desk": "the mac", "station": "the station", "shell": "shell", "watch": "the watch"}
 
 DATE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 _lock = threading.Lock()
@@ -104,9 +104,9 @@ def for_prompt():
     notes = read()
     if not notes:
         return ("Your memory: nothing yet. You share one memory across all your bodies (the Mac, the "
-                "Station and SHELL). Anything they tell you now, you'll keep.")
+                "Station, SHELL and the Apple Watch). Anything they tell you now, you'll keep.")
     lines = [f"- {when(n['t'])}, on {PLACES.get(n['where'], n['where'])}: {n['note']}" for n in notes]
-    return ("Your memory. You share one memory across all your bodies (the Mac, the Station and SHELL), so "
+    return ("Your memory. You share one memory across all your bodies (the Mac, the Station, SHELL and the Apple Watch), so "
             "something said on one is known on all of them. These are your notes about them, oldest first. "
             "Bring one up when it fits, like someone who really listened. Don't recite the list.\n"
             + "\n".join(lines))
