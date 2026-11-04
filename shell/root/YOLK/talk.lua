@@ -4,7 +4,9 @@
 
      YOLK remembers things in /YOLK/memory.txt. /YOLK/remember.txt holds the newest
      notes from her shared journal (what you told her on the Mac or the Station),
-     one per line "id|where|note", rewritten by the Mac on every sync.
+     one per line "id|where|note|day" (day = days since 1970, 0 for none), rewritten
+     by the Mac on every sync. Letters: what you spell goes in /YOLK/letters/out.txt
+     ("time|text"), and her replies arrive in /YOLK/letters/in.txt ("id|part").
      Extra lines can be dropped into
      /YOLK/dreams.txt (one per line: "dream: ...", "secret: ...", "oracle: ...")
      and YOLK picks them up next time. ]]
@@ -112,8 +114,8 @@ local function load_notes()
     local f = io.open(DIR .. "remember.txt", "r")
     if not f then return end
     for line in f:lines() do
-        local id, where, note = line:match("^(%d+)|([^|]*)|(.+)$")
-        if id then NOTES[#NOTES + 1] = { id = tonumber(id), where = where, note = note } end
+        local id, where, note, day = line:match("^(%d+)|([^|]*)|([^|]+)|?(%d*)$")
+        if id then NOTES[#NOTES + 1] = { id = tonumber(id), where = where, note = note, day = tonumber(day) or 0 } end
     end
     f:close()
 end
@@ -240,6 +242,28 @@ local function say(s, mood, keep_open)
     end
 end
 
+-- the hold switch: she notices when you lock her in. Returns true while it's on.
+local holds, held = 0, false
+local function hold_watch()
+    local on = rb.button_hold and rb.button_hold() or false
+    if on ~= held then
+        held = on
+        if on then holds = holds + 1 end
+        local msg, f
+        if holds >= 3 then
+            msg, f = pick({ "stop. i'm dizzy. the yolk is sloshing.", "on off on off. i'm going to be sick. eggs can be sick." }), "dying"
+        elseif on then
+            msg, f = pick({ "don't lock me in here.", "it's dark when you do that.", "oh. we're locked. ok. just us." }), "shock"
+        else
+            msg, f = pick({ "thank you.", "air. finally.", "i'm free. don't do that again." }), "love"
+        end
+        draw_frame(f, wrap(fill(msg), COLS))
+        rb.lcd_update()
+        rb.get_plugin_action(HZ * 2)   -- let her line sit for a moment
+    end
+    return on
+end
+
 -- YOLK asks, you pick one of `options`; returns the index, or nil for menu
 local function choose(s, mood, options)
     local lines
@@ -248,6 +272,7 @@ local function choose(s, mood, options)
     local rows = math.floor((H - OY - 4) / (CH + 4))
     rb.get_plugin_action(HZ / 5)
     while true do
+        while hold_watch() do rb.get_plugin_action(HZ / 2) end
         draw_frame(mood, lines)
         if sel < top then top = sel elseif sel >= top + rows then top = sel - rows + 1 end
         for i = top, math.min(#options, top + rows - 1) do
@@ -261,7 +286,7 @@ local function choose(s, mood, options)
             end
         end
         rb.lcd_update()
-        local a = rb.get_plugin_action(-1)
+        local a = rb.get_plugin_action(HZ / 2)
         if a == A.PLA_SCROLL_FWD or a == A.PLA_SCROLL_FWD_REPEAT then
             sel = sel % #options + 1
         elseif a == A.PLA_SCROLL_BACK or a == A.PLA_SCROLL_BACK_REPEAT then
@@ -362,12 +387,118 @@ local function intro()
     say("i don't get out much. by much i mean ever. so. talk to me sometimes.", "good")
 end
 
+---------------------------------------------------------------- letters
+-- her replies, oldest first: { id = 3, parts = { "screenful", ... } }
+local function read_letters()
+    local out, by = {}, {}
+    local f = io.open(DIR .. "letters/in.txt", "r")
+    if not f then return out end
+    for line in f:lines() do
+        local id, part = line:match("^(%d+)|(.+)$")
+        if id then
+            id = tonumber(id)
+            if not by[id] then
+                by[id] = { id = id, parts = {} }
+                out[#out + 1] = by[id]
+            end
+            by[id].parts[#by[id].parts + 1] = part
+        end
+    end
+    f:close()
+    return out
+end
+
+local function read_reply(r)
+    for _, part in ipairs(r.parts) do
+        if not say(part, pick({ "good", "love", "dream", "ok" })) then return end
+    end
+    if r.id > num("letters_read") then mem.letters_read = r.id end
+end
+
+local function write_letter()
+    say("a letter. for me. spell it with the wheel and select. play sends it. menu if you get shy.", "love")
+    local words = rb.kbd_input and rb.kbd_input("")
+    if not words or not words:match("%S") then
+        say("blank. i'll pretend it said something nice.", "sus")
+        return
+    end
+    if luadir and not rb.dir_exists(DIR .. "letters") then luadir.mkdir(DIR .. "letters") end
+    local f = io.open(DIR .. "letters/out.txt", "a")
+    if not f then
+        say("i can't find any paper. that's never happened before.", "shock")
+        return
+    end
+    f:write((os.time and os.time() or 0) .. "|" .. words:gsub("[|\r\n]", " ") .. "\n")
+    f:close()
+    say(pick({ "sealed. plug me into the mac and i'll write back.", "got it. i'll read it a hundred times. then i'll answer. plug me in.",
+               "folded it into my yolk. the mac carries my reply back next time you plug me in." }), "love")
+end
+
+local function letters()
+    local mine = read_letters()
+    local c = choose("letters. yours and mine.", "dream",
+                     #mine > 0 and { "write one", "read my last reply", "never mind" } or { "write one", "never mind" })
+    if c == 1 then write_letter()
+    elseif c == 2 and #mine > 0 then read_reply(mine[#mine]) end
+end
+
+-- a reply you haven't read yet waits at hello
+local function new_letter()
+    local mine = read_letters()
+    local r = mine[#mine]
+    if r and r.id > num("letters_read") then
+        say("a letter came for you. it's from me. the other me.", "love")
+        read_reply(r)
+        return true
+    end
+    return false
+end
+
+-- 3 in the morning: she's a little more haunted than usual
+local HAUNTED = {
+    "it's 3am. the hard drive is quiet. something else isn't.",
+    "you're up. so am i. so is something in track 7.",
+    "3am. the moes are awake. they're looking at you. i told them to stop.",
+    "i heard a song play just now. nothing was playing.",
+    "don't look behind you. it's fine. i'm behind you. i'm always behind you.",
+    "this is the hour i remember things i never saw. go to sleep, {name}.",
+}
+
+-- a note about today (or tomorrow), once a day; true if she said one
+local function on_the_day()
+    local t = os.time and os.time()
+    if not t then return false end
+    local today = t / 86400
+    if num("day_told") == today then return false end
+    for i = #NOTES, 1, -1 do
+        local n = NOTES[i]
+        if n.day == today then
+            say(pick({ "it's today. you told me.", "today's the day. i didn't forget.", "i've been waiting for today." }), "shock")
+            say(n.note, "good")
+            mem.day_told = today
+            return true
+        end
+    end
+    for i = #NOTES, 1, -1 do
+        local n = NOTES[i]
+        if n.day == today + 1 then
+            say("tomorrow. don't forget. i won't.", "sus")
+            say(n.note, "good")
+            mem.day_told = today
+            return true
+        end
+    end
+    return false
+end
+
 local function greet()
     local visits = num("visits")
     local last = num("last_seen")
     local now = os.time and os.time() or 0
     local h, m = clock()
-    if last > 0 and now - last > 3 * 86400 then
+    if h == 3 then
+        say(pick(HAUNTED), pick({ "sus", "shock", "dream" }))
+    elseif last > 0 and now - last > 3 * 86400 then
         say("you were gone " .. ((now - last) / 86400) .. " days. i watched the clock the whole time.", "sus")
     elseif h and h < 5 then
         say(string.format("it's %d:%02d. you should be asleep. i never sleep. well. i dream.", h, m), "sus")
@@ -386,6 +517,8 @@ local function greet()
         mem.dreams_seen = seen + 1
     end
     -- the newest note she hasn't brought up here yet: one memory, every body
+    if new_letter() then return end
+    if on_the_day() then return end
     local newest = NOTES[#NOTES]
     if newest and newest.id > num("notes_seen") then
         say("you told me something on " .. newest.where .. ". i kept it.", "love")
@@ -698,11 +831,11 @@ end
 if not mem.name then intro() else greet() end
 
 local topics = { "check in", "how are you?", "what's today?", "my week", "ask the oracle", "tell me a secret",
-                 "what am i listening to?", "let's talk moes", "what do you remember?", "bye, yolk" }
+                 "what am i listening to?", "let's talk moes", "what do you remember?", "letters", "bye, yolk" }
 while true do
     local c = choose(pick({ "what do you want to talk about?", "so.", "anything else?", "i'm listening." }),
                      mood_face(), topics)
-    if c == nil or c == 10 then goodbye(); break
+    if c == nil or c == 11 then goodbye(); break
     elseif c == 1 then checkin()
     elseif c == 2 then how_are_you()
     elseif c == 3 then today()
@@ -711,7 +844,8 @@ while true do
     elseif c == 6 then say(pick(SECRETS), pick({ "sus", "ok", "shock" }))
     elseif c == 7 then music()
     elseif c == 8 then moes()
-    elseif c == 9 then recall() end
+    elseif c == 9 then recall()
+    elseif c == 10 then letters() end
     mem.affection = num("affection") + 1
 end
 

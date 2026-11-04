@@ -5,7 +5,7 @@
 ## Layout
 
 - `root/` **mirrors the iPod drive**: `.rockbox/` (theme `yolk.cfg`, `wps/yolk.wps|sbs` skins, `shortcuts.txt`) and `YOLK/` (the Lua apps).
-- Apps in `root/YOLK/`: `boot.lua` (power-on animation), `talk.lua` (Talk to YOLK + check-ins; `checkin.lua` runs it in check-in-only mode), `moekadex.lua` (Moe lookup; `dreams.lua` reuses it for **Dream Things**, the Yumemono dex), `moto.lua` (MOEtorcycles Mini), `meditate.lua`, `finance.lua`, `quests.lua` (**QUEST LOG**: real-life lists + dailies with loot drops, six stats, WHAT NOW?, ranks every 10, a vault; lists in `/YOLK/quests/list.txt`, copied from `starter.txt` on first run, progress in `state.txt`, both only on the device; debt quests read FINANCE's numbers), `radio.lua`, `usb.lua`.
+- Apps in `root/YOLK/`: `boot.lua` (power-on animation), `talk.lua` (Talk to YOLK + check-ins; `checkin.lua` runs it in check-in-only mode. Also her shared memory from `/YOLK/remember.txt` (brought up on the day a note is about), letters spelled with Rockbox's keyboard (`rb.kbd_input`) and her replies, 3am lines, and hold-switch reactions), `moekadex.lua` (Moe lookup; `dreams.lua` reuses it for **Dream Things**, the Yumemono dex), `moto.lua` (MOEtorcycles Mini), `meditate.lua`, `finance.lua`, `quests.lua` (**QUEST LOG**: real-life lists + dailies with loot drops, six stats, WHAT NOW?, ranks every 10, a vault; lists in `/YOLK/quests/list.txt`, copied from `starter.txt` on first run, progress in `state.txt`, both only on the device; debt quests read FINANCE's numbers), `radio.lua`, `usb.lua`.
 - `tools/`: generators (`gen_art.py`, `gen_moekadex.py`, `gen_dreams.py`, `gen_dex_index.py`, `gen_moto.py`), `backup_shell.py` / `restore_shell.py`, and `sim/` (Rockbox simulator).
 - `backup/`: snapshots of the real drive (gitignored).
 - Generated Moekadex/Dream Things data and images are gitignored (431MB+). Rebuild with the `gen_*.py` scripts.
@@ -20,6 +20,7 @@
 - Lua 5.1, **integers only**: no `0.5`, `math.sqrt` or `//`.
 - `%` keeps the sign of the left side (`-1 % 5` is `-1`), so wrapping backwards needs a loop or adding first.
 - `os.date` returns nil, so compute dates from `os.time()`. `rb.font_load` fails (no memory), so use `rb.FONT_UI` + pre-rendered title BMPs. `rb.font_getstringsize` returns (width, w, h).
+- Folders: `luadir.mkdir(path)` (not `rb.mkdir`), `rb.dir_exists(path)`. The hold switch is `rb.button_hold()`. The simulator can't flip it.
 - Rockbox system events (negative numbers from `get_plugin_action`, a burst at power-on) aren't button presses. Whitelist `PLA_*` buttons in any "press to skip" check.
 - **Lua can't play audio**: the plugin takes the whole audio buffer. To play something, write a one-track `.m3u8` + `/.rockbox/.playlist_control`, reset `global_status` resume fields, then `os.exit(rb.PLUGIN_GOTO_WPS)` (see `meditate.lua`).
 - Full-screen transparent blits are slow on the device. Bake backgrounds into solid images.
