@@ -45,6 +45,11 @@ data: /YOLK/dreams.lua
 
 [shortcut]
 type: file
+name: HATCHERY
+data: /YOLK/hatch.lua
+
+[shortcut]
+type: file
 name: WAKE YOLK
 data: /YOLK/boot.lua
 
