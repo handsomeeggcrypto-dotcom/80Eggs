@@ -20,6 +20,7 @@ Each project folder has its own `CLAUDE.md`. Read it before working there.
 | `dreamthings/` | **Dream Things**, a dex for the Yumemono NFTs. `build_data.py` makes `data.js` | live |
 | `nap_time/` | **Nap Time** bedtime-story ARPG | live, behind a password |
 | `moemode/` | **MoeMode** "what should I do right now?" app | hidden |
+| `moepedal/` | **MoePedal**, the Mac as a weird guitar effects pedal: M-Audio Fast Track in, Arturia MiniLab knobs/keys, Alesis ControlPad footswitches (Web Audio + Web MIDI, Chrome only) | hidden |
 | `yolk/` | **YOLK**, the egg AI's home on the Mac (server, Station tablet, Daily, Claude) | this Mac only |
 | `shell/` | **SHELL**, the iPod Classic YOLK lives on (Rockbox + Lua) | this Mac only |
 | `nestegg/` | **Nest Egg**, practice crypto bots with fake money: Solana memecoins (with rug checks) and SOL. Runs all the time as a LaunchAgent. No wallet, can't trade | this Mac only |

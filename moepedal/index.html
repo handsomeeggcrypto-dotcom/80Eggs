@@ -1,0 +1,725 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>MoePedal</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Bungee&display=swap" rel="stylesheet">
+<style>
+:root{
+  --felt:#17141c; --felt2:#211c28; --ink:#f4eefc; --dim:#9d93ad; --line:#3a3346;
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--felt);color:var(--ink);font:14px/1.4 ui-monospace,Menlo,monospace}
+body{
+  min-height:100vh;
+  background:
+    radial-gradient(circle at 20% 0%, #2c2140 0, transparent 50%),
+    repeating-linear-gradient(45deg, var(--felt) 0 6px, var(--felt2) 6px 7px);
+}
+button{font:inherit;color:inherit;cursor:pointer}
+select{font:inherit;background:#0f0d13;color:var(--ink);border:1px solid var(--line);border-radius:6px;padding:4px 6px;max-width:220px}
+
+header{display:flex;flex-wrap:wrap;align-items:center;gap:10px 18px;padding:14px 16px;border-bottom:2px solid #000;background:#0e0c12cc;position:sticky;top:0;z-index:5;backdrop-filter:blur(4px)}
+h1{font-family:Bungee,Impact,sans-serif;font-size:26px;margin:0;letter-spacing:1px;
+  background:linear-gradient(90deg,#ff5fa2,#ffd23f,#5ff0ff,#b98cff);-webkit-background-clip:text;background-clip:text;color:transparent}
+.io{display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center}
+.io label{display:flex;gap:6px;align-items:center;color:var(--dim);font-size:12px}
+.btn{background:#26202e;border:1px solid var(--line);border-radius:8px;padding:6px 12px}
+.btn:hover{border-color:#6b5f80}
+.btn.on{background:#ffd23f;color:#000;border-color:#ffd23f}
+.btn.rec.on{background:#ff3b5c;border-color:#ff3b5c;color:#fff;animation:blink 1s infinite}
+.btn.danger{border-color:#7a2b3b}
+@keyframes blink{50%{opacity:.55}}
+
+.meters{display:flex;gap:10px;align-items:center}
+.meter{width:70px;height:10px;background:#000;border-radius:5px;overflow:hidden;position:relative}
+.meter i{position:absolute;inset:0;width:0;background:linear-gradient(90deg,#3dff8a,#ffd23f 70%,#ff3b5c);transition:width .05s}
+.meters span{font-size:11px;color:var(--dim)}
+canvas#scope{width:180px;height:34px;background:#000;border-radius:6px;display:block}
+
+.midi{display:flex;gap:6px;flex-wrap:wrap}
+.dev{font-size:11px;padding:2px 8px;border-radius:10px;background:#000;color:var(--dim);border:1px solid var(--line)}
+.dev.hit{color:#000;background:#3dff8a}
+
+main{padding:18px 16px 40px;max-width:1200px;margin:0 auto}
+.presets{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px;align-items:center}
+.presets b{color:var(--dim);font-weight:normal;font-size:12px;margin-right:4px}
+.board{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:16px}
+
+.pedal{
+  position:relative;border-radius:16px;padding:16px 14px 18px;
+  background:linear-gradient(160deg,var(--c),var(--d));
+  box-shadow:inset 0 2px 0 #fff5, inset 0 -6px 0 #0004, 0 8px 0 #000, 0 12px 24px #0008;
+  color:#111;display:flex;flex-direction:column;align-items:center;min-height:330px;
+}
+.pedal::before,.pedal::after{content:"";position:absolute;top:10px;width:8px;height:8px;border-radius:50%;background:radial-gradient(circle at 35% 35%,#eee,#555)}
+.pedal::before{left:10px}.pedal::after{right:10px}
+.led{width:12px;height:12px;border-radius:50%;background:#400;box-shadow:inset 0 1px 2px #000;margin-bottom:8px}
+.pedal.lit .led{background:#ff2a2a;box-shadow:0 0 10px #ff2a2a,0 0 22px #ff2a2a88}
+.knobs{display:flex;flex-wrap:wrap;justify-content:center;gap:6px 12px;min-height:96px}
+.knob{display:flex;flex-direction:column;align-items:center;width:62px;touch-action:none;user-select:none;cursor:ns-resize}
+.ring{width:52px;height:52px;border-radius:50%;position:relative;
+  background:conic-gradient(from 225deg,#111 calc(var(--n)*270deg),#0003 0 270deg,transparent 0)}
+.cap{position:absolute;inset:6px;border-radius:50%;background:radial-gradient(circle at 40% 30%,#555,#111 70%);box-shadow:0 2px 3px #0008;transform:rotate(calc(var(--n)*270deg - 135deg))}
+.cap i{position:absolute;left:50%;top:3px;width:3px;height:13px;margin-left:-1.5px;background:#fff;border-radius:2px}
+.knob label{font-size:10px;font-weight:bold;margin-top:3px;letter-spacing:.5px}
+.knob output{font-size:10px;opacity:.75}
+.pedal h2{font-family:Bungee,Impact,sans-serif;font-size:28px;margin:10px 0 0;letter-spacing:1px;text-shadow:0 2px 0 #fff6}
+.pedal p{margin:2px 0 10px;font-size:11px;text-align:center;opacity:.8;min-height:30px}
+.stomp{margin-top:auto;width:78px;height:78px;border-radius:50%;border:none;
+  background:radial-gradient(circle at 40% 30%,#f4f4f4,#8a8a8a 60%,#444);box-shadow:0 5px 0 #222,0 7px 10px #000a}
+.stomp:active,.pedal.lit .stomp{transform:translateY(3px);box-shadow:0 2px 0 #222,0 3px 6px #000a}
+.whammy{position:absolute;top:30px;right:14px;font-size:11px;font-weight:bold;background:#111;color:#ffd23f;padding:1px 6px;border-radius:6px;display:none}
+.pedal.wh .whammy{display:block}
+
+body.learn .knob, body.learn .stomp, body.learn .learnable{outline:2px dashed #fff8;outline-offset:3px;border-radius:12px}
+.picked{outline:3px solid #fff !important;animation:blink .5s infinite}
+
+.master{display:flex;gap:18px;align-items:center;justify-content:center;flex-wrap:wrap;margin-top:22px;padding:14px;border-radius:14px;background:#0e0c12;border:1px solid var(--line)}
+.master .knob{color:var(--ink)}
+.master .ring{background:conic-gradient(from 225deg,#ffd23f calc(var(--n)*270deg),#fff2 0 270deg,transparent 0)}
+
+.recs{margin-top:14px;display:flex;flex-direction:column;gap:6px;align-items:center}
+.recs a{color:#5ff0ff}
+.help{margin-top:26px;color:var(--dim);font-size:12px;line-height:1.7;max-width:760px}
+.help b{color:var(--ink)}
+
+#toast{position:fixed;left:50%;bottom:22px;transform:translateX(-50%) translateY(80px);background:#ffd23f;color:#000;padding:8px 16px;border-radius:10px;font-weight:bold;transition:transform .2s;z-index:20;max-width:calc(100% - 32px);text-align:center}
+#toast.show{transform:translateX(-50%) translateY(0)}
+
+#intro{position:fixed;inset:0;background:#0b0a0ef2;z-index:30;display:flex;align-items:center;justify-content:center;padding:16px}
+#intro .card{max-width:520px;background:#1c1824;border:2px solid #000;border-radius:18px;padding:22px 22px 18px;box-shadow:0 10px 0 #000}
+#intro h2{font-family:Bungee,Impact,sans-serif;margin:0 0 10px;font-size:22px;color:#ffd23f}
+#intro ol{padding-left:20px;margin:0 0 14px;line-height:1.7}
+#intro .go{width:100%;font-family:Bungee,Impact,sans-serif;font-size:22px;padding:12px;background:#ff5fa2;color:#000;border:none;border-radius:12px;box-shadow:0 5px 0 #000}
+#intro .warn{color:#ff9db8;font-size:12px;margin-top:10px}
+#nosig{display:none;margin:0 0 14px;padding:10px 14px;border-radius:10px;background:#3a1420;color:#ffc2d1;font-size:12px}
+</style>
+</head>
+<body>
+
+<div id="intro">
+  <div class="card">
+    <h2>Plug in 🥚🎸</h2>
+    <ol>
+      <li><b>Headphones</b> go in the M-Audio's headphone jack. Not speakers, so it can't squeal.</li>
+      <li>Push the M-Audio's <b>Direct Monitor</b> button <b>up (Off)</b>, or you'll hear the plain sound on top.</li>
+      <li>Guitar or pickup goes in the <b>guitar jack</b>. The yellow SD-1 can go in between.</li>
+      <li>Plug the <b>MiniLab</b> and the <b>ControlPad</b> into USB.</li>
+      <li>Press START. Chrome asks to use the microphone: that's the M-Audio. Say yes.</li>
+    </ol>
+    <button class="go" id="start">START</button>
+    <div class="warn" id="browserWarn"></div>
+  </div>
+</div>
+
+<header>
+  <h1>MoePedal</h1>
+  <div class="io">
+    <label>IN <select id="inSel"><option>—</option></select></label>
+    <label>JACK <select id="chanSel">
+      <option value="both">both</option>
+      <option value="L">left (mic)</option>
+      <option value="R">right (guitar)</option>
+    </select></label>
+    <label>OUT <select id="outSel"><option value="">default</option></select></label>
+  </div>
+  <div class="meters">
+    <span>in</span><div class="meter"><i id="mIn"></i></div>
+    <span>out</span><div class="meter"><i id="mOut"></i></div>
+    <canvas id="scope" width="360" height="68"></canvas>
+  </div>
+  <div class="midi" id="midiDevs"><span class="dev">no controllers yet</span></div>
+</header>
+
+<main>
+  <div id="nosig"></div>
+  <div class="presets" id="presets"><b>SOUNDS:</b></div>
+  <div class="board" id="board"></div>
+
+  <div class="master" id="master">
+    <button class="btn learnable" id="learnBtn" title="Teach a knob or pad to a control">LEARN</button>
+    <button class="btn rec learnable" id="recBtn">● REC</button>
+    <button class="btn danger learnable" id="panicBtn" title="Stops every effect and clears the echoes">SILENCE</button>
+    <button class="btn" id="resetMap" title="Forget which knob and pad does what">forget knobs/pads</button>
+  </div>
+  <div class="recs" id="recs"></div>
+
+  <div class="help">
+    <b>Knobs:</b> drag up/down, scroll, or double-click to reset.
+    <b>MiniLab:</b> turn its knobs one at a time and each one grabs the next knob here, left to right. Its <b>keys</b> play the PITCH pedal: hold a key and your sound jumps to that note (middle C = no change).
+    <b>ControlPad:</b> hit the pads left to right and they become the footswitches (pad 7 = record, pad 8 = silence).
+    To change what a knob or pad does, press <b>LEARN</b>, click the thing on screen, then move the knob or hit the pad.
+    <b>Keyboard:</b> 1–6 stomp the pedals.
+    <br><b>Try:</b> plug a spare pickup in and hold it near your phone, a charger or the laptop, then press <b>GHOST RADIO</b>.
+  </div>
+</main>
+<div id="toast"></div>
+
+<script>
+// ---------------------------------------------------------------- the sound engine (runs on the audio thread)
+const FX_CODE = `
+class MoeFx extends AudioWorkletProcessor {
+  constructor(){
+    super();
+    const sr = sampleRate; this.sr = sr;
+    this.T = {}; this.C = {};
+    this.on = {crush:0, ring:0, pitch:0, stutter:0, echo:0, freeze:0};
+    this.a  = {crush:0, ring:0, pitch:0, stutter:0, echo:0, freeze:0};
+    this.chan = 'both'; this.wh = null;
+    this.hold = 0; this.hc = 0;                                   // crush
+    this.rph = 0;                                                 // ring
+    this.pb = new Float32Array(8192); this.pw = 0; this.pph = 0;  // pitch
+    this.win = Math.round(sr * 0.045);
+    this.sb = new Float32Array(sr * 2 | 0); this.ss = 0; this.sp = 0; this.sl = 1; this.sn = 0; // stutter
+    this.eb = new Float32Array(sr * 3 | 0); this.ew = 0; this.elp = 0; this.ed = sr * 0.4;      // echo
+    this.hb = new Float32Array(sr * 3 | 0); this.hw = 0;                                        // history for freeze
+    this.fb = new Float32Array(sr * 3 | 0); this.fl = 0; this.G = 1;
+    this.gp = [0, 0.25, 0.5, 0.75]; this.gs = [0, 0, 0, 0];
+    this.rec = false; this.rb = new Float32Array(8192); this.ri = 0;
+    this.pkI = 0; this.pkO = 0; this.mc = 0;
+    this.port.onmessage = e => this.msg(e.data);
+  }
+  msg(m){
+    if (m.t === 'p') { this.T[m.k] = m.v; if (!(m.k in this.C)) this.C[m.k] = m.v; }
+    else if (m.t === 'on') {
+      const was = this.on[m.k]; this.on[m.k] = m.v ? 1 : 0;
+      if (m.k === 'freeze' && m.v && !was) this.capture();
+    }
+    else if (m.t === 'chan') this.chan = m.v;
+    else if (m.t === 'wh') this.wh = m.v;
+    else if (m.t === 'rec') { this.rec = m.v; if (!m.v && this.ri) { this.port.postMessage({t:'rec', d:this.rb.slice(0, this.ri)}); this.ri = 0; } }
+    else if (m.t === 'panic') {
+      this.eb.fill(0); this.elp = 0; this.fb.fill(0); this.fl = 0;
+      for (const k in this.on) { this.on[k] = 0; this.a[k] = 0; }
+    }
+  }
+  capture(){
+    const sr = this.sr, hb = this.hb, H = hb.length;
+    const len = Math.min(H - 1, Math.max(sr * 0.05, (this.C['freeze.size'] || 0.6) * sr)) | 0;
+    for (let j = 0; j < len; j++) this.fb[j] = hb[(this.hw - len + j + H) % H];
+    this.fl = len;
+    this.G = Math.max(64, Math.min(sr * 0.1, len * 0.5)) | 0;
+    for (let g = 0; g < 4; g++) this.gs[g] = Math.random() * (len - this.G);
+  }
+  process(inputs, outputs){
+    const inp = inputs[0], out = outputs[0], n = out[0].length, sr = this.sr;
+    for (const k in this.T) this.C[k] += (this.T[k] - this.C[k]) * 0.2;
+    const P = this.C, on = this.on, a = this.a;
+    const L = inp && inp[0], R = inp && (inp[1] || inp[0]);
+    const gain = P['master.input'] ?? 1, vol = P['master.volume'] ?? 0.8;
+    const steps = Math.pow(2, (P['crush.bits'] ?? 8) - 1), rate = Math.max(1, P['crush.rate'] || 1), cmix = P['crush.mix'] ?? 1;
+    const rinc = (P['ring.freq'] || 200) / sr, rmix = P['ring.mix'] ?? 1;
+    const wh = this.wh !== null;
+    const ratio = Math.pow(2, (wh ? this.wh : (P['pitch.semi'] || 0)) / 12), pmix = wh ? 1 : (P['pitch.mix'] ?? 1);
+    const pOn = wh ? 1 : on.pitch, win = this.win;
+    const slice = Math.min(this.sb.length - 1, Math.max(32, (P['stutter.slice'] || 0.1) * sr)) | 0;
+    const reps = Math.round(P['stutter.rep'] || 2);
+    const eTarget = Math.min(this.eb.length - 2, Math.max(16, (P['echo.time'] || 0.4) * sr));
+    const efb = P['echo.fb'] ?? 0.4, emix = P['echo.mix'] ?? 0.5;
+    const drone = P['freeze.drone'] ?? 1;
+    const pb = this.pb, eb = this.eb, EL = eb.length, hb = this.hb, HL = hb.length, fb = this.fb;
+    const stActive = on.stutter || a.stutter > 1e-4;
+    if (!stActive) { this.ss = 0; this.sp = 0; }
+    let pkI = this.pkI, pkO = this.pkO;
+    for (let i = 0; i < n; i++) {
+      let x = 0;
+      if (L) x = this.chan === 'L' ? L[i] : this.chan === 'R' ? R[i] : (L[i] + (inp[1] ? inp[1][i] : 0));
+      x *= gain;
+      const ax = x < 0 ? -x : x; if (ax > pkI) pkI = ax;
+      a.crush += (on.crush - a.crush) * 0.003;
+      a.ring += (on.ring - a.ring) * 0.003;
+      a.pitch += (pOn - a.pitch) * 0.003;
+      a.stutter += (on.stutter - a.stutter) * 0.01;
+      a.echo += (on.echo - a.echo) * 0.003;
+      a.freeze += (on.freeze - a.freeze) * 0.0006;
+
+      // CRUSH: hold samples (lower rate), then chop to few levels (lower bits)
+      if (a.crush > 1e-4) {
+        if (++this.hc >= rate) { this.hc = 0; this.hold = x; }
+        const y = Math.round(this.hold * steps) / steps;
+        const w = a.crush * cmix; x = x * (1 - w) + y * w;
+      }
+      // RING: multiply by a sine wave
+      this.rph += rinc; if (this.rph >= 1) this.rph -= 1;
+      if (a.ring > 1e-4) {
+        const y = x * Math.sin(6.283185307 * this.rph);
+        const w = a.ring * rmix; x = x * (1 - w) + y * w;
+      }
+      // PITCH: two crossfading read heads on a short delay line
+      pb[this.pw] = x;
+      if (a.pitch > 1e-4) {
+        this.pph += (1 - ratio) / win; if (this.pph >= 1) this.pph -= 1; else if (this.pph < 0) this.pph += 1;
+        let ph = this.pph, ys = 0;
+        for (let t = 0; t < 2; t++) {
+          let rp = this.pw - (ph * win + 2); if (rp < 0) rp += 8192;
+          const i0 = rp | 0, fr = rp - i0, s = pb[i0 & 8191] * (1 - fr) + pb[(i0 + 1) & 8191] * fr;
+          const sw = Math.sin(3.141592653 * ph); ys += s * sw * sw;
+          ph += 0.5; if (ph >= 1) ph -= 1;
+        }
+        const w = a.pitch * pmix; x = x * (1 - w) + ys * w;
+      }
+      this.pw = (this.pw + 1) & 8191;
+      // STUTTER: grab a slice, repeat it, grab a new one
+      if (stActive) {
+        let y = x;
+        if (this.ss === 0) {
+          if (this.sp === 0) this.sl = slice;
+          this.sb[this.sp++] = x;
+          if (this.sp >= this.sl) { this.ss = 1; this.sp = 0; this.sn = 0; }
+        } else {
+          const e = Math.min(1, this.sp / 48, (this.sl - this.sp) / 48);
+          y = this.sb[this.sp++] * e;
+          if (this.sp >= this.sl) { this.sp = 0; if (++this.sn >= reps && reps < 9) this.ss = 0; }
+        }
+        x = x * (1 - a.stutter) + y * a.stutter;
+      }
+      // ECHO: tape-ish delay, warbles when you turn TIME, runs away above 100%
+      this.ed += (eTarget - this.ed) * 0.00015;
+      let rp = this.ew - this.ed; if (rp < 0) rp += EL;
+      const e0 = rp | 0, efr = rp - e0, e1 = e0 + 1 >= EL ? 0 : e0 + 1;
+      const d = eb[e0] * (1 - efr) + eb[e1] * efr;
+      this.elp += (d - this.elp) * 0.45;
+      eb[this.ew] = Math.tanh(x * a.echo + this.elp * efb);
+      if (++this.ew >= EL) this.ew = 0;
+      x += d * emix;
+      // FREEZE: keep history; when frozen, smear grains of it forever
+      hb[this.hw] = x; if (++this.hw >= HL) this.hw = 0;
+      if (a.freeze > 1e-4 && this.fl > 0) {
+        let fz = 0; const G = this.G;
+        for (let g = 0; g < 4; g++) {
+          const p = this.gp[g];
+          fz += fb[(this.gs[g] + p * G) | 0] * (0.5 - 0.5 * Math.cos(6.283185307 * p));
+          let np = p + 1 / G;
+          if (np >= 1) { np -= 1; this.gs[g] = Math.random() * (this.fl - G); }
+          this.gp[g] = np;
+        }
+        x += fz * 0.5 * a.freeze * drone;
+      }
+      const y = Math.tanh(x * vol);
+      const ay = y < 0 ? -y : y; if (ay > pkO) pkO = ay;
+      for (let c = 0; c < out.length; c++) out[c][i] = y;
+      if (this.rec) { this.rb[this.ri++] = y; if (this.ri >= this.rb.length) { this.port.postMessage({t:'rec', d:this.rb}); this.rb = new Float32Array(8192); this.ri = 0; } }
+    }
+    this.pkI = pkI; this.pkO = pkO;
+    if (++this.mc >= 12) { this.port.postMessage({t:'m', i:pkI, o:pkO}); this.mc = 0; this.pkI = 0; this.pkO = 0; }
+    return true;
+  }
+}
+registerProcessor('moe-fx', MoeFx);
+`;
+
+// ---------------------------------------------------------------- the pedals
+const pct = v => Math.round(v * 100) + '%';
+const ms = v => v < 1 ? Math.round(v * 1000) + 'ms' : v.toFixed(2) + 's';
+const PEDALS = [
+  {id:'crush', name:'CRUSH', sub:'Game Boy crunch', c:'#ff6fae', d:'#c2346f', knobs:[
+    {id:'bits', label:'CRUNCH', min:12, max:1.5, def:6, fmt:v => v.toFixed(1) + '-bit'},
+    {id:'rate', label:'DOWN', min:1, max:40, def:6, exp:1, fmt:v => '÷' + Math.round(v)},
+    {id:'mix', label:'MIX', min:0, max:1, def:1, fmt:pct}]},
+  {id:'ring', name:'RING', sub:'robot metal · bells', c:'#5ff0ff', d:'#1d8fb0', knobs:[
+    {id:'freq', label:'FREQ', min:20, max:3000, def:180, exp:1, fmt:v => Math.round(v) + 'Hz'},
+    {id:'mix', label:'MIX', min:0, max:1, def:1, fmt:pct}]},
+  {id:'pitch', name:'PITCH', sub:'chipmunk ↔ demon · MiniLab keys play it', c:'#c6ff4a', d:'#6fa41a', knobs:[
+    {id:'semi', label:'SHIFT', min:-24, max:24, def:12, step:1, fmt:v => (v > 0 ? '+' : '') + v},
+    {id:'mix', label:'MIX', min:0, max:1, def:1, fmt:pct}]},
+  {id:'stutter', name:'STUTTER', sub:'chops and repeats · top REPEAT = forever', c:'#ffb13b', d:'#d2661a', knobs:[
+    {id:'slice', label:'SLICE', min:0.02, max:0.8, def:0.12, exp:1, fmt:ms},
+    {id:'rep', label:'REPEAT', min:1, max:9, def:3, step:1, fmt:v => v >= 9 ? '∞' : '×' + v}]},
+  {id:'echo', name:'ECHO', sub:'tape repeats · FEEDBACK past 100% runs away', c:'#c79bff', d:'#6d3fc4', knobs:[
+    {id:'time', label:'TIME', min:0.03, max:1.5, def:0.38, exp:1, fmt:ms},
+    {id:'fb', label:'FEEDBACK', min:0, max:1.08, def:0.45, fmt:v => v > 1 ? '!!' + pct(v) : pct(v)},
+    {id:'mix', label:'MIX', min:0, max:1, def:0.5, fmt:pct}]},
+  {id:'freeze', name:'FREEZE', sub:'stomp to hold the sound forever', c:'#e8f6ff', d:'#86aac4', knobs:[
+    {id:'size', label:'GRAB', min:0.1, max:2, def:0.6, exp:1, fmt:ms},
+    {id:'drone', label:'DRONE', min:0, max:1.5, def:1, fmt:pct}]},
+];
+const MASTER = {id:'master', knobs:[
+  {id:'input', label:'INPUT', min:0, max:4, def:1, fmt:v => '×' + v.toFixed(1)},
+  {id:'volume', label:'VOLUME', min:0, max:1.5, def:0.8, fmt:pct}]};
+
+const PRESETS = {
+  'CLEAN': {},
+  'GHOST RADIO': {ring:{freq:420, mix:0.5}, echo:{time:0.6, fb:0.72, mix:0.55}},
+  'ROBOT MOE': {ring:{freq:110, mix:1}, crush:{bits:8, rate:3, mix:0.6}},
+  'CHIPMUNK': {pitch:{semi:12, mix:1}, echo:{time:0.09, fb:0.25, mix:0.3}},
+  'DEMON': {pitch:{semi:-12, mix:1}, crush:{bits:5, rate:2, mix:0.4}, echo:{time:0.25, fb:0.4, mix:0.35}},
+  'GAME BOY': {crush:{bits:3.5, rate:14, mix:1}},
+  'GLITCH RUSH': {stutter:{slice:0.08, rep:4}, crush:{bits:7, rate:4, mix:0.5}},
+  'FOREVER': {freeze:{size:1.4, drone:1}, echo:{time:0.9, fb:0.8, mix:0.5}},
+  'SPACE EGG': {pitch:{semi:7, mix:0.4}, echo:{time:0.55, fb:0.85, mix:0.6}, ring:{freq:900, mix:0.25}},
+};
+
+// ---------------------------------------------------------------- state
+const S = {n:{}, on:{}};
+const KN = {};            // 'crush.bits' -> {k, el}
+const KNOB_ORDER = [];    // order MiniLab knobs fill in
+const SWITCH_ORDER = PEDALS.map(p => 's:' + p.id).concat(['s:rec', 's:panic']);
+let node = null, ctx = null, stream = null, src = null, analyser = null;
+let map = {};             // midi key -> 's:crush' | 'k:crush.bits'
+let learnOn = false, picked = null;
+const store = {
+  get(k){ try { return JSON.parse(localStorage.getItem(k)); } catch (e) { return null; } },
+  set(k, v){ try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} },
+};
+
+const real = (k, n) => {
+  let v = k.exp ? k.min * Math.pow(k.max / k.min, n) : k.min + (k.max - k.min) * n;
+  if (k.step) v = Math.round(v / k.step) * k.step;
+  return v;
+};
+const norm = (k, v) => Math.min(1, Math.max(0, k.exp ? Math.log(v / k.min) / Math.log(k.max / k.min) : (v - k.min) / (k.max - k.min)));
+const send = m => { if (node) node.port.postMessage(m); };
+
+let saveT = 0;
+function saveSoon(){ clearTimeout(saveT); saveT = setTimeout(() => store.set('moepedal.knobs', S.n), 300); }
+
+function setKnob(id, n){
+  const o = KN[id]; if (!o) return;
+  n = Math.min(1, Math.max(0, n));
+  S.n[id] = n;
+  o.el.style.setProperty('--n', n);
+  const v = real(o.k, n);
+  o.out.textContent = o.k.fmt(v);
+  send({t:'p', k:id, v});
+  saveSoon();
+}
+function setOn(pid, v){
+  S.on[pid] = !!v;
+  document.getElementById('p-' + pid).classList.toggle('lit', !!v);
+  send({t:'on', k:pid, v:!!v});
+}
+
+// ---------------------------------------------------------------- build the board
+function knobEl(prefix, k){
+  const id = prefix + '.' + k.id;
+  const el = document.createElement('div');
+  el.className = 'knob';
+  el.innerHTML = `<div class="ring"><div class="cap"><i></i></div></div><label>${k.label}</label><output></output>`;
+  KN[id] = {k, el, out:el.querySelector('output')};
+  KNOB_ORDER.push(id);
+  let y0 = 0, n0 = 0;
+  el.addEventListener('pointerdown', e => {
+    if (learnOn) { pick('k:' + id, el); return; }
+    el.setPointerCapture(e.pointerId); y0 = e.clientY; n0 = S.n[id];
+  });
+  el.addEventListener('pointermove', e => {
+    if (!el.hasPointerCapture(e.pointerId)) return;
+    setKnob(id, n0 + (y0 - e.clientY) * (e.shiftKey ? 0.001 : 0.005));
+  });
+  el.addEventListener('wheel', e => { e.preventDefault(); setKnob(id, S.n[id] - e.deltaY * 0.0015); }, {passive:false});
+  el.addEventListener('dblclick', () => setKnob(id, norm(k, k.def)));
+  return el;
+}
+
+const board = document.getElementById('board');
+PEDALS.forEach((p, i) => {
+  const el = document.createElement('section');
+  el.className = 'pedal'; el.id = 'p-' + p.id;
+  el.style.setProperty('--c', p.c); el.style.setProperty('--d', p.d);
+  el.innerHTML = `<div class="led"></div><div class="knobs"></div><h2>${p.name}</h2><p>${p.sub}</p>
+    <button class="stomp" title="Stomp (key ${i + 1})" aria-label="Turn ${p.name} on or off"></button>`;
+  if (p.id === 'pitch') el.insertAdjacentHTML('beforeend', '<div class="whammy" id="whTag"></div>');
+  p.knobs.forEach(k => el.querySelector('.knobs').appendChild(knobEl(p.id, k)));
+  const st = el.querySelector('.stomp');
+  st.addEventListener('click', () => { if (learnOn) pick('s:' + p.id, st); else setOn(p.id, !S.on[p.id]); });
+  board.appendChild(el);
+  S.on[p.id] = false;
+});
+const masterEl = document.getElementById('master');
+MASTER.knobs.map(k => knobEl('master', k)).reverse().forEach(el => masterEl.prepend(el));
+
+const savedKnobs = store.get('moepedal.knobs') || {};
+for (const id in KN) setKnob(id, typeof savedKnobs[id] === 'number' ? savedKnobs[id] : norm(KN[id].k, KN[id].k.def));
+map = store.get('moepedal.map') || {};
+
+const presetsEl = document.getElementById('presets');
+for (const name in PRESETS) {
+  const b = document.createElement('button');
+  b.className = 'btn'; b.textContent = name;
+  b.onclick = () => applyPreset(name);
+  presetsEl.appendChild(b);
+}
+function applyPreset(name){
+  const pr = PRESETS[name];
+  PEDALS.forEach(p => {
+    const vals = pr[p.id];
+    p.knobs.forEach(k => setKnob(p.id + '.' + k.id, norm(k, vals && k.id in vals ? vals[k.id] : k.def)));
+    setOn(p.id, !!vals);
+  });
+  toast(name);
+}
+
+// ---------------------------------------------------------------- buttons
+const learnBtn = document.getElementById('learnBtn'), recBtn = document.getElementById('recBtn');
+function setLearn(v){
+  learnOn = v; document.body.classList.toggle('learn', v); learnBtn.classList.toggle('on', v);
+  if (picked) { picked.el.classList.remove('picked'); picked = null; }
+  if (v) toast('Click a knob or switch, then move a MiniLab knob or hit a pad');
+}
+learnBtn.onclick = () => setLearn(!learnOn);
+function pick(target, el){
+  if (picked) picked.el.classList.remove('picked');
+  picked = {target, el}; el.classList.add('picked');
+}
+recBtn.onclick = () => { if (learnOn) pick('s:rec', recBtn); else toggleRec(); };
+document.getElementById('panicBtn').onclick = e => { if (learnOn) pick('s:panic', e.currentTarget); else panic(); };
+document.getElementById('resetMap').onclick = () => { map = {}; store.set('moepedal.map', map); toast('Forgot every knob and pad. Move them again to re-grab.'); };
+document.getElementById('chanSel').onchange = e => { send({t:'chan', v:e.target.value}); store.set('moepedal.chan', e.target.value); };
+const savedChan = store.get('moepedal.chan'); if (savedChan) document.getElementById('chanSel').value = savedChan;
+
+function panic(){
+  send({t:'panic'});
+  PEDALS.forEach(p => setOn(p.id, false));
+  toast('🤫 silence');
+}
+document.addEventListener('keydown', e => {
+  if (e.target.tagName === 'SELECT') return;
+  const i = +e.key - 1;
+  if (i >= 0 && i < PEDALS.length) setOn(PEDALS[i].id, !S.on[PEDALS[i].id]);
+  if (e.key === 'Escape') setLearn(false);
+});
+
+let toastT = 0;
+function toast(msg){
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('show'), 2200);
+}
+
+// ---------------------------------------------------------------- recording (WAV so GarageBand opens it)
+let recChunks = [], recOn = false, recLen = 0;
+function toggleRec(){
+  if (!node) return toast('Press START first');
+  recOn = !recOn; recBtn.classList.toggle('on', recOn);
+  recBtn.textContent = recOn ? '■ STOP' : '● REC';
+  if (recOn) { recChunks = []; recLen = 0; }
+  send({t:'rec', v:recOn});
+  if (!recOn) setTimeout(finishRec, 150);
+}
+function finishRec(){
+  if (!recLen) return;
+  const sr = ctx.sampleRate, buf = new ArrayBuffer(44 + recLen * 2), v = new DataView(buf);
+  const w = (o, s) => { for (let i = 0; i < s.length; i++) v.setUint8(o + i, s.charCodeAt(i)); };
+  w(0, 'RIFF'); v.setUint32(4, 36 + recLen * 2, true); w(8, 'WAVE'); w(12, 'fmt ');
+  v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, 1, true);
+  v.setUint32(24, sr, true); v.setUint32(28, sr * 2, true); v.setUint16(32, 2, true); v.setUint16(34, 16, true);
+  w(36, 'data'); v.setUint32(40, recLen * 2, true);
+  let o = 44;
+  for (const c of recChunks) for (let i = 0; i < c.length; i++, o += 2) v.setInt16(o, Math.max(-1, Math.min(1, c[i])) * 32767, true);
+  const url = URL.createObjectURL(new Blob([buf], {type:'audio/wav'}));
+  const d = new Date(), stamp = [d.getHours(), d.getMinutes(), d.getSeconds()].map(x => String(x).padStart(2, '0')).join('');
+  const a = document.createElement('a');
+  a.href = url; a.download = 'moepedal-' + stamp + '.wav';
+  a.textContent = '⬇ ' + a.download + ' (' + (recLen / sr).toFixed(1) + 's)';
+  document.getElementById('recs').prepend(a);
+  recChunks = []; recLen = 0;
+}
+
+// ---------------------------------------------------------------- audio in/out
+const inSel = document.getElementById('inSel'), outSel = document.getElementById('outSel');
+const IS_FAST = /fast ?track|m-?audio/i;
+
+async function openInput(deviceId){
+  if (stream) stream.getTracks().forEach(t => t.stop());
+  if (src) src.disconnect();
+  stream = await navigator.mediaDevices.getUserMedia({audio:{
+    deviceId: deviceId ? {exact:deviceId} : undefined,
+    echoCancellation:false, noiseSuppression:false, autoGainControl:false,
+    channelCount:{ideal:2}, latency:{ideal:0}}});
+  src = ctx.createMediaStreamSource(stream);
+  src.connect(node);
+  const tr = stream.getAudioTracks()[0], set = tr.getSettings();
+  const chanSel = document.getElementById('chanSel');
+  if (set.channelCount === 1) { chanSel.value = 'both'; chanSel.disabled = true; send({t:'chan', v:'both'}); }
+  else { chanSel.disabled = false; send({t:'chan', v:chanSel.value}); }
+  return tr.label;
+}
+
+async function listDevices(currentLabel){
+  const devs = await navigator.mediaDevices.enumerateDevices();
+  inSel.innerHTML = ''; outSel.innerHTML = '<option value="">Mac default</option>';
+  devs.filter(d => d.kind === 'audioinput').forEach(d => {
+    const o = new Option(d.label || 'input', d.deviceId); if (d.label === currentLabel) o.selected = true; inSel.add(o);
+  });
+  devs.filter(d => d.kind === 'audiooutput' && d.deviceId !== 'default').forEach(d => outSel.add(new Option(d.label || 'output', d.deviceId)));
+  return devs;
+}
+
+document.getElementById('start').onclick = async () => {
+  try {
+    ctx = new AudioContext({latencyHint:'interactive'});
+    const url = URL.createObjectURL(new Blob([FX_CODE], {type:'application/javascript'}));
+    await ctx.audioWorklet.addModule(url);
+    node = new AudioWorkletNode(ctx, 'moe-fx', {numberOfInputs:1, numberOfOutputs:1, outputChannelCount:[2],
+      channelCount:2, channelCountMode:'explicit', channelInterpretation:'discrete'});
+    analyser = ctx.createAnalyser(); analyser.fftSize = 1024;
+    node.connect(analyser); analyser.connect(ctx.destination);
+    node.port.onmessage = e => onEngine(e.data);
+    for (const id in KN) send({t:'p', k:id, v:real(KN[id].k, S.n[id])});
+    for (const id in S.on) send({t:'on', k:id, v:S.on[id]});
+
+    let label = await openInput(store.get('moepedal.in') || undefined).catch(() => openInput());
+    const devs = await listDevices(label);
+    if (!IS_FAST.test(label)) {
+      const fast = devs.find(d => d.kind === 'audioinput' && IS_FAST.test(d.label));
+      if (fast) { label = await openInput(fast.deviceId); inSel.value = fast.deviceId; }
+    }
+    const fastOut = devs.find(d => d.kind === 'audiooutput' && IS_FAST.test(d.label));
+    const outId = store.get('moepedal.out') ?? (fastOut ? fastOut.deviceId : '');
+    if (outId && ctx.setSinkId) { try { await ctx.setSinkId(outId); outSel.value = outId; } catch (e) {} }
+
+    document.getElementById('intro').remove();
+    toast('🎸 ' + (IS_FAST.test(label) ? 'M-Audio found' : 'Listening to: ' + label));
+    startMidi();
+    drawScope();
+    watchSignal();
+  } catch (err) {
+    document.getElementById('browserWarn').textContent = "Couldn't start: " + err.message +
+      '. If Chrome blocked the microphone, click the 🎤 icon in the address bar and allow it.';
+  }
+};
+inSel.onchange = async () => { const l = await openInput(inSel.value); store.set('moepedal.in', inSel.value); toast('🎸 ' + l); };
+outSel.onchange = async () => {
+  if (!ctx.setSinkId) return toast("This browser can't pick an output. Use the Mac's Sound settings.");
+  try { await ctx.setSinkId(outSel.value); store.set('moepedal.out', outSel.value); toast('🎧 ' + outSel.selectedOptions[0].text); }
+  catch (e) { toast("Couldn't switch output"); }
+};
+
+const mIn = document.getElementById('mIn'), mOut = document.getElementById('mOut');
+let maxIn = 0;
+function onEngine(m){
+  if (m.t === 'm') {
+    mIn.style.width = Math.min(100, Math.sqrt(m.i) * 100) + '%';
+    mOut.style.width = Math.min(100, Math.sqrt(m.o) * 100) + '%';
+    if (m.i > maxIn) maxIn = m.i;
+  } else if (m.t === 'rec') {
+    recChunks.push(m.d); recLen += m.d.length;
+    if (recLen > ctx.sampleRate * 300) { toggleRec(); toast('Recording stopped at 5 minutes'); }
+  }
+}
+function watchSignal(){
+  setTimeout(() => {
+    if (maxIn < 0.003) {
+      const b = document.getElementById('nosig');
+      b.style.display = 'block';
+      b.textContent = "No sound is coming in yet. Check: IN is the M-Audio · JACK is set to \"right (guitar)\" or \"both\" · " +
+        "the M-Audio's gain knob (on its side) is turned up · the guitar's volume knob is up.";
+      const hide = setInterval(() => { if (maxIn > 0.01) { b.style.display = 'none'; clearInterval(hide); } }, 500);
+    }
+  }, 6000);
+}
+
+const scope = document.getElementById('scope'), sc = scope.getContext('2d');
+const wave = new Float32Array(1024);
+function drawScope(){
+  requestAnimationFrame(drawScope);
+  analyser.getFloatTimeDomainData(wave);
+  sc.fillStyle = '#000'; sc.fillRect(0, 0, scope.width, scope.height);
+  sc.strokeStyle = '#3dff8a'; sc.lineWidth = 2; sc.beginPath();
+  for (let i = 0; i < wave.length; i += 2) {
+    const x = i / wave.length * scope.width, y = scope.height / 2 - wave[i] * scope.height * 0.45;
+    i ? sc.lineTo(x, y) : sc.moveTo(x, y);
+  }
+  sc.stroke();
+}
+
+// ---------------------------------------------------------------- MIDI: MiniLab + ControlPad
+const devEls = {};
+const held = [];
+const IS_PAD = /controlpad|alesis/i;
+
+async function startMidi(){
+  if (!navigator.requestMIDIAccess) { setDevs(['open in Chrome for controllers']); return; }
+  try {
+    const acc = await navigator.requestMIDIAccess();
+    const hook = () => {
+      const names = [];
+      acc.inputs.forEach(inp => { inp.onmidimessage = e => onMidi(e.data, inp.name); names.push(inp.name); });
+      setDevs(names.length ? names : ['no controllers plugged in']);
+    };
+    acc.onstatechange = hook; hook();
+  } catch (e) { setDevs(['MIDI blocked']); }
+}
+function setDevs(names){
+  const box = document.getElementById('midiDevs'); box.innerHTML = '';
+  names.forEach(n => { const s = document.createElement('span'); s.className = 'dev'; s.textContent = n.replace(/\s*(MIDI|Port)\s*\d*$/i, ''); box.appendChild(s); devEls[n] = s; });
+}
+function flash(name){
+  const el = devEls[name]; if (!el) return;
+  el.classList.add('hit'); clearTimeout(el._t); el._t = setTimeout(() => el.classList.remove('hit'), 80);
+}
+
+function onMidi(data, dev){
+  const st = data[0], type = st & 0xf0, ch = st & 0x0f, d1 = data[1], d2 = data[2];
+  if (type < 0x80 || type > 0xE0) return;
+  flash(dev);
+  if (type === 0xB0) control(dev + '|cc:' + ch + ':' + d1, d2 / 127, true);
+  else if (type === 0xE0) control(dev + '|pb:' + ch, ((d2 << 7) | d1) / 16383, false);
+  else if (type === 0x90 && d2 > 0) noteOn(dev, ch, d1);
+  else if (type === 0x80 || type === 0x90) noteOff(dev, ch, d1);
+}
+
+function bind(key, target){
+  for (const k in map) if (map[k] === target) delete map[k];
+  map[key] = target; store.set('moepedal.map', map);
+  toast('✔ ' + niceName(target));
+}
+function niceName(t){
+  if (t.startsWith('k:')) { const [p, k] = t.slice(2).split('.'); return (p === 'master' ? '' : p.toUpperCase() + ' ') + KN[t.slice(2)].k.label; }
+  return {rec:'RECORD', panic:'SILENCE'}[t.slice(2)] || t.slice(2).toUpperCase() + ' switch';
+}
+function nextFree(order){ const used = new Set(Object.values(map)); return order.find(t => !used.has(t)); }
+
+function learnTake(key){
+  if (!learnOn || !picked) return false;
+  bind(key, picked.target);
+  picked.el.classList.remove('picked'); picked = null;
+  return true;
+}
+function control(key, v, autoGrab){
+  if (learnTake(key)) return;
+  let t = map[key];
+  if (!t && autoGrab && !learnOn) { t = nextFree(KNOB_ORDER.map(id => 'k:' + id)); if (t) bind(key, t); }
+  if (!t) return;
+  if (t.startsWith('k:')) setKnob(t.slice(2), v);
+  else if (v >= 0.5) fire(t);
+}
+function fire(t){
+  const id = t.slice(2);
+  if (id === 'rec') toggleRec();
+  else if (id === 'panic') panic();
+  else setOn(id, !S.on[id]);
+}
+function noteOn(dev, ch, note){
+  const key = dev + '|note:' + ch + ':' + note;
+  if (learnTake(key)) return;
+  const pad = IS_PAD.test(dev) || ch === 9 || map[key];
+  if (pad) {
+    let t = map[key];
+    if (!t && !learnOn) { t = nextFree(SWITCH_ORDER); if (t) bind(key, t); else return; }
+    if (t) t.startsWith('k:') ? setKnob(t.slice(2), S.n[t.slice(2)] > 0.5 ? 0 : 1) : fire(t);
+    return;
+  }
+  // MiniLab keys: whammy the PITCH pedal while held
+  held.push(note); whammy();
+}
+function noteOff(dev, ch, note){
+  const i = held.indexOf(note); if (i < 0) return;
+  held.splice(i, 1); whammy();
+}
+function whammy(){
+  const ped = document.getElementById('p-pitch'), tag = document.getElementById('whTag');
+  if (!held.length) { send({t:'wh', v:null}); ped.classList.remove('wh'); ped.classList.toggle('lit', S.on.pitch); return; }
+  const s = Math.max(-24, Math.min(24, held[held.length - 1] - 60));
+  send({t:'wh', v:s}); ped.classList.add('wh', 'lit'); tag.textContent = 'KEY ' + (s > 0 ? '+' : '') + s;
+}
+
+if (!window.AudioWorkletNode) document.getElementById('browserWarn').textContent = 'This browser is too old for MoePedal. Use Chrome.';
+else if (!navigator.requestMIDIAccess) document.getElementById('browserWarn').textContent = "Heads up: this browser can't read the MiniLab or ControlPad. Sound works, but open it in Chrome for the controllers.";
+</script>
+</body>
+</html>

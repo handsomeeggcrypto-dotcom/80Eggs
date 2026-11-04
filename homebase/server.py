@@ -40,6 +40,8 @@ PROJECTS = [
      "server": {"cmd": ["python3", "nap_time/serve.py"], "port": 8177}},
     {"id": "moemode", "name": "MoeMode", "blurb": "What should I do right now? Quests, brain dump, WHAT NOW.",
      "path": "moemode", "open": "moemode/", "live": "/moemode/", "status": "hidden", "icon": "moemode/icon.png"},
+    {"id": "moepedal", "name": "MoePedal", "blurb": "The Mac as a guitar effects pedal. M-Audio in, MiniLab knobs, ControlPad footswitches. Chrome only.",
+     "path": "moepedal", "open": "moepedal/", "live": "/moepedal/", "status": "hidden", "icon": "🎸"},
     {"id": "yolk", "name": "YOLK", "blurb": "The egg AI. Desktop terminal, Daily, check-ins, tablet Station.",
      "path": "yolk", "open": None, "live": None, "status": "local", "icon": "🍳",
      "server": {"cmd": ["python3", "yolk/server.py"], "port": 8008}},
