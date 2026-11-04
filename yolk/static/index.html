@@ -71,6 +71,9 @@
   .moe .tier { display: inline-block; padding: 0 8px; color: var(--bg); }
   .moe ul { list-style: none; padding: 0; margin: 8px 0 0; font-size: 22px; }
   .moe li span { color: var(--dim); }
+  .notes { list-style: none; padding: 0; margin: 18px 0 0; font-size: 22px; max-height: 40vh; overflow-y: auto; }
+  .notes li { margin-bottom: 6px; }
+  .notes li span { color: var(--dim); }
 
   .stats { margin-top: 18px; }
   .stats .days { display: flex; gap: 10px; margin-bottom: 14px; }
@@ -357,6 +360,38 @@ async function aboutShell() {
   if (state.queued) { await say(`i'm holding ${state.queued} dream${state.queued > 1 ? "s" : ""} for SHELL until it plugs in.`, "dream"); await next(); }
 }
 
+// her shared journal (yolk/journal.py): what she remembers from every body, and forgetting
+async function memories() {
+  let notes = [];
+  try { notes = (await api("/api/journal")).notes || []; } catch (e) { }
+  if (!notes.length) {
+    await say("nothing yet. talk to me, here or on the station, and i'll keep what matters. everywhere.", "sus");
+    await next();
+    return;
+  }
+  const esc = t => t.replace(/[&<>]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" })[c]);
+  const show = () => {
+    $("extra").innerHTML = `<ul class="notes">${notes.slice().reverse().map(n =>
+      `<li>${esc(n.note)} <span>· ${n.when}, ${n.place}</span></li>`).join("")}</ul>`;
+  };
+  show();
+  await say(`${notes.length} thing${notes.length > 1 ? "s" : ""}. the mac, the station and SHELL all know them. one memory. mine.`, "dream");
+  while (true) {
+    const c = await choose(["forget something", "that's enough"]);
+    if (c !== 0) break;
+    const recent = notes.slice(-12).reverse();
+    await say("which one. i'll cross it out everywhere.", "sus");
+    const f = await choose(recent.map(n => n.note.length > 60 ? n.note.slice(0, 57) + "..." : n.note).concat(["never mind"]));
+    if (f >= recent.length) continue;
+    await api("/api/forget", { id: recent[f].id });
+    notes = notes.filter(n => n.id !== recent[f].id);
+    show();
+    await say(pick(["gone. i never heard it.", "forgotten. it hurt a little.", "crossed out. SHELL will forget it next time it plugs in."]), "ok");
+    if (!notes.length) break;
+  }
+  $("extra").innerHTML = "";
+}
+
 // real-AI YOLK (yolk/chat.py), typed; "never mind" or an empty line goes back to the menu
 async function talk() {
   await say(pick(["ok. type to me. i'm listening.", "go ahead. i read fast.", "talk. i'm all yolk."]), "good");
@@ -386,7 +421,8 @@ async function main() {
   await remember({ desk_visits: num("desk_visits") + 1 });
 
   const topics = ["talk to me", "how are you?", "how am i doing?", "ask the oracle", "tell me a secret", "let's talk moes",
-                  "leave SHELL a dream", "remind me tomorrow", "edit my habits", "how's SHELL?", "pair a tablet", "bye, yolk"];
+                  "leave SHELL a dream", "remind me tomorrow", "edit my habits", "how's SHELL?", "pair a tablet",
+                  "what do you remember?", "bye, yolk"];
   while (true) {
     await say(pick(["what do you want to talk about?", "so.", "anything else?", "i'm listening."]), mood);
     const c = await choose(topics);
@@ -401,6 +437,7 @@ async function main() {
     else if (c === 8) await editHabits();
     else if (c === 9) await aboutShell();
     else if (c === 10) await pairTablet();
+    else if (c === 11) await memories();
     else { await say(pick(L.goodbye), num("affection") >= 10 ? "love" : "ok"); await remember({}); await choose(["wake YOLK again"]); }
     await remember({ affection: num("affection") + 1 });
   }

@@ -10,6 +10,9 @@ tablet speaks the answer with /api/say.
 The desktop terminal (localhost:8008) has "talk to me" too, typed instead of spoken.
   python3 yolk/chat.py --cost       what talking has cost, per day and this month
 
+Everything she's told goes in one shared memory (journal.py), so the Mac, the
+Station and SHELL all know it.
+
 Her brain is one word in yolk/data/talk.json:  {"brain": "opus"}
   opus = smartest (default), sonnet = in between, haiku = fastest and cheapest.
 Change it and restart the server. Every reply's cost goes in data/talk_cost.txt.
@@ -29,6 +32,7 @@ HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 import ai  # noqa: E402  (API key)
 import server  # noqa: E402  (memory, check-ins, meditation, ambient)
+import journal  # noqa: E402  (her shared memory)
 
 DATA = HERE / "data"
 SETTINGS = DATA / "talk.json"
@@ -44,6 +48,7 @@ BRAINS = {
 }
 FORGET_AFTER = 10 * 60      # a new conversation after 10 quiet minutes
 MAX_TURNS = 20              # older turns drop off so a long chat doesn't get pricey
+NOTE_AFTER = 2 * 60         # after 2 quiet minutes she writes down what's worth keeping (journal.py)
 
 PLACES = {
     "station": "Right now you're on the Station, the old Samsung tablet. Your owner is talking to you out "
@@ -129,11 +134,44 @@ def details(where="station"):
     text += "\n\nYour oracle answers:\n" + "\n".join(f"- {x}" for x in oracle)
     if amb.get("daily"):
         text += "\n\nToday's YOLK Daily briefing (you already read it to them):\n" + amb["daily"]
+    text += "\n\n" + journal.for_prompt()
     return text
 
 
 _lock = threading.Lock()
 _convos = {}          # one conversation per place: "station", "desk"
+_watcher = []
+
+
+def _note(where, msgs):
+    try:
+        journal.take_notes(msgs, where)
+    except Exception as e:
+        print("YOLK couldn't write in her journal:", e)
+
+
+def _watch():
+    """Every half minute: any conversation quiet for NOTE_AFTER goes in the journal."""
+    while True:
+        time.sleep(30)
+        due = []
+        with _lock:
+            for where, c in _convos.items():
+                if c.get("unnoted") and time.time() - c["last"] > NOTE_AFTER:
+                    due.append((where, c["unnoted"]))
+                    c["unnoted"] = []
+        for where, msgs in due:
+            _note(where, msgs)
+
+
+def note_now():
+    """Writes down everything not yet in the journal, right away (for the command line)."""
+    with _lock:
+        due = [(w, c["unnoted"]) for w, c in _convos.items() if c.get("unnoted")]
+        for c in _convos.values():
+            c["unnoted"] = []
+    for where, msgs in due:
+        _note(where, msgs)
 
 
 def log_cost(brain, usage):
@@ -155,9 +193,14 @@ def reply(text, new=False, where="station"):
     brain = settings()["brain"]
     model = BRAINS[brain][0]
     with _lock:
-        _convo = _convos.setdefault(where, {"messages": [], "system": "", "last": 0})
+        if not _watcher:
+            _watcher.append(threading.Thread(target=_watch, daemon=True))
+            _watcher[0].start()
+        _convo = _convos.setdefault(where, {"messages": [], "system": "", "last": 0, "unnoted": []})
         if new or time.time() - _convo["last"] > FORGET_AFTER:
-            _convo["messages"], _convo["system"] = [], details(where)
+            if _convo["unnoted"]:      # the last conversation goes in the journal first
+                threading.Thread(target=_note, args=(where, _convo["unnoted"]), daemon=True).start()
+            _convo["messages"], _convo["system"], _convo["unnoted"] = [], details(where), []
         msgs = _convo["messages"] + [{"role": "user", "content": text}]
         msgs = msgs[-MAX_TURNS * 2 + 1:]
         if msgs[0]["role"] != "user":
@@ -179,6 +222,7 @@ def reply(text, new=False, where="station"):
             answer = " ".join(b.text for b in response.content if b.type == "text").strip()
             answer = re.sub(r"[*_#`]", "", answer) or "..."
         _convo["messages"] = msgs + [{"role": "assistant", "content": answer}]
+        _convo["unnoted"] += [{"role": "user", "content": text}, {"role": "assistant", "content": answer}]
         _convo["last"] = time.time()
     return answer
 
@@ -235,5 +279,6 @@ if __name__ == "__main__":
         print(cost_report())
     elif len(sys.argv) > 1:
         print(reply(" ".join(sys.argv[1:]), new=True, where="desk"))
+        note_now()
     else:
         print(__doc__)

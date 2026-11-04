@@ -2,7 +2,10 @@
      spin   pick a reply      select   choose / skip ahead
      menu   say goodbye
 
-     YOLK remembers things in /YOLK/memory.txt. Extra lines can be dropped into
+     YOLK remembers things in /YOLK/memory.txt. /YOLK/remember.txt holds the newest
+     notes from her shared journal (what you told her on the Mac or the Station),
+     one per line "id|where|note", rewritten by the Mac on every sync.
+     Extra lines can be dropped into
      /YOLK/dreams.txt (one per line: "dream: ...", "secret: ...", "oracle: ...")
      and YOLK picks them up next time. ]]
 
@@ -99,6 +102,18 @@ local function load_dreams()
         if kind == "dream" then DREAMS[#DREAMS + 1] = text
         elseif kind == "secret" then SECRETS[#SECRETS + 1] = text
         elseif kind == "oracle" then ORACLE[#ORACLE + 1] = text end
+    end
+    f:close()
+end
+
+-- her journal: things you told her on her other bodies (newest last)
+local NOTES = {}
+local function load_notes()
+    local f = io.open(DIR .. "remember.txt", "r")
+    if not f then return end
+    for line in f:lines() do
+        local id, where, note = line:match("^(%d+)|([^|]*)|(.+)$")
+        if id then NOTES[#NOTES + 1] = { id = tonumber(id), where = where, note = note } end
     end
     f:close()
 end
@@ -369,6 +384,25 @@ local function greet()
         say("i had a dream while i was charging.", "dream")
         say(DREAMS[seen + 1], "dream")
         mem.dreams_seen = seen + 1
+    end
+    -- the newest note she hasn't brought up here yet: one memory, every body
+    local newest = NOTES[#NOTES]
+    if newest and newest.id > num("notes_seen") then
+        say("you told me something on " .. newest.where .. ". i kept it.", "love")
+        say(newest.note, "good")
+        mem.notes_seen = newest.id
+    end
+end
+
+local function recall()
+    if #NOTES == 0 then
+        say("nothing yet. talk to me on the mac or the station and i'll carry it here.", "sus")
+        return
+    end
+    say(pick({ "everything. but here's some.", "i remember all of you. everywhere.", "let me look inside myself." }), "dream")
+    local first = math.max(1, #NOTES - 2)
+    for i = #NOTES, first, -1 do
+        if not say(NOTES[i].note, pick({ "good", "love", "sus" })) then return end
     end
 end
 
@@ -644,6 +678,7 @@ end
 math.randomseed(rb.current_tick() + (os.time and os.time() or 0))
 load_mem()
 load_dreams()
+load_notes()
 YOLK_ON_USB = function()  -- keep what YOLK learned if you plug in mid-chat
     mem.last_seen = os.time and os.time() or 0
     save_mem()
@@ -663,11 +698,11 @@ end
 if not mem.name then intro() else greet() end
 
 local topics = { "check in", "how are you?", "what's today?", "my week", "ask the oracle", "tell me a secret",
-                 "what am i listening to?", "let's talk moes", "bye, yolk" }
+                 "what am i listening to?", "let's talk moes", "what do you remember?", "bye, yolk" }
 while true do
     local c = choose(pick({ "what do you want to talk about?", "so.", "anything else?", "i'm listening." }),
                      mood_face(), topics)
-    if c == nil or c == 9 then goodbye(); break
+    if c == nil or c == 10 then goodbye(); break
     elseif c == 1 then checkin()
     elseif c == 2 then how_are_you()
     elseif c == 3 then today()
@@ -675,7 +710,8 @@ while true do
     elseif c == 5 then oracle()
     elseif c == 6 then say(pick(SECRETS), pick({ "sus", "ok", "shock" }))
     elseif c == 7 then music()
-    elseif c == 8 then moes() end
+    elseif c == 8 then moes()
+    elseif c == 9 then recall() end
     mem.affection = num("affection") + 1
 end
 

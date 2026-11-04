@@ -9,7 +9,8 @@ Anything not on this Mac must pair first with the code in data/station.json
 
 Memory lives in yolk/data/memory.txt (same key=value format as SHELL's
 /YOLK/memory.txt). Whenever SHELL is plugged in, the two memories are merged
-and any dreams left for SHELL are written to its /YOLK/dreams.txt.
+(see merge), her journal's newest notes go to /YOLK/remember.txt, and any
+dreams left for SHELL are written to its /YOLK/dreams.txt.
 Listens on the home network so the tablet can connect; other devices get only
 the pairing page until they enter the code.
 """
@@ -90,16 +91,40 @@ def stamp(mem):
 COUNTERS = ("visits", "desk_visits", "affection", "dreams_seen")
 
 
-def merge(desk, shell):
-    """Whichever side was used most recently wins on shared keys; counters only go up."""
+MERGED = DATA / "memory_synced.txt"   # what both sides agreed on at the last sync
+
+
+def merge(desk, shell, base=None):
+    """Combines the Mac's and SHELL's memories so neither side's changes get lost.
+
+    `base` is what both had after the last sync. A key changed on only one side
+    takes that side's value; changed on both, the side used most recently wins.
+    Counters add up what each side added since then. With no base (the first
+    sync), the most recent side wins and counters take the higher number."""
     newer, older = (shell, desk) if stamp(shell) > stamp(desk) else (desk, shell)
-    out = dict(older)
-    out.update(newer)
-    for k in COUNTERS:
-        vals = [int(m[k]) for m in (desk, shell) if str(m.get(k, "")).isdigit()]
-        if vals:
-            out[k] = str(max(vals))
-    return out
+    if base is None:
+        out = dict(older)
+        out.update(newer)
+        for k in COUNTERS:
+            vals = [int(m[k]) for m in (desk, shell) if str(m.get(k, "")).isdigit()]
+            if vals:
+                out[k] = str(max(vals))
+        return out
+    out = {}
+    for k in set(desk) | set(shell):
+        d, s, b = desk.get(k), shell.get(k), base.get(k)
+        if k in COUNTERS:
+            n = lambda v: int(v) if str(v or "").isdigit() else 0
+            out[k] = str(max(n(b) + (n(d) - n(b)) + (n(s) - n(b)), n(d), n(s)))
+        elif k == "last_seen":
+            out[k] = str(max(stamp(desk), stamp(shell)))
+        elif d == s or s == b:
+            out[k] = d if d is not None else s
+        elif d == b:
+            out[k] = s if s is not None else d
+        else:
+            out[k] = newer.get(k, older.get(k))
+    return {k: v for k, v in out.items() if v is not None}
 
 
 # ------------------------------------------------------------------ check-ins
@@ -213,9 +238,12 @@ def sync():
     if not shell_connected():
         return desk, False
     shell = read_mem(SHELL / "memory.txt")
-    mem = merge(desk, shell)
+    mem = merge(desk, shell, read_mem(MERGED) if MERGED.exists() else None)
     write_mem(MEMORY, mem)
     write_mem(SHELL / "memory.txt", mem)
+    write_mem(MERGED, mem)
+    import journal                      # her notes from the Mac and the Station
+    journal.deliver(SHELL)
     # check-ins: union of both sides (newest wins per day), kept on both, so the
     # Mac also holds a backup for after SHELL's storage swap
     log = read_log(LOG)
@@ -423,6 +451,13 @@ class Handler(BaseHTTPRequestHandler):
             queued = [l for l in QUEUE.read_text(encoding="utf-8").splitlines() if l.strip()] if QUEUE.exists() else []
             return self.send(200, {"memory": mem, "shell": connected, "queued": len(queued),
                                    "battery": mac_battery(), "now": int(time.time())})
+        if path == "/api/journal":            # what she remembers; personal, so this Mac only
+            if self.client_address[0] not in ("127.0.0.1", "::1"):
+                return self.send(403, {"error": "only on the mac"})
+            import journal
+            return self.send(200, {"notes": [dict(n, when=journal.when(n["t"]),
+                                                  place=journal.PLACES.get(n["where"], n["where"]))
+                                             for n in journal.read()]})
         if path == "/api/stats":
             return self.send(200, {**stats(), "meditation": meditation_stats()})
         if path == "/api/lines":
@@ -500,6 +535,13 @@ class Handler(BaseHTTPRequestHandler):
             write_mem(MEMORY, mem)
             mem, connected = sync()
             return self.send(200, {"memory": mem, "shell": connected})
+        if path == "/api/forget":
+            if self.client_address[0] not in ("127.0.0.1", "::1"):
+                return self.send(403, {"error": "only on the mac"})
+            import journal
+            notes = journal.change(forget=[data.get("id")])
+            sync()
+            return self.send(200, {"left": len(notes)})
         if path == "/api/meditate":
             mins = int(data.get("minutes", 0) or 0)
             if not 1 <= mins <= 180:

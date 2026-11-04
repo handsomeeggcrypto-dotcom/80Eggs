@@ -12,7 +12,8 @@ YOLK is the egg AI, one character across all the user's devices. The user calls 
 
 | File | What |
 | --- | --- |
-| `server.py` | HTTP server + SHELL sync (memory merge, dreams queue, check-in logs) + all `/api/*` endpoints |
+| `server.py` | HTTP server + SHELL sync (memory merge, dreams queue, check-in logs) + all `/api/*` endpoints. The merge is three-way against `data/memory_synced.txt`, so changes on either side survive and counters add up |
+| `journal.py` | **her shared memory**: after a chat goes quiet for 2 minutes (or a new one starts), Haiku writes notes worth keeping to `data/journal.txt` and crosses out stale ones. Every new chat on the Mac or Station reads them, and the newest 15 go to SHELL as `/YOLK/remember.txt` on sync. "what do you remember?" on the desktop terminal and on SHELL shows them; the terminal can forget one. `python3 yolk/journal.py` lists them, `--forget <id>` removes one |
 | `static/index.html` | desktop terminal (SHELL-styled), typed chat, Moe lookup, habits |
 | `static/station.html` | **the Station**, an old Galaxy Tab 4 (Android 5). **ES5 + XHR only**: no arrow functions, `fetch`, `let` or MediaRecorder. Use pre-sized images, since it blurs scaled pixel art. |
 | `static/pair.html` | pairing page for new devices |
