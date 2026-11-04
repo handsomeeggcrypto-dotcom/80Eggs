@@ -2,22 +2,36 @@
 # Change this file while SHELL is plugged into the Mac: open
 # SHELL > YOLK > quests > list.txt in TextEdit, save, eject.
 #
-#   == NAME               starts a new list
+#   == NAME @stat         starts a new list (its quests train that stat)
 #   fix the gutters       a quest you check off
+#   ~ play guitar         a daily: check it off once a day, it resets tomorrow
 #   save up | 2000        a money goal: spin in what you've saved on SHELL
 #   pay off debt | debt   follows your total debt in FINANCE on its own
 #   pay off car | debt: car    follows one debt in FINANCE (by its name)
+#   read a book @knowledge     "@stat" on a quest beats the list's stat
 #
-# Every quest done, and every 10% of a goal, drops loot.
+# Stats: @wealth @mind @body @creativity @knowledge @bonds
+#
+# Every quest done, and every 10% of a goal, drops loot and trains its stat.
 # Every 10 drops: rank up + a guaranteed EXOTIC.
-# Finish a whole list for a bonus drop.
-# Big jobs? Split them into small steps. More steps, more loot.
+# Finish a whole list for a bonus drop. Missing a daily costs nothing.
+# Big jobs? Split them into small steps (5 to 30 minutes each).
+# More steps, more loot.
 # Lines starting with # are notes and get skipped.
 
-== MONEY
+== MONEY @wealth
 pay off the debts | debt
 save $2,000 | 2000
 
-== HOUSE
+== HOUSE @body
 fix the gutters
 finish the kitchen
+
+== DAILY
+~ meditate @mind
+~ move for 20 minutes @body
+~ play guitar @creativity
+~ read something @knowledge
+~ quality time with someone you love @bonds
+~ time with the cats @bonds
+~ a real rest. no guilt. @mind

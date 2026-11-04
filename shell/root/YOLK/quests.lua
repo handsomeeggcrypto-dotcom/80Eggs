@@ -11,6 +11,10 @@
      drops a guaranteed exotic. Finishing a whole list drops a legendary or better.
      Loot is only ever given once per quest step, so unchecking can't farm it.
 
+     "~" lines are dailies: loot once a day, reset tomorrow, never punished for
+     missing. "@stat" trains one of six stats (a level every 5). WHAT NOW? picks
+     one open quest for you.
+
      Progress, rank and the vault are saved in /YOLK/quests/state.txt. ]]
 
 require "actions"
@@ -138,6 +142,23 @@ local function read_file(path)
     return s
 end
 
+-- the six stats. "@word" at the end of a list or quest line picks one.
+local STATS = { "WEALTH", "MIND", "BODY", "CREATIVITY", "KNOWLEDGE", "BONDS" }
+local ALIAS = { money = 1, debt = 1, save = 1, work = 1, meditate = 2, calm = 2, health = 3, fit = 3,
+    sleep = 3, house = 3, home = 3, create = 4, art = 4, code = 4, music = 4, guitar = 4, game = 4,
+    build = 4, learn = 5, read = 5, study = 5, love = 6, family = 6, friends = 6, people = 6,
+    relationships = 6, cats = 6 }
+local function find_stat(word)
+    word = word:lower()
+    for i, s in ipairs(STATS) do if s:lower():sub(1, 3) == word:sub(1, 3) then return i end end
+    return ALIAS[word]
+end
+local function take_stat(line)   -- "fix the gutters @body" -> "fix the gutters", 3
+    local word = line:match("@(%a+)%s*$")
+    if not word then return line end
+    return clean(line:gsub("@%a+%s*$", "")), find_stat(word)
+end
+
 local lists = {}
 local function load_lists()
     local s = read_file(DIR .. "list.txt")
@@ -152,13 +173,18 @@ local function load_lists()
         if line == "" or line:sub(1, 1) == "#" then
             -- note
         elseif line:sub(1, 2) == "==" then
-            cur = { name = clean(line:sub(3)):upper(), items = {} }
+            local name, stat = take_stat(clean(line:sub(3)))
+            cur = { name = name:upper(), items = {}, stat = stat }
             if cur.name == "" then cur.name = "QUESTS" end
             lists[#lists + 1] = cur
         else
             if not cur then cur = { name = "QUESTS", items = {} }; lists[#lists + 1] = cur end
+            local daily = line:sub(1, 1) == "~"
+            if daily then line = clean(line:sub(2)) end
+            local stat
+            line, stat = take_stat(line)
             local words, goal = line:match("^(.-)%s*|%s*(.-)$")
-            local q = { text = words or line, kind = "task" }
+            local q = { text = words or line, kind = "task", daily = daily, stat = stat or cur.stat }
             if goal then
                 local lower = goal:lower()
                 if lower:sub(1, 4) == "debt" then
@@ -168,6 +194,7 @@ local function load_lists()
                     if n and n > 0 then q.kind, q.target = "money", n end
                 end
             end
+            if daily then q.kind, q.target, q.debt = "task", nil, nil end
             if q.text == "" then q.text = "?" end
             q.key = (cur.name .. "/" .. q.text):lower():gsub("|", "/")
             cur.items[#cur.items + 1] = q
@@ -196,7 +223,8 @@ local function debt_now(q)
 end
 
 ---------------------------------------------------------------- saved progress
-local S = { done = {}, got = {}, amt = {}, start = {}, clear = {}, loot = {}, pk = 0 }
+local S = { done = {}, got = {}, amt = {}, start = {}, clear = {}, loot = {}, pk = 0,
+            day = {}, dg = {}, xp = { 0, 0, 0, 0, 0, 0 } }   -- day: daily done on; dg: daily loot given on
 
 local function load_state()
     local s = read_file(DIR .. "state.txt")
@@ -211,6 +239,9 @@ local function load_state()
         elseif k == "start" then S.start[p[2]] = tonumber(p[3]) or 0
         elseif k == "clear" then S.clear[p[2]] = true
         elseif k == "loot" then S.loot[#S.loot + 1] = { r = tonumber(p[2]) or 1, power = tonumber(p[3]) or 1, name = p[4] or "?" }
+        elseif k == "day" then S.day[p[2]] = tonumber(p[3])
+        elseif k == "dg" then S.dg[p[2]] = tonumber(p[3])
+        elseif k == "xp" then local i = tonumber(p[2]); if i and S.xp[i] then S.xp[i] = tonumber(p[3]) or 0 end
         elseif k == "pk" then S.pk = tonumber(p[2]) or 0 end
     end
 end
@@ -224,6 +255,9 @@ local function save_state()
     for k, v in pairs(S.amt) do f:write("amt|" .. k .. "|" .. v .. "\n") end
     for k, v in pairs(S.start) do f:write("start|" .. k .. "|" .. v .. "\n") end
     for k in pairs(S.clear) do f:write("clear|" .. k .. "\n") end
+    for k, v in pairs(S.day) do f:write("day|" .. k .. "|" .. v .. "\n") end
+    for k, v in pairs(S.dg) do f:write("dg|" .. k .. "|" .. v .. "\n") end
+    for i, v in ipairs(S.xp) do f:write("xp|" .. i .. "|" .. v .. "\n") end
     for _, l in ipairs(S.loot) do f:write("loot|" .. l.r .. "|" .. l.power .. "|" .. l.name .. "\n") end
     f:close()
 end
@@ -235,8 +269,13 @@ local function power()
     return p
 end
 
+-- SHELL's day number (its clock is local time); dailies reset when it changes
+local function today() return math.floor((os.time and os.time() or 0) / 86400) end
+local function stat_level(xp) return math.floor(xp / 5) + 1 end   -- a level every 5 quests
+
 -- how far a quest is, in tenths (0..10), plus a line about it
 local function progress(q)
+    if q.daily then return S.day[q.key] == today() and 10 or 0 end
     if q.kind == "task" then return S.done[q.key] and 10 or 0 end
     if q.kind == "money" then
         local t = math.floor((S.amt[q.key] or 0) * 10 / q.target)
@@ -272,29 +311,38 @@ end
 -- gives out everything earned since last time; returns the events to show
 local function collect()
     local events = {}
-    local function package(why)
+    local function package(why, stat)
         S.pk = S.pk + 1
         events[#events + 1] = { kind = "drop", item = roll(1), why = why }
+        if stat then
+            S.xp[stat] = S.xp[stat] + 1
+            if S.xp[stat] % 5 == 0 then events[#events + 1] = { kind = "level", stat = stat } end
+        end
         if S.pk % 10 == 0 then
             events[#events + 1] = { kind = "rank" }
             events[#events + 1] = { kind = "drop", item = roll(5), why = "rank up: " .. rank_name(S.pk) }
         end
     end
     for _, list in ipairs(lists) do
-        local all = #list.items > 0
+        local all, any = true, false   -- dailies never "clear"
         for _, q in ipairs(list.items) do
             local t = progress(q)
-            if t < 10 then all = false end
-            local got = S.got[q.key] or 0
-            local earn = (q.kind == "task") and (t >= 10 and 1 or 0) or t
-            for _ = got + 1, earn do
-                package(q.kind == "task" and q.text or (q.text .. " " .. (got + 1) * 10 .. "%"))
-                got = got + 1
+            if q.daily then
+                if t >= 10 and S.dg[q.key] ~= today() then S.dg[q.key] = today(); package(q.text, q.stat) end
+            else
+                any = true
+                if t < 10 then all = false end
+                local got = S.got[q.key] or 0
+                local earn = (q.kind == "task") and (t >= 10 and 1 or 0) or t
+                for _ = got + 1, earn do
+                    package(q.kind == "task" and q.text or (q.text .. " " .. (got + 1) * 10 .. "%"), q.stat)
+                    got = got + 1
+                end
+                S.got[q.key] = got
             end
-            S.got[q.key] = got
         end
         local ck = list.name:lower()
-        if all and not S.clear[ck] then
+        if all and any and not S.clear[ck] then
             S.clear[ck] = true
             events[#events + 1] = { kind = "clear", list = list.name }
             events[#events + 1] = { kind = "drop", item = roll(4), why = list.name .. " cleared" }
@@ -350,7 +398,11 @@ local function play(events)
         else
             rect(C.bg, 0, 0, W, H)
             draw_face(e.kind == "rank" and "love" or "great", W / 2, 56)
-            if e.kind == "rank" then
+            if e.kind == "level" then
+                text(C.yolk, STATS[e.stat] .. " LEVEL UP", W / 2, 104, "center")
+                text(C.white, "now level " .. stat_level(S.xp[e.stat]), W / 2, 128, "center")
+                text(C.dim, "look at you, growing.", W / 2, 152, "center")
+            elseif e.kind == "rank" then
                 text(C.yolk, S.pk .. " QUESTS DONE!", W / 2, 104, "center")
                 text(C.white, "RANK UP: " .. rank_name(S.pk), W / 2, 128, "center")
                 text(C.dim, "a reward waits. it is shiny.", W / 2, 152, "center")
@@ -359,7 +411,7 @@ local function play(events)
                 text(C.white, e.list, W / 2, 128, "center")
                 text(C.dim, "every box. checked. i'm proud.", W / 2, 152, "center")
             end
-            text(C.dim, "select: open it", W / 2, H - CH - 6, "center")
+            text(C.dim, e.kind == "level" and "select: nice" or "select: open it", W / 2, H - CH - 6, "center")
             rb.lcd_update()
             wait_button()
         end
@@ -468,7 +520,8 @@ local function list_screen(list)
             local t, sub = progress(q)
             if t >= 10 then done = done + 1 end
             if q.kind == "task" then
-                rows[#rows + 1] = { left = (t >= 10 and "[x] " or "[ ] ") .. q.text, color = t >= 10 and C.dim or C.text }
+                rows[#rows + 1] = { left = (t >= 10 and "[x] " or "[ ] ") .. q.text, color = t >= 10 and C.dim or C.text,
+                                    right = (q.daily and t >= 10) and "today" or nil }
             else
                 rows[#rows + 1] = { left = q.text, right = t * 10 .. "%", bar = t, sub = sub,
                                     color = t >= 10 and C.green or C.text }
@@ -487,7 +540,15 @@ local function list_screen(list)
         if not pick then return end
         sel = pick
         local q = list.items[pick]
-        if q and q.kind == "task" then
+        if q and q.daily then
+            if S.day[q.key] ~= today() then
+                if confirm("DONE TODAY?", q.text, "no streaks. no guilt. just loot.") then
+                    S.day[q.key] = today(); play(collect())
+                end
+            elseif confirm("UNCHECK IT?", q.text, "back tomorrow either way") then
+                S.day[q.key] = nil; save_state()
+            end
+        elseif q and q.kind == "task" then
             if not S.done[q.key] then
                 if confirm("QUEST DONE?", q.text, nil) then S.done[q.key] = true; play(collect()) end
             elseif confirm("UNCHECK IT?", q.text, "your loot stays yours") then
@@ -533,10 +594,64 @@ local function vault()
     end
 end
 
+-- WHAT NOW?: one open quest, picked for you. Dailies and plain quests only.
+local NO_HURRY = { "no hurry. one thing is enough.", "small steps still count.",
+    "resting is allowed. i checked.", "you don't have to do it all today.", "finish one. that's the trick." }
+local function what_now()
+    local open = {}
+    for _, list in ipairs(lists) do
+        for _, q in ipairs(list.items) do
+            if q.kind == "task" and progress(q) < 10 then open[#open + 1] = { q = q, list = list.name } end
+        end
+    end
+    local line = NO_HURRY[math.random(1, #NO_HURRY)]
+    while true do
+        rect(C.bg, 0, 0, W, H)
+        if #open == 0 then
+            draw_face("love", W / 2, 60)
+            text(C.yolk, "nothing open.", W / 2, 110, "center")
+            text(C.text, "rest. you earned it.", W / 2, 134, "center")
+            rb.lcd_update(); wait_button(); return
+        end
+        local pick = open[math.random(1, #open)]
+        draw_face("good", W / 2, 50)
+        text(C.dim, "WHAT NOW? try this:", W / 2, 96, "center")
+        text(C.white, fit(pick.q.text, 38), W / 2, 120, "center")
+        text(C.dim, "from " .. pick.list .. (pick.q.stat and (" . " .. STATS[pick.q.stat]) or ""), W / 2, 142, "center")
+        text(C.yolk, line, W / 2, 168, "center")
+        text(C.dim, "select: did it   >>: another", W / 2, H - CH * 2 - 10, "center")
+        text(C.dim, "menu: later", W / 2, H - CH - 6, "center")
+        rb.lcd_update()
+        local a = wait_button()
+        if a == A.PLA_SELECT_REL then
+            if pick.q.daily then S.day[pick.q.key] = today() else S.done[pick.q.key] = true end
+            play(collect()); return
+        elseif a ~= A.PLA_RIGHT and a ~= A.PLA_DOWN and a ~= A.PLA_LEFT then return end
+    end
+end
+
+local function character()
+    rect(C.bg, 0, 0, W, H)
+    rect(C.panel, 0, 0, W, TOP - 4)
+    rect(C.yolk, 0, TOP - 4, W, 1)
+    text(C.yolk, "CHARACTER", 10, 6)
+    text(C.text, rank_name(S.pk), 10, 26)
+    text(C.dim, "POWER", W - 10, 6, "right")
+    text(RARITY[5].color, tostring(power()), W - 10, 26, "right")
+    for i, name in ipairs(STATS) do
+        local y, xp = TOP + 6 + (i - 1) * (CH + 13), S.xp[i]
+        text(C.text, name, 10, y)
+        text(C.yolk, "LV " .. stat_level(xp), 150, y)
+        bar(200, y + 5, W - 210, 7, (xp % 5) * 2)
+    end
+    rb.lcd_update()
+    wait_button()
+end
+
 local function main()
     local sel = 1
     while true do
-        local rows = {}
+        local rows = { { left = "WHAT NOW?", color = C.yolk, right = "pick one for me" } }
         for _, list in ipairs(lists) do
             local done = 0
             for _, q in ipairs(list.items) do if progress(q) >= 10 then done = done + 1 end end
@@ -545,11 +660,15 @@ local function main()
                                 bar = n > 0 and math.floor(done * 10 / n) or 0,
                                 sub = S.clear[list.name:lower()] and "cleared" or nil }
         end
+        rows[#rows + 1] = { left = "CHARACTER", right = "6 stats", color = RARITY[3].color }
         rows[#rows + 1] = { left = "VAULT", right = #S.loot .. " things", color = RARITY[4].color }
         local pick = menu(main_header, rows, sel)
         if not pick then return end
         sel = pick
-        if pick > #lists then vault() else list_screen(lists[pick]) end
+        if pick == 1 then what_now()
+        elseif pick == #lists + 2 then character()
+        elseif pick == #lists + 3 then vault()
+        else list_screen(lists[pick - 1]) end
     end
 end
 

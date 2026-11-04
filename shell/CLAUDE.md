@@ -5,7 +5,7 @@
 ## Layout
 
 - `root/` **mirrors the iPod drive**: `.rockbox/` (theme `yolk.cfg`, `wps/yolk.wps|sbs` skins, `shortcuts.txt`) and `YOLK/` (the Lua apps).
-- Apps in `root/YOLK/`: `boot.lua` (power-on animation), `talk.lua` (Talk to YOLK + check-ins; `checkin.lua` runs it in check-in-only mode), `moekadex.lua` (Moe lookup; `dreams.lua` reuses it for **Dream Things**, the Yumemono dex), `moto.lua` (MOEtorcycles Mini), `meditate.lua`, `finance.lua`, `quests.lua` (**QUEST LOG**: real-life to-do lists with loot drops, ranks every 10, a vault; lists in `/YOLK/quests/list.txt`, copied from `starter.txt` on first run, progress in `state.txt`, both only on the device; debt quests read FINANCE's numbers), `radio.lua`, `usb.lua`.
+- Apps in `root/YOLK/`: `boot.lua` (power-on animation), `talk.lua` (Talk to YOLK + check-ins; `checkin.lua` runs it in check-in-only mode), `moekadex.lua` (Moe lookup; `dreams.lua` reuses it for **Dream Things**, the Yumemono dex), `moto.lua` (MOEtorcycles Mini), `meditate.lua`, `finance.lua`, `quests.lua` (**QUEST LOG**: real-life lists + dailies with loot drops, six stats, WHAT NOW?, ranks every 10, a vault; lists in `/YOLK/quests/list.txt`, copied from `starter.txt` on first run, progress in `state.txt`, both only on the device; debt quests read FINANCE's numbers), `radio.lua`, `usb.lua`.
 - `tools/`: generators (`gen_art.py`, `gen_moekadex.py`, `gen_dreams.py`, `gen_dex_index.py`, `gen_moto.py`), `backup_shell.py` / `restore_shell.py`, and `sim/` (Rockbox simulator).
 - `backup/`: snapshots of the real drive (gitignored).
 - Generated Moekadex/Dream Things data and images are gitignored (431MB+). Rebuild with the `gen_*.py` scripts.
