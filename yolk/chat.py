@@ -53,6 +53,9 @@ NOTE_AFTER = 2 * 60         # after 2 quiet minutes she writes down what's worth
 PLACES = {
     "station": "Right now you're on the Station, the old Samsung tablet. Your owner is talking to you out "
                "loud, usually in the morning, and your words are read aloud by a robotic voice.",
+    "shell": "Right now you're writing a letter back to your owner. They spelled a letter to you on SHELL, "
+             "letter by letter with the click wheel, which takes real effort, and your reply will be "
+             "waiting on SHELL's tiny screen when they unplug it.",
     "desk": "Right now you're on the desktop terminal on the Mac. Your owner is typing to you, and your "
             "words appear as text on the terminal screen.",
 }
@@ -225,6 +228,36 @@ def reply(text, new=False, where="station"):
         _convo["unnoted"] += [{"role": "user", "content": text}, {"role": "assistant", "content": answer}]
         _convo["last"] = time.time()
     return answer
+
+
+LETTER = """
+
+This time it's a letter, not a chat. Write back two to five short sentences: lowercase, no lists,
+no emoji, no markdown, no greeting line or signature. Answer what they actually wrote. If there's
+something to remember, show that you will."""
+
+
+def letter_reply(text):
+    """Her answer to a letter written on SHELL (see letters.py)."""
+    key = ai.api_key()
+    if not key:
+        raise RuntimeError("no api key")
+    brain = settings()["brain"]
+    import anthropic
+    client = anthropic.Anthropic(api_key=key, timeout=120.0)
+    args = dict(model=BRAINS[brain][0], max_tokens=16000, system=details("shell") + LETTER,
+                messages=[{"role": "user", "content": text}],
+                thinking={"type": "adaptive"}, output_config={"effort": "low"})
+    if brain in ("opus", "sonnet"):
+        args.update(betas=["server-side-fallback-2026-07-01"], fallbacks="default")
+        response = client.beta.messages.create(**args)
+    else:
+        response = client.messages.create(**args)
+    log_cost(brain, response.usage)
+    if response.stop_reason == "refusal":
+        return "i read it. i'm keeping it. i don't have words back for that one yet."
+    answer = " ".join(b.text for b in response.content if b.type == "text").strip()
+    return re.sub(r"[*_#`]", "", answer) or "i read it. twice."
 
 
 def transcribe(wav):

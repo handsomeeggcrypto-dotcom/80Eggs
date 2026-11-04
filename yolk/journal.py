@@ -11,7 +11,9 @@ time it's plugged in (/YOLK/remember.txt) and can bring them up.
   python3 yolk/journal.py            everything she remembers
   python3 yolk/journal.py --forget 7 cross out note 7
 
-data/journal.txt, one note per line:  id|unix time|where|note
+data/journal.txt, one note per line:  id|unix time|where|note[|yyyy-mm-dd]
+(the date, when there is one, is the day the note is about, so SHELL can
+bring it up on that day)
 It's personal, so it lives in data/ (gitignored) and never leaves this Mac.
 """
 import json
@@ -33,6 +35,7 @@ FOR_SHELL = 15           # newest notes copied to SHELL
 NOTE_MODEL = "claude-haiku-5-5"
 PLACES = {"desk": "the mac", "station": "the station", "shell": "shell"}
 
+DATE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 _lock = threading.Lock()
 
 
@@ -40,26 +43,32 @@ def read():
     notes = []
     if JOURNAL.exists():
         for line in JOURNAL.read_text(encoding="utf-8").splitlines():
-            parts = line.split("|", 3)
-            if len(parts) == 4 and parts[0].isdigit() and parts[1].isdigit():
-                notes.append({"id": int(parts[0]), "t": int(parts[1]), "where": parts[2], "note": parts[3]})
+            parts = line.split("|")
+            if len(parts) in (4, 5) and parts[0].isdigit() and parts[1].isdigit():
+                day = parts[4] if len(parts) == 5 and DATE.match(parts[4]) else ""
+                notes.append({"id": int(parts[0]), "t": int(parts[1]), "where": parts[2], "note": parts[3],
+                              "on": day})
     return notes
 
 
 def _write(notes):
     JOURNAL.parent.mkdir(parents=True, exist_ok=True)
     tmp = JOURNAL.with_suffix(".tmp")
-    tmp.write_text("".join(f"{n['id']}|{n['t']}|{n['where']}|{n['note']}\n" for n in notes), encoding="utf-8")
+    tmp.write_text("".join(f"{n['id']}|{n['t']}|{n['where']}|{n['note']}" + (f"|{n['on']}" if n.get("on") else "")
+                           + "\n" for n in notes), encoding="utf-8")
     tmp.replace(JOURNAL)
 
 
 def clean(text):
     text = re.sub(r"[\s|]+", " ", str(text)).strip().lower()
-    return text[:NOTE_LEN].rstrip()
+    if len(text) > NOTE_LEN:                        # cut at a word, not in the middle of one
+        text = text[:NOTE_LEN].rsplit(" ", 1)[0].rstrip(",;:- ") + "..."
+    return text
 
 
 def change(add=(), forget=(), where="desk"):
-    """Adds notes and crosses out notes by id. Returns the journal after."""
+    """Adds notes and crosses out notes by id. Returns the journal after.
+    Each note to add is text, or {"note": text, "on": "yyyy-mm-dd"} for one about a certain day."""
     with _lock:
         notes = read()
         gone = {int(i) for i in forget if str(i).isdigit()}
@@ -73,9 +82,11 @@ def change(add=(), forget=(), where="desk"):
         now = int(time.time())
         have = {n["note"] for n in notes}
         for a in add:
-            a = clean(a)
+            day = (a.get("on") or "") if isinstance(a, dict) else ""
+            a = clean(a.get("note", "") if isinstance(a, dict) else a)
+            day = day if DATE.match(str(day)) else ""
             if a and a not in have:
-                notes.append({"id": next_id, "t": now, "where": where, "note": a})
+                notes.append({"id": next_id, "t": now, "where": where, "note": a, "on": day})
                 have.add(a)
                 next_id += 1
         _write(notes[-MAX_NOTES:])
@@ -107,16 +118,18 @@ notes about her owner, then a conversation they just had on {place}.
 Decide what she should remember. Write notes for things that will still matter later: plans and dates,
 people and pets in their life, likes and dislikes, projects, worries, wins, how they've been feeling,
 promises she made, and anything they ask her to remember. Skip small talk, oracle questions, jokes and
-anything already in the notes. Write each note as YOLK talking to them: lowercase, short, starting with
+anything already in the notes. Keep each note under 100 characters, one fact per note. Write each note
+as YOLK talking to them: lowercase, short, starting with
 "you" where it fits (like "you have a dentist appointment friday, nov 6" or "your sister's name is ana").
-Turn words like "tomorrow" or "friday" into the actual date. Today is {today}.
+Turn words like "tomorrow" or "friday" into the actual date. Today is {today}. When a note is about
+a certain day (an appointment, a trip, a birthday, a deadline), also give that day as "on".
 
 Cross out (forget) notes that this conversation shows are wrong or out of date, or that they ask her to
 forget. When something changes, forget the old note and add a new one. Never write down passwords, card
 numbers, seed phrases or private keys.
 
-Answer with only JSON: {{"add": ["note", ...], "forget": [id, ...]}}. Both lists can be empty, and
-usually are.
+Answer with only JSON: {{"add": [{{"note": "...", "on": "yyyy-mm-dd or null"}}, ...], "forget": [id, ...]}}.
+Both lists can be empty, and usually are.
 
 Current notes:
 {notes}
@@ -157,17 +170,27 @@ def take_notes(messages, where="desk"):
         out = json.loads(m.group(0))
     except json.JSONDecodeError:
         return [], []
-    add = [a for a in out.get("add", []) if isinstance(a, str)][:10]
+    add = [a for a in out.get("add", []) if isinstance(a, (str, dict))][:10]
     forget = [i for i in out.get("forget", []) if isinstance(i, int) or str(i).isdigit()]
     before = {n["id"] for n in notes}
     change(add, forget, where)
     return add, [i for i in forget if int(i) in before]
 
 
+def day_number(day):
+    """yyyy-mm-dd -> days since 1970, the way SHELL counts them (its clock is local time)."""
+    import datetime as dt
+    return (dt.date.fromisoformat(day) - dt.date(1970, 1, 1)).days
+
+
 def deliver(shell):
-    """Copies the newest notes to SHELL as /YOLK/remember.txt: id|where|note (latin-1 for its font)."""
-    notes = read()[-FOR_SHELL:]
-    text = "".join(f"{n['id']}|{PLACES.get(n['where'], n['where'])}|{n['note']}\n" for n in notes)
+    """Copies notes to SHELL as /YOLK/remember.txt: id|where|note|day (latin-1 for its font).
+    That's the newest few, plus every note about a day that hasn't passed yet (day 0 = none)."""
+    notes = read()
+    today = time.strftime("%Y-%m-%d")
+    keep = {n["id"] for n in notes[-FOR_SHELL:]} | {n["id"] for n in notes if n["on"] and n["on"] >= today}
+    text = "".join(f"{n['id']}|{PLACES.get(n['where'], n['where'])}|{n['note']}|"
+                   f"{day_number(n['on']) if n['on'] else 0}\n" for n in notes if n["id"] in keep)
     (shell / "remember.txt").write_text(text, encoding="latin-1", errors="replace")
 
 

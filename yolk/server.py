@@ -244,6 +244,8 @@ def sync():
     write_mem(MERGED, mem)
     import journal                      # her notes from the Mac and the Station
     journal.deliver(SHELL)
+    import letters                      # letters written on SHELL, and her replies
+    letters.on_sync(SHELL)
     # check-ins: union of both sides (newest wins per day), kept on both, so the
     # Mac also holds a backup for after SHELL's storage swap
     log = read_log(LOG)
