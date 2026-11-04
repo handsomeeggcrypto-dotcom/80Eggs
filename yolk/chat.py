@@ -127,6 +127,13 @@ def details(where="station"):
         facts.append(f"meditation streak: {med['streak']} days")
     if st.get("mood_avg"):
         facts.append(f"mood averaged over their last week of check-ins: {st['mood_avg']} out of 5")
+    try:
+        import music
+        heard = music.for_chat()
+        if heard:
+            facts.append(heard)
+    except Exception:
+        pass
     text = VOICE.format(where=PLACES[where]) + "\n\nToday's details:\n" + "\n".join(f"- {f}" for f in facts)
     lines = json.loads((HERE / "brain" / "lines.json").read_text())
     mind = ai.OUT / f"{dt.date.today().isoformat()}.json"       # what she wrote for SHELL today

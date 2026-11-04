@@ -50,7 +50,7 @@ def song_name(path):
     return (parts[2] if parts[1] == "Various Artists" else parts[1]), title
 
 
-def pick_songs(day, library=None):
+def pick_songs(day, library=None, favorites=()):
     picks = json.loads(PICKS.read_text(encoding="utf-8")) if library is None else library
     used_file = OUT / "used.json"
     used = json.loads(used_file.read_text()) if used_file.exists() else []
@@ -58,6 +58,17 @@ def pick_songs(day, library=None):
     fresh = [p for p in pool if p not in used] or pool
     rnd = random.Random(day.toordinal())
     rnd.shuffle(fresh)
+    # lean on the artists they've been playing on SHELL: about every third song is one of theirs
+    favs = set(favorites)
+    if favs:
+        liked = [p for p in fresh if song_name(p)[0] in favs]
+        rest = [p for p in fresh if song_name(p)[0] not in favs]
+        mixed = []
+        while liked or rest:
+            for src in (rest, rest, liked):
+                if src:
+                    mixed.append(src.pop(0))
+        fresh = mixed
     show = []
     for p in fresh:                  # never the same artist twice in a row
         if not show or show[-1].split("/")[1] != p.split("/")[1]:
@@ -100,7 +111,12 @@ def build(day, speak, voice, rate, extras=()):
     if not ai.api_key() or not needs_build(day):
         return False
     try:
-        songs = pick_songs(day)
+        try:
+            import music                  # what they've been playing on SHELL
+            favorites, extras = music.favorite_artists(), list(extras) + music.for_radio()
+        except Exception:
+            favorites = ()
+        songs = pick_songs(day, favorites=favorites)
         if not songs:
             return False
         show = write_show(day, songs, extras)

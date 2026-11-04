@@ -246,6 +246,11 @@ def sync():
     journal.deliver(SHELL)
     import letters                      # letters written on SHELL, and her replies
     letters.on_sync(SHELL)
+    try:
+        import music                    # what you've played on SHELL
+        music.on_sync(SHELL)
+    except Exception as e:
+        print("YOLK couldn't read SHELL's play log:", e)
     # check-ins: union of both sides (newest wins per day), kept on both, so the
     # Mac also holds a backup for after SHELL's storage swap
     log = read_log(LOG)
