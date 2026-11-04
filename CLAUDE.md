@@ -22,6 +22,7 @@ Each project folder has its own `CLAUDE.md`. Read it before working there.
 | `moemode/` | **MoeMode** "what should I do right now?" app | hidden |
 | `yolk/` | **YOLK**, the egg AI's home on the Mac (server, Station tablet, Daily, Claude) | this Mac only |
 | `shell/` | **SHELL**, the iPod Classic YOLK lives on (Rockbox + Lua) | this Mac only |
+| `nestegg/` | **Nest Egg**, practice crypto bots with fake money: Solana memecoins (with rug checks) and SOL. Runs all the time as a LaunchAgent. No wallet, can't trade | this Mac only |
 | `homebase/` | **Home Base**, a dashboard of every project | this Mac only |
 | `moe_fights.html` | Moe Fights. **The master copy is `~/Desktop/MoeFights_beta.html`**, so edit that one and copy it here | live |
 | `director_moe.html` | Moe Fights scene studio | hidden |
@@ -58,8 +59,8 @@ Each project folder has its own `CLAUDE.md`. Read it before working there.
 
 ## Not on the website (see `.vercelignore`)
 
-`yolk/`, `shell/`, `homebase/` and every `CLAUDE.md`. They're in the public GitHub repo but Vercel skips them. A new Mac-only project goes in `.vercelignore` too. Keep personal details (real name, town, addresses, wallet) out of code and comments, and put them in gitignored data files instead.
+`yolk/`, `shell/`, `homebase/`, `nestegg/` and every `CLAUDE.md`. They're in the public GitHub repo but Vercel skips them. A new Mac-only project goes in `.vercelignore` too. Keep personal details (real name, town, addresses, wallet) out of code and comments, and put them in gitignored data files instead.
 
 ## Not in git (see `.gitignore`)
 
-`yolk/data/` (API key, wallet address, logs, memory), `jack/` (tablet photos), `moekedex/ipod_photos/` (4.5 GB), `homebase/logs/`, plus the generated SHELL data and caches listed in `shell/.gitignore`.
+`yolk/data/` (API key, wallet address, logs, memory), `jack/` (tablet photos), `moekedex/ipod_photos/` (4.5 GB), `homebase/logs/`, `nestegg/data/`, plus the generated SHELL data and caches listed in `shell/.gitignore`.

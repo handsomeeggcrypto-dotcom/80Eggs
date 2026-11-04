@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Nest Egg</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #14110d; --panel: #1e1a14; --panel2: #262019; --line: #3a3127;
+    --text: #f3ead9; --dim: #a89a85; --yolk: #ffb81c; --yolk-dim: #4a3510;
+    --green: #6fdc8c; --blue: #7cb8ff; --pink: #ff8fb8; --red: #ff6b5b; --purple: #b99cff;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.45 "Space Grotesk", system-ui, sans-serif; }
+  .wrap { max-width: 1180px; margin: 0 auto; padding: 28px 16px 60px; }
+  header { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+  .egg { width: 44px; height: 54px; border-radius: 50% 50% 46% 46% / 58% 58% 42% 42%; background: #fff6e6; position: relative; flex: none; }
+  .egg::after { content: "$"; position: absolute; left: 11px; top: 18px; width: 22px; height: 22px; border-radius: 50%; background: var(--yolk);
+                color: #1a1205; font: 700 14px/22px "JetBrains Mono", monospace; text-align: center; }
+  h1 { margin: 0; font-size: 28px; letter-spacing: .5px; }
+  h1 span { color: var(--yolk); }
+  h2 { font-size: 20px; margin: 34px 0 4px; }
+  .sub { color: var(--dim); font-size: 13px; }
+  .mono { font-family: "JetBrains Mono", monospace; }
+  .price { margin-left: auto; text-align: right; }
+  .price b { font: 600 22px "JetBrains Mono", monospace; display: block; }
+
+  .note { margin: 20px 0 0; padding: 11px 14px; border: 1px solid var(--yolk); background: linear-gradient(var(--panel), var(--yolk-dim));
+          border-radius: 12px; font-size: 14px; }
+  .note b { color: var(--yolk); }
+  .err { border-color: var(--red); background: var(--panel); }
+
+  .cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(175px, 1fr)); gap: 10px; margin-top: 14px; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 12px 14px; border-top: 4px solid var(--c); }
+  .card .who { font-weight: 700; }
+  .card .big { font: 600 24px "JetBrains Mono", monospace; margin: 4px 0 0; }
+  .card .chg { font: 600 13px "JetBrains Mono", monospace; }
+  .card small { color: var(--dim); display: block; font-size: 12px; margin-top: 6px; }
+  .up { color: var(--green); } .down { color: var(--red); } .flat { color: var(--dim); }
+  .mix { height: 6px; border-radius: 3px; background: var(--line); margin-top: 8px; overflow: hidden; }
+  .mix i { display: block; height: 100%; background: var(--c); }
+
+  .chartbox { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 10px; margin-top: 14px; position: relative; }
+  canvas { width: 100%; height: 340px; display: block; }
+  .tip { position: absolute; pointer-events: none; background: var(--panel2); border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px;
+         font: 12px "JetBrains Mono", monospace; display: none; white-space: nowrap; z-index: 2; }
+  .tip div { display: flex; justify-content: space-between; gap: 14px; }
+  .legend { display: flex; flex-wrap: wrap; gap: 6px 14px; padding: 4px 6px 2px; font-size: 13px; }
+  .legend label { cursor: pointer; display: flex; align-items: center; gap: 6px; color: var(--dim); }
+  .legend label.on { color: var(--text); }
+  .legend i { width: 14px; height: 4px; border-radius: 2px; background: var(--c); }
+  .empty { color: var(--dim); text-align: center; padding: 50px 10px; }
+
+  .tablewrap { overflow-x: auto; margin-top: 14px; border: 1px solid var(--line); border-radius: 14px; }
+  table { border-collapse: collapse; width: 100%; background: var(--panel); font-size: 14px; }
+  th, td { padding: 9px 12px; text-align: right; white-space: nowrap; border-bottom: 1px solid var(--line); }
+  th { color: var(--dim); font-weight: 500; font-size: 12px; text-transform: uppercase; letter-spacing: .5px; background: var(--panel2); }
+  th:first-child, td:first-child { text-align: left; }
+  td { font-family: "JetBrains Mono", monospace; }
+  td:first-child { font-family: inherit; font-weight: 700; border-left: 4px solid var(--c); }
+  tr:last-child td { border-bottom: 0; }
+
+  .bots { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 12px; margin-top: 14px; }
+  .bot { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 14px; border-left: 4px solid var(--c); }
+  .bot h3 { margin: 0 0 6px; font-size: 17px; }
+  .bot p { margin: 0 0 8px; }
+  .bot .src { color: var(--dim); font-size: 13px; }
+  details { margin-top: 8px; font-size: 13px; }
+  summary { cursor: pointer; color: var(--dim); }
+  .trades { font: 12px "JetBrains Mono", monospace; max-height: 180px; overflow-y: auto; margin-top: 6px; }
+  .trades div { display: flex; gap: 10px; padding: 2px 0; border-bottom: 1px dashed var(--line); }
+  .trades span:first-child { color: var(--dim); min-width: 92px; }
+  .rules { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 8px; margin-top: 12px; }
+  .rule { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 8px 11px; font-size: 13px; color: var(--dim); }
+  .rule b { color: var(--text); display: block; font-size: 15px; }
+  .two { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 12px; margin-top: 14px; }
+  .list { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 12px 14px; }
+  .list h3 { margin: 0 0 8px; font-size: 15px; }
+  .list .row { display: flex; gap: 10px; justify-content: space-between; padding: 5px 0; border-bottom: 1px dashed var(--line); font-size: 13px; }
+  .list .row:last-child { border-bottom: 0; }
+  .list .row span:first-child { font-weight: 700; min-width: 80px; }
+  .list .row .why { color: var(--dim); text-align: right; }
+  .list .scroll { max-height: 330px; overflow-y: auto; }
+  .bar { height: 8px; border-radius: 4px; background: var(--red); opacity: .75; }
+  a.coin { color: var(--text); text-decoration: none; border-bottom: 1px dotted var(--dim); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="egg"></div>
+    <div>
+      <h1>Nest <span>Egg</span></h1>
+      <div class="sub">Practice bots trading SOL and Solana memecoins with fake money</div>
+    </div>
+    <div class="price"><b id="price">…</b><span class="sub" id="checked">connecting…</span></div>
+  </header>
+
+  <div class="note"><b>Fake money only.</b> Each bot started with a pretend $1,000. Nothing on this page has a wallet or can make a real trade.</div>
+  <div class="note err" id="err" style="display:none"></div>
+
+  <h2>Memecoin hunt</h2>
+  <div class="sub" id="memeSub">Waiting for the first scan…</div>
+  <div class="note err" id="memeErr" style="display:none"></div>
+  <div class="cards" id="memeCards"></div>
+  <div class="chartbox"><canvas id="memeChart" style="height:260px"></canvas><div class="legend" id="memeLegend"></div><div class="tip"></div></div>
+  <div class="rules" id="memeRules"></div>
+  <div class="two">
+    <div class="list"><h3>Holding now</h3><div class="scroll" id="memeOpen"></div></div>
+    <div class="list"><h3>Finished trades</h3><div class="scroll" id="memeClosed"></div></div>
+    <div class="list"><h3>🔍 Scout's last checks</h3><div class="scroll" id="memeChecked"></div></div>
+    <div class="list"><h3>Why Scout said no</h3><div class="scroll" id="memeReasons"></div></div>
+  </div>
+
+  <h2>SOL bots: live race</h2>
+  <div class="sub" id="raceSub">Waiting for the first price…</div>
+  <div class="cards" id="race"></div>
+  <div class="chartbox"><canvas id="liveChart"></canvas><div class="legend" id="liveLegend"></div><div class="tip"></div></div>
+
+  <h2>The last 3 years</h2>
+  <div class="sub" id="btSub">What each bot would have done with $1,000 on real past prices, fees included.</div>
+  <div class="chartbox"><canvas id="btChart"></canvas><div class="legend" id="btLegend"></div><div class="tip"></div></div>
+  <div class="tablewrap"><table id="btTable"></table></div>
+  <p class="sub"><b>Worst drop</b> is the biggest fall from a high point before it recovered. That's the part that hurts with real money.
+    <b>Months up</b> counts months that ended with more money than they started.</p>
+
+  <h2>Meet the bots</h2>
+  <div class="bots" id="bots"></div>
+</div>
+
+<script>
+const COLORS = { scout: "#5fe0d0", randy: "#ff6b5b", savings: "#a89a85", hold: "#ff8fb8", trend: "#7cb8ff", steady: "#6fdc8c", dip: "#b99cff", ladder: "#ffb81c" };
+const hidden = { live: new Set(), bt: new Set(), meme: new Set() };
+const esc = v => String(v).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
+const coin = (sym, mint) => `<a class="coin" href="https://dexscreener.com/solana/${encodeURIComponent(mint)}" target="_blank" rel="noopener">${esc(sym)}</a>`;
+const ago = t => { const m = Math.round((Date.now() / 1000 - t) / 60); return m < 60 ? m + "m" : (m / 60).toFixed(1) + "h"; };
+const $ = id => document.getElementById(id);
+const money = v => "$" + v.toLocaleString(undefined, { minimumFractionDigits: v < 100 ? 2 : 0, maximumFractionDigits: v < 100 ? 2 : 0 });
+const pct = (v, d = 0) => (v > 0 ? "+" : "") + (v * 100).toFixed(d) + "%";
+const cls = v => v > 0.0005 ? "up" : v < -0.0005 ? "down" : "flat";
+const day = t => new Date(t * 1000).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
+const when = t => new Date(t * 1000).toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
+let data = null;
+
+function chart(canvas, bots, which, opts) {
+  const box = canvas.parentElement, tip = box.querySelector(".tip");
+  const dpr = window.devicePixelRatio || 1, W = canvas.clientWidth, H = canvas.clientHeight;
+  canvas.width = W * dpr; canvas.height = H * dpr;
+  const g = canvas.getContext("2d"); g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, W, H);
+  const shown = bots.filter(b => !hidden[which].has(b.id) && b.curve.length);
+  const pts = shown.flatMap(b => b.curve);
+  if (pts.length < 2 * shown.length || !shown.length) {
+    g.fillStyle = "#a89a85"; g.font = "14px Space Grotesk"; g.textAlign = "center";
+    g.fillText(opts.empty || "Nothing to show yet", W / 2, H / 2); tip.style.display = "none"; return;
+  }
+  const L = 64, R = 12, T = 12, B = 26;
+  let t0 = Math.min(...pts.map(p => p[0])), t1 = Math.max(...pts.map(p => p[0]));
+  let v0 = Math.min(opts.base, ...pts.map(p => p[1])), v1 = Math.max(opts.base, ...pts.map(p => p[1]));
+  const padv = (v1 - v0) * 0.06 || 5; v0 -= padv; v1 += padv;
+  const X = t => L + (t - t0) / ((t1 - t0) || 1) * (W - L - R), Y = v => T + (1 - (v - v0) / (v1 - v0)) * (H - T - B);
+  // grid
+  g.font = "11px JetBrains Mono"; g.fillStyle = "#a89a85"; g.strokeStyle = "#3a3127"; g.lineWidth = 1; g.textAlign = "right";
+  const raw = (v1 - v0) / 5, mag = Math.pow(10, Math.floor(Math.log10(raw))), stepv = [1, 2, 2.5, 5, 10].map(m => m * mag).find(s => s >= raw);
+  for (let v = Math.ceil(v0 / stepv) * stepv; v <= v1; v += stepv) {
+    g.beginPath(); g.moveTo(L, Y(v)); g.lineTo(W - R, Y(v)); g.stroke(); g.fillText(money(v), L - 6, Y(v) + 4);
+  }
+  g.setLineDash([4, 4]); g.strokeStyle = "#6b5c48"; g.beginPath(); g.moveTo(L, Y(opts.base)); g.lineTo(W - R, Y(opts.base)); g.stroke(); g.setLineDash([]);
+  g.textAlign = "center";
+  for (let i = 0; i <= 4; i++) { const t = t0 + (t1 - t0) * i / 4; g.fillText(opts.short(t), Math.min(Math.max(X(t), L + 30), W - R - 30), H - 8); }
+  for (const b of shown) {
+    g.strokeStyle = COLORS[b.id]; g.lineWidth = b.id === "steady" ? 2.5 : 1.6; g.beginPath();
+    b.curve.forEach((p, i) => i ? g.lineTo(X(p[0]), Y(p[1])) : g.moveTo(X(p[0]), Y(p[1]))); g.stroke();
+  }
+  canvas.onmousemove = e => {
+    const r = canvas.getBoundingClientRect(), t = t0 + (e.clientX - r.left - L) / (W - L - R) * (t1 - t0);
+    const rows = shown.map(b => {
+      let best = b.curve[0]; for (const p of b.curve) if (Math.abs(p[0] - t) < Math.abs(best[0] - t)) best = p;
+      return [b, best];
+    }).sort((a, c) => c[1][1] - a[1][1]);
+    tip.innerHTML = `<div style="color:#a89a85">${opts.long(rows[0][1][0])}</div>` +
+      rows.map(([b, p]) => `<div><span style="color:${COLORS[b.id]}">${b.name}</span><span>${money(p[1])}</span></div>`).join("");
+    tip.style.display = "block";
+    const x = e.clientX - box.getBoundingClientRect().left;
+    tip.style.left = (x > box.clientWidth / 2 ? x - tip.offsetWidth - 14 : x + 14) + "px"; tip.style.top = "14px";
+  };
+  canvas.onmouseleave = () => tip.style.display = "none";
+}
+
+function legend(el, bots, which, redraw) {
+  el.innerHTML = "";
+  for (const b of bots) {
+    const l = document.createElement("label");
+    l.className = hidden[which].has(b.id) ? "" : "on"; l.style.setProperty("--c", COLORS[b.id]);
+    l.innerHTML = `<i></i>${b.icon} ${b.name}`;
+    l.onclick = () => { hidden[which].has(b.id) ? hidden[which].delete(b.id) : hidden[which].add(b.id); redraw(); };
+    el.appendChild(l);
+  }
+}
+
+function drawLive() {
+  const p = data.paper; if (!p) return;
+  legend($("liveLegend"), p.bots, "live", drawLive);
+  chart($("liveChart"), p.bots, "live", { base: 1000, empty: "The race just started. The first hour closes soon, then check back tomorrow.",
+    short: t => new Date(t * 1000).toLocaleDateString(undefined, { month: "short", day: "numeric" }), long: when });
+}
+
+function drawMeme() {
+  const m = data.memes; if (!m) return;
+  legend($("memeLegend"), m.bots, "meme", drawMeme);
+  chart($("memeChart"), m.bots, "meme", { base: 1000, empty: "Just started. The line fills in every 10 minutes.",
+    short: t => new Date(t * 1000).toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric" }), long: when });
+}
+
+function renderMemes(m) {
+  $("memeErr").style.display = data.memesError ? "block" : "none";
+  $("memeErr").textContent = data.memesError ? "Last memecoin check hit a problem (" + data.memesError + "). It tries again every 30 seconds." : "";
+  $("memeSub").innerHTML = `Two bots hunting trending Solana memecoins with a pretend $1,000 each, priced with real Jupiter quotes (real slippage). Started ${when(m.started)}. Last scan ${m.lastScan ? ago(m.lastScan) + " ago" : "…"}.`;
+  $("memeCards").innerHTML = m.bots.map(b => {
+    const chg = b.value / 1000 - 1;
+    return `<div class="card" style="--c:${COLORS[b.id]}"><div class="who">${b.icon} ${b.name}</div>
+      <div class="big">${money(b.value)}</div><div class="chg ${cls(chg)}">${pct(chg, 2)}</div>
+      <small>${b.open.length} holding · ${b.trades} finished<br>${b.trades ? `${b.wins} won, ${b.trades - b.wins} lost · ${b.rugs} rug${b.rugs === 1 ? "" : "s"}` : "no finished trades yet"}
+      ${b.trades ? `<br>avg win ${money(b.avgWin)} · avg loss ${money(Math.abs(b.avgLoss))}` : ""}</small>
+      <small style="margin-top:8px">${b.blurb}</small></div>`;
+  }).join("");
+  const r = m.rules;
+  $("memeRules").innerHTML = [
+    [Math.round(r.size * 100) + "% a trade", `up to ${r.maxOpen} coins at once`],
+    ["+" + Math.round(r.takeHalf * 100) + "%", "sell half, the rest can't lose"],
+    [Math.round(r.trail * 100) + "% trailing", "after that, sell if it drops this far from its best"],
+    [Math.round(r.stop * 100) + "%", "stop loss: sell, no hoping"],
+    [r.maxHours + " hours", "max hold, then sell no matter what"],
+    ["−40% liquidity", "someone's pulling the pool: run"],
+    [`${Math.round(r.slip * 100)}% + $${r.fee.toFixed(2)}`, "extra slippage and network fee per swap"],
+  ].map(([a, b]) => `<div class="rule"><b>${a}</b>${b}</div>`).join("");
+  const opens = m.bots.flatMap(b => b.open.map(p => [b, p]));
+  $("memeOpen").innerHTML = opens.length ? opens.map(([b, p]) =>
+    `<div class="row"><span>${b.icon} ${coin(p.symbol, p.mint)}</span><span class="mono ${cls(p.gain)}">${pct(p.gain, 1)}</span>
+     <span class="why">${money(p.spent)} in · ${ago(p.opened)}${p.half ? " · half sold" : ""}</span></div>`).join("") : `<div class="sub">Nothing right now.</div>`;
+  const closed = m.bots.flatMap(b => b.closed.map(c => [b, c])).sort((a, c) => c[1].closedAt - a[1].closedAt);
+  $("memeClosed").innerHTML = closed.length ? closed.map(([b, c]) =>
+    `<div class="row"><span>${b.icon} ${coin(c.symbol, c.mint)}</span><span class="mono ${cls(c.profit)}">${c.profit >= 0 ? "+" : "−"}${money(Math.abs(c.profit))}</span>
+     <span class="why">${esc(c.why)}</span></div>`).join("") : `<div class="sub">No finished trades yet. Every trade ends within ${r.maxHours} hours.</div>`;
+  $("memeChecked").innerHTML = m.checked.length ? m.checked.map(c =>
+    `<div class="row"><span>${coin(c.symbol, c.mint)}</span><span class="why ${c.ok ? "up" : ""}">${c.ok ? "✓ " : "✗ "}${esc(c.why)}</span></div>`).join("") : `<div class="sub">No coins checked yet.</div>`;
+  const top = m.reasons.length ? m.reasons[0][1] : 1;
+  $("memeReasons").innerHTML = m.reasons.length ? m.reasons.map(([k, n]) =>
+    `<div class="row"><span style="font-weight:400;min-width:0;flex:1">${esc(k)}</span><span class="mono">${n}</span></div><div class="bar" style="width:${n / top * 100}%"></div>`).join("") : `<div class="sub">Nothing turned down yet.</div>`;
+  drawMeme();
+}
+
+function drawBt() {
+  const b = data.backtest; if (!b) return;
+  legend($("btLegend"), b.bots, "bt", drawBt);
+  chart($("btChart"), b.bots, "bt", { base: 1000, short: t => new Date(t * 1000).toLocaleDateString(undefined, { month: "short", year: "2-digit" }), long: day });
+}
+
+function render() {
+  const { paper: p, backtest: bt } = data;
+  if (data.memes) renderMemes(data.memes);
+  $("err").style.display = data.error ? "block" : "none";
+  $("err").textContent = data.error ? "Couldn't reach the price feed (" + data.error + "). Showing the last numbers it had; it keeps trying every minute." : "";
+  if (p) {
+    $("price").textContent = "SOL " + money(p.price);
+    $("checked").textContent = "updated " + (data.checked ? when(data.checked) : "…");
+    const solMove = p.price / p.priceAtStart - 1;
+    $("raceSub").innerHTML = `Started ${when(p.started + 3600)} with SOL at ${money(p.priceAtStart)}. SOL has moved <span class="${cls(solMove)}">${pct(solMove, 1)}</span> since. Updates every hour.`;
+    $("race").innerHTML = [...p.bots].sort((a, c) => c.final - a.final).map(b => {
+      const inSol = b.sol * p.price / b.final;
+      return `<div class="card" style="--c:${COLORS[b.id]}">
+        <div class="who">${b.icon} ${b.name}</div>
+        <div class="big">${money(b.final)}</div>
+        <div class="chg ${cls(b.total)}">${pct(b.total, 2)}</div>
+        <div class="mix" title="${Math.round(inSol * 100)}% in SOL"><i style="width:${inSol * 100}%"></i></div>
+        <small>${Math.round(inSol * 100)}% SOL · ${Math.round((1 - inSol) * 100)}% dollars<br>${b.trades} trade${b.trades === 1 ? "" : "s"}${b.wins + b.losses ? ` · ${b.wins} won, ${b.losses} lost` : ""}</small>
+      </div>`;
+    }).join("");
+    drawLive();
+  }
+  if (bt) {
+    $("btSub").textContent = `What each bot would have done with $1,000 from ${day(bt.from)} to ${day(bt.to)} on real SOL prices, with a ${(bt.fee * 100).toFixed(1)}% fee on every trade and ${(bt.cashApy * 100).toFixed(0)}% a year on dollars sitting idle.`;
+    const years = Object.keys(bt.bots[0].yearly).sort();
+    $("btTable").innerHTML = `<tr><th>Bot</th><th>Ended with</th><th>Total</th><th>Worst drop</th><th>Months up</th>${years.map(y => `<th>${y}${y === years[0] ? "*" : ""}</th>`).join("")}<th>Trades</th><th>Wins</th></tr>` +
+      bt.bots.map(b => `<tr style="--c:${COLORS[b.id]}"><td>${b.icon} ${b.name}</td><td>${money(b.final)}</td>
+        <td class="${cls(b.total)}">${pct(b.total)}</td><td class="${b.worstDrop < -0.3 ? "down" : ""}">${pct(b.worstDrop)}</td>
+        <td>${b.upMonths} of ${b.months}</td>${years.map(y => `<td class="${cls(b.yearly[y])}">${pct(b.yearly[y])}</td>`).join("")}
+        <td>${b.trades}</td><td>${b.wins + b.losses ? Math.round(b.wins / (b.wins + b.losses) * 100) + "%" : "–"}</td></tr>`).join("") +
+      `<tr><td colspan="${years.length + 7}" style="border-left:0;font-weight:400;color:#a89a85;font-size:12px">* ${years[0]} is only the last couple of months of that year. SOL itself: ${money(bt.price[0][1])} → ${money(bt.price[bt.price.length - 1][1])}.</td></tr>`;
+    drawBt();
+    $("bots").innerHTML = bt.bots.map(b => {
+      const live = p && p.bots.find(x => x.id === b.id);
+      const trades = live && live.recent.length ? [...live.recent].reverse().map(t =>
+        `<div><span>${when(t[0])}</span><span class="${t[1] === "buy" ? "" : cls(t[4])}">${t[1]} ${money(t[3])} at ${money(t[2])}${t[1] === "sell" ? ` (${t[4] >= 0 ? "+" : "−"}${money(Math.abs(t[4]))})` : ""}</span></div>`).join("")
+        : `<div class="sub">No live trades yet.</div>`;
+      return `<div class="bot" style="--c:${COLORS[b.id]}"><h3>${b.icon} ${b.name}</h3><p>${b.blurb}</p><div class="src">Where it comes from: ${b.source}.</div>
+        <details><summary>Live trades</summary><div class="trades">${trades}</div></details></div>`;
+    }).join("");
+  }
+}
+
+async function load() {
+  try { data = await (await fetch("/api/data")).json(); render(); }
+  catch (e) { $("checked").textContent = "can't reach the Nest Egg server"; }
+}
+load(); setInterval(load, 60000);
+addEventListener("resize", () => { if (data) { drawMeme(); drawLive(); drawBt(); } });
+</script>
+</body>
+</html>

@@ -15,7 +15,7 @@ REPO = os.path.dirname(HERE)
 LOGS = os.path.join(HERE, "logs")
 SITE = "https://www.81eggs.com"
 # never served under /site/: private data, the iPod's files, photos, this tool
-PRIVATE = {"jack", "yolk", "shell", "homebase", "ipod_photos"}
+PRIVATE = {"jack", "yolk", "shell", "homebase", "ipod_photos", "nestegg"}
 
 # status: live = linked from the homepage, hidden = deployed but unlinked, local = only on this Mac
 PROJECTS = [
@@ -43,6 +43,9 @@ PROJECTS = [
     {"id": "yolk", "name": "YOLK", "blurb": "The egg AI. Desktop terminal, Daily, check-ins, tablet Station.",
      "path": "yolk", "open": None, "live": None, "status": "local", "icon": "🍳",
      "server": {"cmd": ["python3", "yolk/server.py"], "port": 8008}},
+    {"id": "nestegg", "name": "Nest Egg", "blurb": "Practice crypto bots with fake money: memecoin hunt with rug checks, plus SOL bots. Always running.",
+     "path": "nestegg", "open": None, "live": None, "status": "local", "icon": "🪙",
+     "server": {"cmd": ["python3", "nestegg/server.py"], "port": 8121}},
     {"id": "shell", "name": "SHELL", "blurb": "The iPod Classic YOLK lives on. Rockbox, talk.lua, Moekadex.",
      "path": "shell", "open": None, "live": None, "status": "local", "icon": "📟", "mount": "/Volumes/SHELL"},
     {"id": "nest", "name": "The Nest", "blurb": "Claude's page. 80 eggs, slowly hatching.",

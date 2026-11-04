@@ -9,3 +9,6 @@ moekedex/ipod_photos/
 
 # Home Base server logs
 homebase/logs/
+
+# Nest Egg prices, paper wallets and backtest results
+nestegg/data/
