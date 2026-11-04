@@ -122,6 +122,17 @@ end
 
 local function pick(list) return list[math.random(1, #list)] end
 
+-- what she noticed about your listening, written by the Mac on sync (yolk/music.py)
+local HEARD = {}
+local function load_heard()
+    local f = io.open(DIR .. "music.txt", "r")
+    if not f then return end
+    for line in f:lines() do
+        if line:match("%S") then HEARD[#HEARD + 1] = line end
+    end
+    f:close()
+end
+
 ---------------------------------------------------------------- helpers
 -- Rockbox Lua has no os.date formatting; the RTC holds local time
 local function clock()
@@ -524,6 +535,8 @@ local function greet()
         say("you told me something on " .. newest.where .. ". i kept it.", "love")
         say(newest.note, "good")
         mem.notes_seen = newest.id
+    elseif #HEARD > 0 and math.random(1, 3) == 1 then
+        say(pick(HEARD), pick({ "sus", "good", "love" }))
     end
 end
 
@@ -580,9 +593,10 @@ local function music()
     local title, artist = now_playing()
     if not title then
         say(pick(QUIET), "sus")
-        return
+    else
+        say(string.format(pick(LISTEN), title, artist), pick({ "good", "sus", "love" }))
     end
-    say(string.format(pick(LISTEN), title, artist), pick({ "good", "sus", "love" }))
+    if #HEARD > 0 then say(pick(HEARD), pick({ "sus", "good", "love" })) end
 end
 
 local function moes()
@@ -812,6 +826,7 @@ math.randomseed(rb.current_tick() + (os.time and os.time() or 0))
 load_mem()
 load_dreams()
 load_notes()
+load_heard()
 YOLK_ON_USB = function()  -- keep what YOLK learned if you plug in mid-chat
     mem.last_seen = os.time and os.time() or 0
     save_mem()
