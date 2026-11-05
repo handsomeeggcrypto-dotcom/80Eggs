@@ -381,6 +381,29 @@ TYPES = {".html": "text/html; charset=utf-8", ".js": "text/javascript", ".css": 
          ".webmanifest": "application/manifest+json", ".m4a": "audio/mp4", ".wav": "audio/wav"}
 
 
+def watch_page(you="", answer=""):
+    """YOLK's chat page for the Apple Watch. Opened from a link in Messages, since the watch
+    has no browser of its own. Plain HTML form, no JavaScript, so the watch's web view copes."""
+    import html
+    said = '<p class="her">i&#39;m here.</p>'
+    if you:
+        said = f'<p class="you">{html.escape(you)}</p><p class="her">{html.escape(answer)}</p>'
+    return f"""<!doctype html><html><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="disabled-adaptations" content="watch">
+<title>YOLK</title><style>
+body{{background:#000;color:#ffb000;font:15px -apple-system,sans-serif;margin:0;padding:4px 6px;text-align:center}}
+img{{width:44px;height:44px;image-rendering:pixelated}}
+.you{{color:#777;font-size:13px;margin:4px 0}} .her{{margin:4px 0 10px}}
+input{{width:100%;box-sizing:border-box;font-size:15px;padding:6px;border-radius:8px;border:1px solid #ffb000;background:#111;color:#ffb000}}
+button{{width:100%;margin-top:6px;font-size:15px;padding:6px;border-radius:8px;border:0;background:#ffb000;color:#000}}
+</style></head><body>
+<img src="/faces/good.png" alt="">
+{said}
+<form method="post"><input name="text" placeholder="talk to yolk" autocomplete="off"><button>say it</button></form>
+</body></html>"""
+
+
 class Handler(BaseHTTPRequestHandler):
     def log_message(self, *args):
         pass
@@ -416,14 +439,14 @@ class Handler(BaseHTTPRequestHandler):
     def watch_ok(self, path):
         """The Apple Watch Shortcut can't keep a cookie, so it sends its own key, either in a
         header (X-YOLK-Key) or at the end of the address (/api/watch/<key>, easier to set up by hand)."""
-        key = self.headers.get("X-YOLK-Key") or path[len("/api/watch/"):]
+        key = self.headers.get("X-YOLK-Key") or path.rsplit("/", 1)[-1]
         return secrets.compare_digest(key.strip(), station_config()["watch_key"])
 
     def gate(self, path):
         """True if the request may continue; otherwise answers it with the pairing page."""
         if self.trusted() or path in self.PUBLIC:
             return True
-        if (path == "/api/watch" or path.startswith("/api/watch/")) and self.watch_ok(path):
+        if (path == "/api/watch" or path.startswith(("/api/watch/", "/w/"))) and self.watch_ok(path):
             return True
         if path.startswith("/api/"):
             self.send(403, {"error": "pair first"})
@@ -437,6 +460,8 @@ class Handler(BaseHTTPRequestHandler):
         path = self.path.split("?")[0]
         if not self.gate(path):
             return
+        if path.startswith("/w/"):           # the Apple Watch chat page
+            return self.send(200, watch_page(), TYPES[".html"])
         if path == "/pair":
             path = "/pair.html"
         if path == "/station":
@@ -504,6 +529,20 @@ class Handler(BaseHTTPRequestHandler):
         path = self.path.split("?")[0]
         if not self.gate(path):
             return
+        if path.startswith("/w/"):           # the Apple Watch chat page's form
+            import chat
+            from urllib.parse import parse_qs
+            n = int(self.headers.get("Content-Length", 0) or 0)
+            form = parse_qs(self.rfile.read(min(n, 20000)).decode("utf-8", "replace"))
+            text = (form.get("text") or [""])[0].strip()[:1000]
+            if not text:
+                return self.send(200, watch_page(), TYPES[".html"])
+            try:
+                answer = chat.reply(text, where="watch")
+            except Exception as e:
+                print("YOLK watch chat failed:", e)
+                answer = "my brain glitched. try again in a second."
+            return self.send(200, watch_page(text, answer), TYPES[".html"])
         if path == "/api/watch" or path.startswith("/api/watch/"):   # the Apple Watch Shortcut: plain text in, plain text out
             import chat
             n = int(self.headers.get("Content-Length", 0) or 0)
