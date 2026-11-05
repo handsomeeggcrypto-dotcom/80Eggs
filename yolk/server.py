@@ -413,16 +413,17 @@ class Handler(BaseHTTPRequestHandler):
         token = station_config()["token"]
         return f"yolk_pair={token}" in (self.headers.get("Cookie") or "")
 
-    def watch_ok(self):
-        """The Apple Watch Shortcut can't keep a cookie, so it sends its own key in a header."""
-        key = self.headers.get("X-YOLK-Key") or ""
+    def watch_ok(self, path):
+        """The Apple Watch Shortcut can't keep a cookie, so it sends its own key, either in a
+        header (X-YOLK-Key) or at the end of the address (/api/watch/<key>, easier to set up by hand)."""
+        key = self.headers.get("X-YOLK-Key") or path[len("/api/watch/"):]
         return secrets.compare_digest(key.strip(), station_config()["watch_key"])
 
     def gate(self, path):
         """True if the request may continue; otherwise answers it with the pairing page."""
         if self.trusted() or path in self.PUBLIC:
             return True
-        if path == "/api/watch" and self.watch_ok():
+        if (path == "/api/watch" or path.startswith("/api/watch/")) and self.watch_ok(path):
             return True
         if path.startswith("/api/"):
             self.send(403, {"error": "pair first"})
@@ -503,7 +504,7 @@ class Handler(BaseHTTPRequestHandler):
         path = self.path.split("?")[0]
         if not self.gate(path):
             return
-        if path == "/api/watch":             # the Apple Watch Shortcut: plain text in, plain text out
+        if path == "/api/watch" or path.startswith("/api/watch/"):   # the Apple Watch Shortcut: plain text in, plain text out
             import chat
             n = int(self.headers.get("Content-Length", 0) or 0)
             raw = self.rfile.read(min(n, 20000)).decode("utf-8", "replace").strip()
