@@ -37,6 +37,8 @@ PROJECTS = [
      "path": "moekedex", "open": "moekedex/", "live": "/moekedex/", "status": "live", "icon": "moekedex/icon.png"},
     {"id": "blorps", "name": "Blorp Museum", "blurb": "90s-style art museum for all 205 Blorps, the blue alien Moes.",
      "path": "blorps", "open": "blorps/", "live": "/blorps/", "status": "live", "icon": "🛸"},
+    {"id": "patrol", "name": "Blorp Patrol", "blurb": "Jetpack into the mothership tube with the right answer. Spot the human!",
+     "path": "blorps/patrol.html", "open": "blorps/patrol.html", "live": None, "status": "local", "icon": "🚀"},
     {"id": "naptime", "name": "Nap Time", "blurb": "Bedtime story, then play the dream. Every dream has a shadow.",
      "path": "nap_time", "open": "nap_time/", "live": "/nap_time/", "status": "live", "icon": "🌙",
      "server": {"cmd": ["python3", "nap_time/serve.py"], "port": 8177}},

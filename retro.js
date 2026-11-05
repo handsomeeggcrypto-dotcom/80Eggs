@@ -22,7 +22,6 @@
   var RING = [
     { name: "MoeSpace", path: "/", icon: "🥚" },
     { name: "The Blorp Museum", path: "/blorps/", icon: "🛸" },
-    { name: "Blorp Patrol", path: "/blorps/patrol.html", icon: "🚀" },
     { name: "Moekedex", path: "/moekedex/", icon: "💛" },
     { name: "Dream Things", path: "/dreamthings/", icon: "☁️" },
     { name: "Tomochi Pop", path: "/bubbles/", icon: "🫧" },

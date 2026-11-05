@@ -56,6 +56,7 @@
     background: var(--gray); border: 2px solid; border-color: var(--gray-hi) var(--gray-dk) var(--gray-dk) var(--gray-hi);
     box-shadow: inset -1px -1px 0 var(--gray-lo), inset 1px 1px 0 #dfdfdf;
   }
+  .bevel[hidden] { display: none; }
   .bevel:active, .bevel.on {
     border-color: var(--gray-dk) var(--gray-hi) var(--gray-hi) var(--gray-dk);
     box-shadow: inset 1px 1px 0 var(--gray-lo); background: #b4b4b4;
@@ -198,7 +199,7 @@
       <a class="bevel" href="#vault" data-room="vault">🔒 The Vault</a>
       <a class="bevel" href="#mine" data-room="mine">💙 My Collection</a>
       <a class="bevel" href="#guestbook" data-room="guestbook">📖 Guestbook</a>
-      <a class="bevel" href="patrol.html">🚀 Blorp Patrol</a>
+      <a class="bevel" href="patrol.html" id="patrolLink" hidden>🚀 Blorp Patrol</a>
       <a class="bevel" href="screensaver.html">🌌 Screensaver</a>
       <div class="small comic">Open daily<br>24 hrs / 7 days<br>Admission: FREE</div>
     </nav>
@@ -587,6 +588,9 @@
 
   // ---- 90s bits ----
   $("wordart").innerHTML = [..."THE BLORP MUSEUM"].map((c, i) => c === " " ? " " : `<span style="animation-delay:${i * .09}s">${c}</span>`).join("");
+
+  // Blorp Patrol is Mac-only for now (it isn't on the website), so only show its button here
+  if (/^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname)) $("patrolLink").hidden = false;
 
   renderMine(); renderGb(); route();
 })();
