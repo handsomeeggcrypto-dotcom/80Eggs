@@ -308,6 +308,25 @@ def deliver_daily():
     threading.Thread(target=work, daemon=True).start()
 
 
+def keep_backing_up():
+    """Once a day, a copy of her memory goes to iCloud Drive (backup.py).
+    Test runs with their own YOLK_DATA skip it unless they set YOLK_BACKUP too."""
+    if os.environ.get("YOLK_DATA") and not os.environ.get("YOLK_BACKUP"):
+        return
+
+    def loop():
+        import backup
+        while True:
+            try:
+                made = backup.daily()
+                if made:
+                    print(f"Backed up {made[1]} files to {made[0]}")
+            except Exception as e:
+                print("YOLK couldn't back up:", e)
+            time.sleep(3600)
+    threading.Thread(target=loop, daemon=True).start()
+
+
 # ------------------------------------------------------------------ extras
 def mac_battery():
     """Percent, or None on a Mac without a battery."""
@@ -663,4 +682,5 @@ if __name__ == "__main__":
     addr = lan_address()
     if addr:
         print(f"YOLK Station (tablet): http://{addr}:{PORT}/station   pairing code: {cfg['code']}")
+    keep_backing_up()
     ThreadingHTTPServer(("0.0.0.0", PORT), Handler).serve_forever()
