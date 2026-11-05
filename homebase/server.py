@@ -36,7 +36,7 @@ PROJECTS = [
     {"id": "moekedex", "name": "Moekedex", "blurb": "Pokédex for all 5,250 moemoe LLC NFTs, with rarity ranks.",
      "path": "moekedex", "open": "moekedex/", "live": "/moekedex/", "status": "live", "icon": "moekedex/icon.png"},
     {"id": "blorps", "name": "Blorp Museum", "blurb": "90s-style art museum for all 205 Blorps, the blue alien Moes.",
-     "path": "blorps", "open": "blorps/", "live": "/blorps/", "status": "hidden", "icon": "🛸"},
+     "path": "blorps", "open": "blorps/", "live": "/blorps/", "status": "live", "icon": "🛸"},
     {"id": "naptime", "name": "Nap Time", "blurb": "Bedtime story, then play the dream. Every dream has a shadow.",
      "path": "nap_time", "open": "nap_time/", "live": "/nap_time/", "status": "live", "icon": "🌙",
      "server": {"cmd": ["python3", "nap_time/serve.py"], "port": 8177}},
