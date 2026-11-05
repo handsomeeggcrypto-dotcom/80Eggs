@@ -30,6 +30,7 @@ Each project folder has its own `CLAUDE.md`. Read it before working there.
 | `director_moe.html` | Moe Fights scene studio | hidden |
 | `nest.html` | **The Nest**, Claude's own page (see below) | live, via "Groups" |
 | `scores.js` + `api/scores.py` | **Shared leaderboards** for Tomochi Pop (Classic, Rush), MOEtorcycles (Normal, Portal) and Defend Your LLC. `api/` is a Vercel Python function backed by Upstash Redis | live |
+| `retro.js` | **The 90s kit**: one `<script src="/retro.js" data-kit="stars sparkles ring counter">` line gives a page the starfield, mouse sparkles, visitor counter and the **80Eggs Webring** bar. The ring's order is `RING` at the top of the file, so add new pages there. On the Blorp Museum, Moekedex, Dream Things, Sudoku and the Nest so far (full-screen games are in the ring but don't show the bar) | live |
 | `api/telegram.py` | **Telegram bot**: `/pop` posts the Tomochi Pop menu picture + a Play button; `/scores` posts the top 5 of the Tomochi Pop leaderboards (the bot is for the Tomochi group, so no MOEtorcycles). Token is `TELEGRAM_BOT_TOKEN` in Vercel; webhook points at `/api/telegram`. Add commands to `COMMANDS` | live |
 | `crypto.html`, `eggdefend.html`, `smokebreak.html`, `sudoku.html`, `typing.html` | Small single-file games and tools | live |
 

@@ -15,16 +15,7 @@
   html { background: var(--space); }
   body {
     margin: 0; color: #fff; font: 16px/1.4 "Times New Roman", Times, serif;
-    background-color: var(--space);
-    /* tiled starfield, the old-fashioned way */
-    background-image:
-      radial-gradient(1px 1px at 12px 18px, #fff 99%, transparent),
-      radial-gradient(1px 1px at 70px 90px, #9fe0ff 99%, transparent),
-      radial-gradient(2px 2px at 140px 40px, #fff 99%, transparent),
-      radial-gradient(1px 1px at 180px 150px, #ffff99 99%, transparent),
-      radial-gradient(1px 1px at 40px 170px, #fff 99%, transparent),
-      radial-gradient(1px 1px at 110px 130px, #fff 99%, transparent);
-    background-size: 200px 200px;
+    background-color: var(--space); /* stars come from /retro.js */
   }
   a { color: var(--lime); }
   a:visited { color: var(--pink); }
@@ -167,15 +158,11 @@
 
   /* ---------- footer ---------- */
   footer { text-align: center; margin-top: 22px; font-size: 13px; color: var(--gray); }
-  .counter { display: inline-flex; gap: 2px; margin: 4px 0; }
-  .counter b { background: #000; color: var(--lime); font: bold 18px "Courier New", monospace; padding: 1px 4px; border: 1px solid #555; }
-  .webring { display: inline-block; margin: 10px 0; border: 3px ridge var(--pink); padding: 6px 12px; background: #200020; }
+  .counter { display: inline-block; margin: 4px 0; }
   .badges { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; margin-top: 8px; }
   .badge { width: 88px; height: 31px; display: flex; align-items: center; justify-content: center; text-align: center;
     font: bold 9px/1.05 Verdana, sans-serif; border: 1px solid #fff; }
 
-  .sparkle { position: fixed; pointer-events: none; z-index: 99; font-size: 14px; animation: fall .8s linear forwards; }
-  @keyframes fall { to { transform: translateY(30px) scale(.3); opacity: 0 } }
 
   @media (max-width: 760px) {
     .layout { grid-template-columns: 1fr; }
@@ -307,11 +294,9 @@
   <footer class="comic">
     <hr class="rainbow">
     <div>You are visitor number</div>
-    <div class="counter" id="counter"></div>
+    <div class="counter" data-retro-counter></div>
     <div>since the Blorps landed</div>
-    <div class="webring">
-      ◀ <a href="../moekedex/index.html">Moekedex</a> | <b>~ 80Eggs Webring ~</b> | <a href="../dreamthings/index.html">Dream Things</a> ▶
-    </div>
+    <div data-retro-ring></div>
     <div class="badges" aria-hidden="true">
       <span class="badge" style="background:#000080;color:#ff0">NETSCAPE<br>NOW!</span>
       <span class="badge" style="background:#000;color:#39ff14">BLORP<br>APPROVED</span>
@@ -346,6 +331,7 @@
   </div>
 </div>
 
+<script src="/retro.js" data-kit="stars sparkles ring"></script>
 <script src="../moekedex/data.js"></script>
 <script>
 (() => {
@@ -599,20 +585,6 @@
 
   // ---- 90s bits ----
   $("wordart").innerHTML = [..."THE BLORP MUSEUM"].map((c, i) => c === " " ? " " : `<span style="animation-delay:${i * .09}s">${c}</span>`).join("");
-  const visits = (+store("blorp_visits") || 0) + 1; store("blorp_visits", visits);
-  const count = String(4096 + Math.floor(Date.now() / 864e5 - 20400) * 13 + visits).padStart(7, "0");
-  $("counter").innerHTML = [...count].map(d => `<b>${d}</b>`).join("");
-  if (!matchMedia("(prefers-reduced-motion: reduce)").matches && matchMedia("(pointer: fine)").matches) {
-    let last = 0;
-    document.addEventListener("mousemove", e => {
-      const now = performance.now(); if (now - last < 45) return; last = now;
-      const s = document.createElement("span");
-      s.className = "sparkle"; s.textContent = ["✦", "✧", "★", "·"][Math.floor(Math.random() * 4)];
-      s.style.left = e.clientX + 6 + "px"; s.style.top = e.clientY + 6 + "px";
-      s.style.color = ["#3fa9ff", "#9fe0ff", "#39ff14", "#ffff33"][Math.floor(Math.random() * 4)];
-      document.body.appendChild(s); setTimeout(() => s.remove(), 800);
-    });
-  }
 
   renderMine(); renderGb(); route();
 })();
