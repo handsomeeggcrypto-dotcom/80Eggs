@@ -1,0 +1,622 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>The Blorp Museum</title>
+<meta name="description" content="A digital art museum for the Blorps, the blue aliens of moemoe LLC.">
+<style>
+  :root {
+    --space: #050522; --navy: #0a0a4a; --blorp: #3fa9ff; --blorp-hi: #9fe0ff; --lime: #39ff14;
+    --yellow: #ffff33; --pink: #ff66cc; --gold: #d4a017; --gold-hi: #ffe27a; --gold-lo: #7a5a00;
+    --gray: #c0c0c0; --gray-hi: #ffffff; --gray-lo: #808080; --gray-dk: #404040; --ink: #000;
+  }
+  * { box-sizing: border-box; }
+  html { background: var(--space); }
+  body {
+    margin: 0; color: #fff; font: 16px/1.4 "Times New Roman", Times, serif;
+    background-color: var(--space);
+    /* tiled starfield, the old-fashioned way */
+    background-image:
+      radial-gradient(1px 1px at 12px 18px, #fff 99%, transparent),
+      radial-gradient(1px 1px at 70px 90px, #9fe0ff 99%, transparent),
+      radial-gradient(2px 2px at 140px 40px, #fff 99%, transparent),
+      radial-gradient(1px 1px at 180px 150px, #ffff99 99%, transparent),
+      radial-gradient(1px 1px at 40px 170px, #fff 99%, transparent),
+      radial-gradient(1px 1px at 110px 130px, #fff 99%, transparent);
+    background-size: 200px 200px;
+  }
+  a { color: var(--lime); }
+  a:visited { color: var(--pink); }
+  .comic { font-family: "Comic Sans MS", "Comic Sans", "Chalkboard SE", cursive; }
+
+  .page { max-width: 980px; margin: 0 auto; padding: 12px 16px 40px; }
+
+  /* ---------- header ---------- */
+  .topbar { display: flex; justify-content: space-between; gap: 8px; font-size: 13px; }
+  .wordart {
+    margin: 10px 0 0; text-align: center; font: 900 clamp(36px, 9vw, 76px)/1 Impact, "Arial Black", sans-serif;
+    letter-spacing: .02em; color: #7fd8ff;
+    -webkit-text-stroke: 1px #e6fbff;
+    text-shadow: 1px 1px 0 #1a5fd6, 2px 2px 0 #1a5fd6, 3px 3px 0 #0b3a9a, 4px 4px 0 #0b3a9a, 6px 6px 0 #000;
+  }
+  .wordart span { display: inline-block; animation: wave 2.4s ease-in-out infinite; }
+  @keyframes wave { 0%,100% { transform: translateY(0) } 50% { transform: translateY(-8px) } }
+  .tagline { text-align: center; color: var(--yellow); margin: 6px 0 10px; font-size: 18px; }
+  .marquee {
+    overflow: hidden; white-space: nowrap; border: 3px ridge var(--blorp); background: #000;
+    color: var(--lime); font: 16px "Courier New", monospace; padding: 4px 0;
+  }
+  .marquee span { display: inline-block; padding-left: 100%; animation: scroll 28s linear infinite; }
+  @keyframes scroll { to { transform: translateX(-100%) } }
+  .blink { animation: blink 1s steps(1) infinite; }
+  @keyframes blink { 50% { visibility: hidden } }
+
+  /* ---------- layout ---------- */
+  .layout { display: grid; grid-template-columns: 190px 1fr; gap: 14px; margin-top: 14px; }
+  nav {
+    background: var(--navy); border: 4px outset var(--blorp); padding: 10px; align-self: start;
+    position: sticky; top: 10px;
+  }
+  nav h3 { margin: 0 0 8px; text-align: center; color: var(--yellow); font-size: 15px; text-decoration: underline; }
+  .bevel {
+    display: block; width: 100%; margin: 0 0 8px; padding: 6px 8px; cursor: pointer; text-align: left;
+    font: bold 14px "MS Sans Serif", Tahoma, Geneva, sans-serif; color: var(--ink); text-decoration: none;
+    background: var(--gray); border: 2px solid; border-color: var(--gray-hi) var(--gray-dk) var(--gray-dk) var(--gray-hi);
+    box-shadow: inset -1px -1px 0 var(--gray-lo), inset 1px 1px 0 #dfdfdf;
+  }
+  .bevel:active, .bevel.on {
+    border-color: var(--gray-dk) var(--gray-hi) var(--gray-hi) var(--gray-dk);
+    box-shadow: inset 1px 1px 0 var(--gray-lo); background: #b4b4b4;
+  }
+  .bevel.on::before { content: "► "; color: #000080; }
+  nav .small { font-size: 12px; color: var(--blorp-hi); text-align: center; margin-top: 10px; }
+  :focus-visible { outline: 2px dotted var(--yellow); outline-offset: 2px; }
+
+  main {
+    background: rgba(0, 0, 40, .82); border: 4px ridge var(--gold); padding: 16px 18px; min-height: 480px;
+  }
+  main h2 {
+    margin: 0 0 4px; font: bold 30px "Comic Sans MS", "Chalkboard SE", cursive; color: var(--blorp-hi);
+    text-shadow: 2px 2px 0 #001a66;
+  }
+  main h2 + .sub { margin: 0 0 14px; color: var(--yellow); font-style: italic; }
+  hr.rainbow { border: 0; height: 6px; margin: 16px 0;
+    background: linear-gradient(90deg, red, orange, yellow, lime, cyan, blue, violet); }
+  .room { display: none; }
+  .room.on { display: block; }
+
+  /* ---------- picture frames ---------- */
+  .wall { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 18px 14px; }
+  .piece { text-align: center; cursor: pointer; background: none; border: 0; padding: 0; color: inherit; font: inherit; }
+  .frame {
+    position: relative; padding: 9px; background: linear-gradient(135deg, var(--gold-hi), var(--gold) 30%, var(--gold-lo) 70%, var(--gold));
+    border: 2px solid #3a2a00; box-shadow: 4px 4px 0 rgba(0,0,0,.6);
+  }
+  .frame::after { content: ""; position: absolute; inset: 7px; border: 2px inset var(--gold-lo); pointer-events: none; }
+  .frame img { display: block; width: 100%; aspect-ratio: 1; object-fit: cover; background: #111 center/40% no-repeat; }
+  .piece:hover .frame { transform: translateY(-3px); box-shadow: 6px 8px 0 rgba(0,0,0,.6); }
+  .placard {
+    display: inline-block; margin-top: 7px; padding: 2px 8px; background: #f3ecd6; color: #222;
+    border: 1px solid #8a7a50; font: 12px Georgia, serif; max-width: 100%;
+  }
+  .placard b { display: block; font-size: 13px; }
+  .tier { font: bold 11px "Courier New", monospace; letter-spacing: .05em; }
+  .MYTHIC { color: #c4003a } .LEGENDARY { color: #a46e00 } .EPIC { color: #7a20c8 } .RARE { color: #0070a8 } .COMMON { color: #555 }
+
+  /* ---------- lobby ---------- */
+  .lobby { display: grid; grid-template-columns: 1fr 260px; gap: 18px; align-items: start; }
+  .spinbox { text-align: center; }
+  .spinbox .frame { width: 220px; margin: 0 auto; animation: spin 6s linear infinite; transform-style: preserve-3d; }
+  @keyframes spin { from { transform: perspective(600px) rotateY(0) } to { transform: perspective(600px) rotateY(360deg) } }
+  .facts { width: 100%; border: 3px outset var(--blorp); background: #000033; border-collapse: collapse; }
+  .facts td { border: 1px inset var(--blorp); padding: 4px 8px; }
+  .facts td:first-child { color: var(--yellow); width: 45%; }
+  .new { color: red; font: bold 12px Arial, sans-serif; background: yellow; padding: 0 3px; }
+  .construction {
+    margin: 14px 0 0; padding: 6px; text-align: center; color: #000; font: bold 14px Arial, sans-serif;
+    background: repeating-linear-gradient(45deg, #ffcc00 0 14px, #000 14px 28px);
+  }
+  .construction span { background: #ffcc00; padding: 2px 8px; }
+
+  /* ---------- toolbar ---------- */
+  .tools { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-bottom: 14px;
+    background: var(--gray); color: #000; padding: 6px 8px; border: 2px outset var(--gray-hi); font: 13px Tahoma, Geneva, sans-serif; }
+  .tools select, .tools input { font: 13px Tahoma, Geneva, sans-serif; min-height: 28px; max-width: 100%; }
+  .tools .bevel { display: inline-block; width: auto; margin: 0; }
+  .count { margin-left: auto; }
+
+  /* ---------- vault ---------- */
+  .vault-door {
+    text-align: center; padding: 20px; background: radial-gradient(circle, #1a1a1a, #000 70%);
+    border: 6px double #888; margin-bottom: 20px;
+  }
+  .vault-door .frame { width: min(320px, 100%); margin: 10px auto; animation: glow 2.5s ease-in-out infinite alternate; }
+  @keyframes glow { from { box-shadow: 0 0 12px 2px #3fa9ff } to { box-shadow: 0 0 40px 12px #39ffd0 } }
+  .vault-door h3 { color: var(--lime); font: bold 22px "Courier New", monospace; margin: 0; }
+
+  /* ---------- guestbook / forms ---------- */
+  .win { background: var(--gray); color: #000; border: 2px solid; border-color: var(--gray-hi) var(--gray-dk) var(--gray-dk) var(--gray-hi); font: 13px Tahoma, Geneva, sans-serif; }
+  .win .title { background: linear-gradient(90deg, #000080, #1084d0); color: #fff; font-weight: bold; padding: 3px 6px; display: flex; justify-content: space-between; align-items: center; }
+  .win .title .x { background: var(--gray); color: #000; border: 2px outset var(--gray-hi); width: 20px; height: 18px; line-height: 12px; padding: 0; cursor: pointer; font: bold 12px Tahoma, sans-serif; }
+  .win .body { padding: 10px; }
+  .win label { display: block; margin: 6px 0 2px; }
+  .win input, .win textarea { width: 100%; font: 13px Tahoma, Geneva, sans-serif; border: 2px inset var(--gray-hi); padding: 3px; }
+  .entries { margin-top: 16px; }
+  .entry { border: 2px dashed var(--blorp); padding: 8px 10px; margin-bottom: 10px; background: #000033; }
+  .entry .who { color: var(--yellow); font-weight: bold; }
+  .entry .when { color: var(--gray); font-size: 12px; }
+  .note { font-size: 13px; color: var(--blorp-hi); font-style: italic; }
+
+  /* ---------- exhibit viewer ---------- */
+  .modal { position: fixed; inset: 0; background: rgba(0,0,30,.75); display: none; align-items: center; justify-content: center; padding: 16px; z-index: 50; }
+  .modal.on { display: flex; }
+  .viewer { width: min(760px, 100%); max-height: calc(100vh - 32px); overflow: auto; }
+  .viewer .body { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .viewer .frame { padding: 14px; }
+  .viewer .frame::after { inset: 11px; }
+  .big-placard { background: #f3ecd6; border: 2px solid #8a7a50; padding: 10px 12px; font: 14px Georgia, serif; color: #222; }
+  .big-placard h4 { margin: 0; font: italic bold 20px Georgia, serif; }
+  .big-placard .meta { margin: 4px 0 8px; font-size: 13px; color: #555; }
+  .big-placard table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .big-placard td { border-top: 1px dotted #b8a878; padding: 2px 0; }
+  .big-placard td:first-child { color: #7a6a40; text-transform: capitalize; width: 40%; }
+  .big-placard td.rare-t { color: #c4003a; font-weight: bold; }
+  .viewer .actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+  .viewer .actions .bevel { width: auto; margin: 0; display: inline-block; }
+
+  /* ---------- footer ---------- */
+  footer { text-align: center; margin-top: 22px; font-size: 13px; color: var(--gray); }
+  .counter { display: inline-flex; gap: 2px; margin: 4px 0; }
+  .counter b { background: #000; color: var(--lime); font: bold 18px "Courier New", monospace; padding: 1px 4px; border: 1px solid #555; }
+  .webring { display: inline-block; margin: 10px 0; border: 3px ridge var(--pink); padding: 6px 12px; background: #200020; }
+  .badges { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; margin-top: 8px; }
+  .badge { width: 88px; height: 31px; display: flex; align-items: center; justify-content: center; text-align: center;
+    font: bold 9px/1.05 Verdana, sans-serif; border: 1px solid #fff; }
+
+  .sparkle { position: fixed; pointer-events: none; z-index: 99; font-size: 14px; animation: fall .8s linear forwards; }
+  @keyframes fall { to { transform: translateY(30px) scale(.3); opacity: 0 } }
+
+  @media (max-width: 760px) {
+    .layout { grid-template-columns: 1fr; }
+    nav { position: static; display: flex; flex-wrap: wrap; gap: 6px; }
+    nav h3, nav .small { width: 100%; margin: 0; }
+    .bevel { width: auto; margin: 0; flex: 1 1 40%; }
+    .lobby, .viewer .body { grid-template-columns: 1fr; }
+    .wall { grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); }
+    main { padding: 12px; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation: none !important; }
+    .marquee span { padding-left: 8px; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="topbar">
+    <a href="../index.html">« back to MoeSpace</a>
+    <span class="comic">est. 2026 · a moemoe LLC fan wing</span>
+  </div>
+
+  <h1 class="wordart" id="wordart" aria-label="The Blorp Museum">THE BLORP MUSEUM</h1>
+  <p class="tagline comic">~*~ the internet's #1 gallery of small blue aliens ~*~</p>
+  <div class="marquee" aria-hidden="true"><span id="marq">★ WELCOME 2 THE BLORP MUSEUM ★ PLEASE DO NOT TAP ON THE GLASS ★ NO FLASH PHOTOGRAPHY ★ BLORPS ARE NOT FOOD ★ SIGN OUR GUESTBOOK!!! ★ BEST VIEWED IN NETSCAPE NAVIGATOR 4.0 AT 800x600 ★</span></div>
+
+  <div class="layout">
+    <nav aria-label="Museum rooms">
+      <h3>~ MUSEUM MAP ~</h3>
+      <a class="bevel" href="#lobby" data-room="lobby">🛸 Lobby</a>
+      <a class="bevel" href="#gallery" data-room="gallery">🖼️ Main Gallery</a>
+      <a class="bevel" href="#vault" data-room="vault">🔒 The Vault</a>
+      <a class="bevel" href="#mine" data-room="mine">💙 My Collection</a>
+      <a class="bevel" href="#guestbook" data-room="guestbook">📖 Guestbook</a>
+      <div class="small comic">Open daily<br>24 hrs / 7 days<br>Admission: FREE</div>
+    </nav>
+
+    <main>
+      <!-- LOBBY -->
+      <section class="room" id="room-lobby">
+        <h2>Welcome, Earthling!</h2>
+        <p class="sub">You have entered the one and only museum devoted entirely to Blorps.</p>
+        <div class="lobby">
+          <div>
+            <p class="comic">Out of the 5,250 Moes of <b>moemoe LLC</b>, only <b id="blorpCount">—</b> were born with blue alien skin. We call them <b style="color:var(--blorp-hi)">BLORPS</b>, and every single one of them hangs on these walls.</p>
+            <p class="comic">Wander the <a href="#gallery">Main Gallery</a>, peek into <a href="#vault">The Vault</a> where the rarest Blorps are kept, and don't forget to sign the <a href="#guestbook">Guestbook</a> on your way out!! <span class="new">NEW!</span></p>
+            <table class="facts" aria-label="Blorp facts">
+              <tr><td>Blorps on display</td><td id="fCount">—</td></tr>
+              <tr><td>Share of all Moes</td><td id="fPct">—</td></tr>
+              <tr><td>Blorp hairstyles</td><td id="fHair">—</td></tr>
+              <tr><td>Rarest Blorp</td><td id="fRare">—</td></tr>
+              <tr><td>One-of-a-kind</td><td id="fOne">—</td></tr>
+            </table>
+            <div class="construction"><span>🚧 THIS MUSEUM IS ALWAYS UNDER CONSTRUCTION 🚧</span></div>
+          </div>
+          <div class="spinbox">
+            <p class="comic" style="color:var(--yellow);margin:0 0 8px"><b>✨ Blorp of the Day ✨</b></p>
+            <button class="piece" id="dailyPiece" aria-label="Open the Blorp of the Day"></button>
+          </div>
+        </div>
+      </section>
+
+      <!-- GALLERY -->
+      <section class="room" id="room-gallery">
+        <h2>The Main Gallery</h2>
+        <p class="sub">Every Blorp in existence. Click a painting to view the exhibit.</p>
+        <div class="tools">
+          <label>Wing: <select id="wing"></select></label>
+          <label>Sort: <select id="sort">
+            <option value="num">by number</option>
+            <option value="rank">rarest first</option>
+            <option value="shuffle">shuffle!</option>
+          </select></label>
+          <span class="count" id="galCount"></span>
+        </div>
+        <div class="wall" id="galleryWall"></div>
+      </section>
+
+      <!-- VAULT -->
+      <section class="room" id="room-vault">
+        <h2>The Vault</h2>
+        <p class="sub">Authorized personnel only. (That means you. You are authorized.)</p>
+        <div class="vault-door" id="vaultStar"></div>
+        <h3 class="comic" style="color:var(--yellow)">🏆 Hall of the Ten Rarest Blorps</h3>
+        <div class="wall" id="vaultWall"></div>
+      </section>
+
+      <!-- MY COLLECTION -->
+      <section class="room" id="room-mine">
+        <h2>My Collection</h2>
+        <p class="sub">The curator's personal Blorps.</p>
+        <div class="tools">
+          <label>Wallet: <input id="walletIn" size="22" placeholder="0x…" autocomplete="off" spellcheck="false"></label>
+          <button class="bevel" id="walletBtn">Load from wallet</button>
+          <button class="bevel" id="walletForget" hidden>Forget wallet</button>
+          <span class="count" id="walletMsg"></span>
+        </div>
+        <div class="tools">
+          <label>Add Blorp #<input id="addNum" inputmode="numeric" size="6" placeholder="1234"></label>
+          <button class="bevel" id="addBtn">Add to wall</button>
+          <span class="count" id="mineMsg"></span>
+        </div>
+        <div class="wall" id="mineWall"></div>
+        <p class="note" id="mineEmpty">This wall is empty for now. Paste an Ethereum wallet and click <b>Load from wallet</b>, or type a Blorp number and click <b>Add to wall</b>.</p>
+        <p class="note">The wallet is only remembered in this browser, and it's checked again every time you visit this room, so the wall follows what you own.</p>
+      </section>
+
+      <!-- GUESTBOOK -->
+      <section class="room" id="room-guestbook">
+        <h2>Sign the Guestbook!</h2>
+        <p class="sub">Tell the Blorps what you think. They can read. Probably.</p>
+        <div class="win">
+          <div class="title"><span>📖 guestbook.exe</span><span aria-hidden="true">_ □ ✕</span></div>
+          <form class="body" id="gbForm">
+            <label for="gbName">Your name / handle:</label>
+            <input id="gbName" maxlength="40" required>
+            <label for="gbMsg">Your message:</label>
+            <textarea id="gbMsg" rows="3" maxlength="300" required></textarea>
+            <p style="margin:8px 0 0"><button class="bevel" style="display:inline-block;width:auto" type="submit">Sign it!</button></p>
+          </form>
+        </div>
+        <p class="note">Your entries are saved in your own browser (for now).</p>
+        <div class="entries" id="gbEntries"></div>
+      </section>
+    </main>
+  </div>
+
+  <footer class="comic">
+    <hr class="rainbow">
+    <div>You are visitor number</div>
+    <div class="counter" id="counter"></div>
+    <div>since the Blorps landed</div>
+    <div class="webring">
+      ◀ <a href="../moekedex/index.html">Moekedex</a> | <b>~ 80Eggs Webring ~</b> | <a href="../dreamthings/index.html">Dream Things</a> ▶
+    </div>
+    <div class="badges" aria-hidden="true">
+      <span class="badge" style="background:#000080;color:#ff0">NETSCAPE<br>NOW!</span>
+      <span class="badge" style="background:#000;color:#39ff14">BLORP<br>APPROVED</span>
+      <span class="badge" style="background:#3fa9ff;color:#000">MADE ON<br>A MAC</span>
+      <span class="badge" style="background:#c0c0c0;color:#c00">GET<br>MOEMOE</span>
+    </div>
+    <p>Blorp art © its creators, moemoe LLC. This museum is a fan page. 💙</p>
+  </footer>
+</div>
+
+<!-- exhibit viewer -->
+<div class="modal" id="modal" role="dialog" aria-modal="true" aria-labelledby="exTitle">
+  <div class="win viewer">
+    <div class="title"><span id="exBar">EXHIBIT.BMP - Blorp Viewer</span><button class="x" id="exClose" aria-label="Close">✕</button></div>
+    <div class="body">
+      <div class="frame"><img id="exImg" alt=""></div>
+      <div>
+        <div class="big-placard">
+          <h4 id="exTitle"></h4>
+          <div class="meta" id="exMeta"></div>
+          <table id="exTraits"></table>
+        </div>
+        <div class="actions">
+          <button class="bevel" id="exPrev">◀ Prev</button>
+          <button class="bevel" id="exNext">Next ▶</button>
+          <a class="bevel" id="exDex" href="#">Moekedex</a>
+          <a class="bevel" id="exSea" href="#" target="_blank" rel="noopener">OpenSea</a>
+          <button class="bevel" id="exMine"></button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="../moekedex/data.js"></script>
+<script>
+(() => {
+  const D = window.MOEDEX, N = D.tokens.length;
+  const COLL = "wptfgy1wqkagfmd05vz3zult";
+  const CONTRACT = "0x06f97E756f5c7aC0db75411101Bd09e17F63ABa7";
+  const $ = id => document.getElementById(id);
+  const store = (k, v) => { try { if (v === undefined) return localStorage.getItem(k); localStorage.setItem(k, v); } catch (e) {} return null; };
+  const imgUrl = n => `https://www.scatter.art/api/instareveal/media?collectionId=${COLL}&tokenId=${n}&v=${D.v[n - 1]}&mimeType=image%2Fpng&filename=${n}.png`;
+  const esc = s => String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
+  const titleCase = s => s.replace(/(^|\s)\S/g, c => c.toUpperCase());
+  const pad = n => String(n).padStart(4, "0");
+
+  // ---- find the Blorps ----
+  const T = name => D.types.indexOf(name);
+  const SKIN = T("skin"), HAIR = T("hair"), BG = T("background"), UNIQ = T("unique");
+  const BLORP_SKIN = D.values[SKIN].indexOf("blorp");
+  const BIO = D.values[UNIQ].indexOf("bio luminescent blorp");
+  const traitsOf = n => {
+    const p = D.tokens[n - 1], out = [];
+    for (let i = 0; i < p.length; i += 2) out.push({ ti: p[i], vi: p[i + 1], type: D.types[p[i]], value: D.values[p[i]][p[i + 1]], count: D.counts[p[i]][p[i + 1]] });
+    return out;
+  };
+  const has = (n, ti, vi) => { const p = D.tokens[n - 1]; for (let i = 0; i < p.length; i += 2) if (p[i] === ti && p[i + 1] === vi) return true; return false; };
+  const get = (n, ti) => { const p = D.tokens[n - 1]; for (let i = 0; i < p.length; i += 2) if (p[i] === ti) return D.values[ti][p[i + 1]]; return null; };
+
+  const BLORPS = [];
+  for (let n = 1; n <= N; n++) if (has(n, SKIN, BLORP_SKIN) || has(n, UNIQ, BIO)) BLORPS.push(n);
+  const isBlorp = new Set(BLORPS);
+  const bioN = BLORPS.find(n => has(n, UNIQ, BIO));
+  const rank = n => D.rank[n - 1];
+  const tier = r => { const f = r / N; return f <= .01 ? "MYTHIC" : f <= .05 ? "LEGENDARY" : f <= .15 ? "EPIC" : f <= .4 ? "RARE" : "COMMON"; };
+
+  // "short blorp green" -> "Short Green", "long blorp bangs ocean" -> "Long Ocean Bangs"
+  const hairStyle = n => {
+    const h = get(n, HAIR);
+    if (!h || !h.includes("blorp")) return null;
+    const w = h.replace("blorp", "").split(/\s+/).filter(Boolean);
+    const bangs = w.includes("bangs");
+    const rest = w.filter(x => x !== "bangs");
+    return titleCase(rest.join(" ") + (bangs ? " bangs" : ""));
+  };
+  const titleOf = n => {
+    if (n === bioN) return "The Bio-Luminescent Blorp";
+    const hs = hairStyle(n), bg = get(n, BG);
+    return (hs ? hs + " Blorp" : "Blorp") + (bg ? " at " + titleCase(bg) : "");
+  };
+
+  // ---- picture frames ----
+  function piece(n, opts = {}) {
+    const b = document.createElement("button");
+    b.className = "piece"; b.dataset.n = n;
+    b.setAttribute("aria-label", `Blorp number ${n}: ${titleOf(n)}`);
+    const t = tier(rank(n));
+    b.innerHTML = `<div class="frame"><img loading="lazy" src="${imgUrl(n)}" alt=""></div>` +
+      (opts.noPlacard ? "" : `<span class="placard"><b>No. ${pad(n)}</b>${esc(titleOf(n))}<br><span class="tier ${t}">${t} · #${rank(n)}</span></span>`);
+    b.addEventListener("click", () => openExhibit(n, opts.list || BLORPS));
+    return b;
+  }
+  function hang(wall, list, opts = {}) {
+    wall.innerHTML = "";
+    const frag = document.createDocumentFragment();
+    list.forEach(n => frag.appendChild(piece(n, { ...opts, list })));
+    wall.appendChild(frag);
+  }
+
+  // ---- lobby ----
+  const hairs = [...new Set(BLORPS.map(hairStyle).filter(Boolean))];
+  const byRank = [...BLORPS].sort((a, b) => rank(a) - rank(b));
+  $("blorpCount").textContent = BLORPS.length;
+  $("fCount").textContent = BLORPS.length;
+  $("fPct").textContent = (BLORPS.length / N * 100).toFixed(1) + "%";
+  $("fHair").textContent = hairs.length + " special Blorp styles";
+  const rarest = byRank.find(n => n !== bioN);
+  $("fRare").innerHTML = `<a href="#exhibit-${rarest}">No. ${rarest}</a> (rank #${rank(rarest)} of ${N.toLocaleString()})`;
+  $("fOne").innerHTML = bioN ? `<a href="#exhibit-${bioN}">No. ${bioN}</a>, the Bio-Luminescent Blorp` : "—";
+  const day = Math.floor(Date.now() / 864e5);
+  const daily = BLORPS[(day * 7919) % BLORPS.length];
+  const dp = piece(daily);
+  $("dailyPiece").replaceWith(dp);
+
+  // ---- gallery ----
+  const wing = $("wing"), sort = $("sort");
+  wing.innerHTML = `<option value="all">All Blorps (${BLORPS.length})</option>` +
+    hairs.map(h => `<option value="${esc(h)}">${esc(h)} Wing (${BLORPS.filter(n => hairStyle(n) === h).length})</option>`).join("") +
+    `<option value="other">Other Hairdos (${BLORPS.filter(n => !hairStyle(n)).length})</option>`;
+  function renderGallery() {
+    let list = BLORPS.filter(n => wing.value === "all" || (wing.value === "other" ? !hairStyle(n) : hairStyle(n) === wing.value));
+    if (sort.value === "rank") list.sort((a, b) => rank(a) - rank(b));
+    if (sort.value === "shuffle") for (let i = list.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [list[i], list[j]] = [list[j], list[i]]; }
+    $("galCount").textContent = `${list.length} painting${list.length === 1 ? "" : "s"}`;
+    hang($("galleryWall"), list);
+  }
+  wing.addEventListener("change", renderGallery);
+  sort.addEventListener("change", renderGallery);
+
+  // ---- vault ----
+  if (bioN) {
+    const v = $("vaultStar");
+    v.innerHTML = `<h3>★ 1 of 1 ★</h3><p class="comic" style="margin:4px 0;color:#9fe0ff">The only Bio-Luminescent Blorp in the universe. It glows. We don't know why.</p>`;
+    v.appendChild(piece(bioN, { list: [bioN, ...byRank.filter(n => n !== bioN).slice(0, 10)] }));
+  }
+  const top10 = byRank.filter(n => n !== bioN).slice(0, 10);
+  hang($("vaultWall"), top10);
+
+  // ---- my collection ----
+  const loadList = k => { try { return (JSON.parse(store(k) || "[]") || []).filter(n => isBlorp.has(n)); } catch (e) { return []; } };
+  let mine = loadList("blorp_mine");            // added by hand
+  let owned = loadList("blorp_wallet_owned");   // found in the wallet
+  const saveMine = () => store("blorp_mine", JSON.stringify(mine));
+  const wallList = () => [...new Set([...owned, ...mine])].sort((a, b) => a - b);
+  function renderMine() {
+    const list = wallList();
+    hang($("mineWall"), list);
+    $("mineEmpty").style.display = list.length ? "none" : "";
+    $("walletForget").hidden = !store("blorp_wallet");
+  }
+
+  // Wallet lookup: asks Ethereum who owns each Blorp, straight from this browser.
+  // A few at a time, because the free RPC refuses big batches.
+  const RPC = "https://eth.drpc.org";
+  const hex64 = n => n.toString(16).padStart(64, "0");
+  let scanning = false;
+  async function scanWallet(addr, quiet) {
+    const msg = $("walletMsg");
+    if (!/^0x[0-9a-fA-F]{40}$/.test(addr)) { msg.textContent = "That doesn't look like an Ethereum wallet (0x + 40 characters)."; return; }
+    if (scanning) return;
+    scanning = true; $("walletBtn").disabled = true;
+    const want = addr.slice(2).toLowerCase(), found = [];
+    try {
+      for (let k = 0; k < BLORPS.length; k += 3) {
+        if (!quiet) msg.textContent = `Checking the blockchain… ${Math.min(k + 3, BLORPS.length)} / ${BLORPS.length}`;
+        const chunk = BLORPS.slice(k, k + 3);
+        const body = chunk.map(n => ({ jsonrpc: "2.0", id: n, method: "eth_call", params: [{ to: CONTRACT, data: "0x6352211e" + hex64(n) }, "latest"] }));
+        let res = null;
+        for (let tries = 0; tries < 3 && !res; tries++) {
+          try {
+            const r = await fetch(RPC, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+            if (r.ok) res = await r.json(); else await new Promise(ok => setTimeout(ok, 800));
+          } catch (e) { await new Promise(ok => setTimeout(ok, 800)); }
+        }
+        if (!res) throw new Error("rpc");
+        for (const x of res) if (x.result && x.result.slice(-40).toLowerCase() === want) found.push(x.id);
+      }
+      owned = found.sort((a, b) => a - b);
+      store("blorp_wallet", addr); store("blorp_wallet_owned", JSON.stringify(owned));
+      msg.textContent = owned.length
+        ? `💙 This wallet holds ${owned.length} of the ${BLORPS.length} Blorps (${(owned.length / BLORPS.length * 100).toFixed(1)}%)!`
+        : "No Blorps in this wallet (yet).";
+      renderMine();
+    } catch (e) {
+      msg.textContent = "Couldn't reach the blockchain just now. Try again in a minute.";
+    } finally { scanning = false; $("walletBtn").disabled = false; }
+  }
+  $("walletIn").value = store("blorp_wallet") || "";
+  $("walletBtn").addEventListener("click", () => scanWallet($("walletIn").value.trim()));
+  $("walletIn").addEventListener("keydown", e => { if (e.key === "Enter") scanWallet($("walletIn").value.trim()); });
+  $("walletForget").addEventListener("click", () => {
+    try { ["blorp_wallet", "blorp_wallet_owned"].forEach(k => localStorage.removeItem(k)); } catch (e) {}
+    owned = []; $("walletIn").value = ""; $("walletMsg").textContent = "Wallet forgotten."; renderMine();
+  });
+  function addMine() {
+    const n = parseInt($("addNum").value, 10), msg = $("mineMsg");
+    if (!n || n < 1 || n > N) { msg.textContent = "That's not a Moe number (1–5250)."; return; }
+    if (!isBlorp.has(n)) { msg.textContent = `#${n} isn't a Blorp! No humans allowed.`; return; }
+    if (mine.includes(n)) { msg.textContent = `#${n} is already on the wall.`; return; }
+    mine.push(n); mine.sort((a, b) => a - b); saveMine(); renderMine();
+    msg.textContent = `Hung #${n} on the wall!`; $("addNum").value = "";
+  }
+  $("addBtn").addEventListener("click", addMine);
+  $("addNum").addEventListener("keydown", e => { if (e.key === "Enter") addMine(); });
+
+  // ---- guestbook (this browser only) ----
+  const SEED = [
+    { name: "xX_blorpfan_Xx", msg: "first!!! cool site. the blue ones r the best ones", when: "this museum's opening day" },
+    { name: "the curator", msg: "Welcome to the Blorp Museum. Please do not lick the paintings.", when: "this museum's opening day" },
+  ];
+  const loadGb = () => { try { return JSON.parse(store("blorp_guestbook") || "[]") || []; } catch (e) { return []; } };
+  function renderGb() {
+    const all = [...loadGb().slice().reverse(), ...SEED];
+    $("gbEntries").innerHTML = all.map(e => `<div class="entry"><span class="who">${esc(e.name)}</span> <span class="when">wrote on ${esc(e.when)}:</span><div>${esc(e.msg)}</div></div>`).join("");
+  }
+  $("gbForm").addEventListener("submit", e => {
+    e.preventDefault();
+    const name = $("gbName").value.trim(), msg = $("gbMsg").value.trim();
+    if (!name || !msg) return;
+    const list = loadGb(); list.push({ name, msg, when: new Date().toLocaleDateString() });
+    store("blorp_guestbook", JSON.stringify(list.slice(-50)));
+    $("gbMsg").value = ""; renderGb();
+  });
+
+  // ---- exhibit viewer ----
+  let exList = BLORPS, exN = null, lastFocus = null;
+  function openExhibit(n, list) {
+    exList = list && list.includes(n) ? list : BLORPS; exN = n;
+    if (!$("modal").classList.contains("on")) lastFocus = document.activeElement;
+    const r = rank(n), t = tier(r);
+    $("exBar").textContent = `BLORP_${pad(n)}.BMP - Blorp Viewer`;
+    $("exImg").src = imgUrl(n); $("exImg").alt = `Blorp number ${n}`;
+    $("exTitle").textContent = titleOf(n);
+    $("exMeta").innerHTML = `No. ${pad(n)} · moemoe LLC<br>Rarity: <span class="tier ${t}">${t}</span>, #${r} of ${N.toLocaleString()}`;
+    $("exTraits").innerHTML = traitsOf(n).map(x => {
+      const p = x.count / N * 100, rare = p < 1;
+      return `<tr><td>${esc(x.type)}</td><td class="${rare ? "rare-t" : ""}">${esc(x.value)} <small>(${p < 1 ? p.toFixed(2) : p.toFixed(1)}%)</small></td></tr>`;
+    }).join("");
+    $("exDex").href = `../moekedex/index.html#${n}`;
+    $("exSea").href = `https://opensea.io/assets/ethereum/${CONTRACT}/${n}`;
+    const inWallet = owned.includes(n);
+    $("exMine").disabled = inWallet;
+    $("exMine").textContent = inWallet ? "💙 In your wallet" : mine.includes(n) ? "Remove from My Collection" : "Add to My Collection";
+    $("modal").classList.add("on");
+    if (location.hash !== `#exhibit-${n}`) history.replaceState(null, "", `#exhibit-${n}`);
+    $("exClose").focus();
+  }
+  function closeExhibit() {
+    $("modal").classList.remove("on"); exN = null;
+    history.replaceState(null, "", "#" + currentRoom);
+    if (lastFocus) lastFocus.focus();
+  }
+  const step = d => { const i = exList.indexOf(exN); openExhibit(exList[(i + d + exList.length) % exList.length], exList); };
+  $("exPrev").addEventListener("click", () => step(-1));
+  $("exNext").addEventListener("click", () => step(1));
+  $("exClose").addEventListener("click", closeExhibit);
+  $("modal").addEventListener("click", e => { if (e.target === $("modal")) closeExhibit(); });
+  $("exMine").addEventListener("click", () => {
+    mine = mine.includes(exN) ? mine.filter(m => m !== exN) : [...mine, exN].sort((a, b) => a - b);
+    saveMine(); renderMine(); openExhibit(exN, exList);
+  });
+  document.addEventListener("keydown", e => {
+    if (exN === null) return;
+    if (e.key === "Escape") closeExhibit();
+    else if (e.key === "ArrowLeft") step(-1);
+    else if (e.key === "ArrowRight") step(1);
+  });
+
+  // ---- rooms ----
+  let currentRoom = "lobby", galleryDone = false, walletChecked = false;
+  function route() {
+    const h = location.hash.slice(1);
+    const ex = h.match(/^exhibit-(\d+)$/);
+    if (ex && isBlorp.has(+ex[1])) { if (exN !== +ex[1]) openExhibit(+ex[1]); return; }
+    const room = ["lobby", "gallery", "vault", "mine", "guestbook"].includes(h) ? h : "lobby";
+    currentRoom = room;
+    document.querySelectorAll(".room").forEach(s => s.classList.toggle("on", s.id === "room-" + room));
+    document.querySelectorAll("nav .bevel").forEach(a => a.classList.toggle("on", a.dataset.room === room));
+    if (room === "gallery" && !galleryDone) { renderGallery(); galleryDone = true; }
+    if (room === "mine" && !walletChecked && store("blorp_wallet")) { walletChecked = true; scanWallet(store("blorp_wallet")); }
+    if (exN !== null) { $("modal").classList.remove("on"); exN = null; }
+  }
+  window.addEventListener("hashchange", route);
+
+  // ---- 90s bits ----
+  $("wordart").innerHTML = [..."THE BLORP MUSEUM"].map((c, i) => c === " " ? " " : `<span style="animation-delay:${i * .09}s">${c}</span>`).join("");
+  const visits = (+store("blorp_visits") || 0) + 1; store("blorp_visits", visits);
+  const count = String(4096 + Math.floor(Date.now() / 864e5 - 20400) * 13 + visits).padStart(7, "0");
+  $("counter").innerHTML = [...count].map(d => `<b>${d}</b>`).join("");
+  if (!matchMedia("(prefers-reduced-motion: reduce)").matches && matchMedia("(pointer: fine)").matches) {
+    let last = 0;
+    document.addEventListener("mousemove", e => {
+      const now = performance.now(); if (now - last < 45) return; last = now;
+      const s = document.createElement("span");
+      s.className = "sparkle"; s.textContent = ["✦", "✧", "★", "·"][Math.floor(Math.random() * 4)];
+      s.style.left = e.clientX + 6 + "px"; s.style.top = e.clientY + 6 + "px";
+      s.style.color = ["#3fa9ff", "#9fe0ff", "#39ff14", "#ffff33"][Math.floor(Math.random() * 4)];
+      document.body.appendChild(s); setTimeout(() => s.remove(), 800);
+    });
+  }
+
+  renderMine(); renderGb(); route();
+})();
+</script>
+</body>
+</html>
