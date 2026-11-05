@@ -4,8 +4,9 @@ YOLK is the egg AI, one character across all the user's devices. The user calls 
 
 ## Run
 
-- `python3 yolk/server.py` → http://localhost:8008, or double-click `Wake YOLK.command`, or Home Base → Start, or the `yolk` preview config.
-- **After changing `server.py`, restart the server.** The user's running copy won't pick up changes otherwise.
+- **She's always on** (since 2026-11-05): `tools/keep_awake.py --install` made a LaunchAgent (`com.80eggs.yolk.server`) that runs `~/Applications/YOLK.app`, which runs `server.py`, at login and again ~10s after any stop or crash. Output goes to `data/server.log`. The app exists so macOS gives *it* permission to read SHELL and the Desktop. `--uninstall` goes back to waking her by hand.
+- By hand (if uninstalled): `python3 yolk/server.py` → http://localhost:8008, `Wake YOLK.command` (just opens her page if she's already up), Home Base → Start, or the `yolk` preview config.
+- **After changing `server.py`, restart her:** `python3 yolk/tools/keep_awake.py --restart` (Home Base's Stop also works as a restart now). Her running copy won't pick up changes otherwise.
 - It listens on `0.0.0.0` so the tablet can reach it. Anything that isn't this Mac gets only the pairing page until it enters the 6-digit code (`data/station.json`). 8 wrong tries locks pairing out for 5 minutes.
 
 ## Files
@@ -27,7 +28,7 @@ YOLK is the egg AI, one character across all the user's devices. The user calls 
 | `radio.py` | **YOLK Radio**: a daily show of the user's songs with spoken intros, delivered to `Music/YOLK Radio/` + `/YOLK/radio/`. `ai.weekly()` writes the weekly note, `/YOLK/review.txt` on SHELL. |
 | `chat.py` | conversations: Station voice (whisper-cli → Claude) and desktop typing. Model set in `data/talk.json`. `python3 yolk/chat.py --cost` shows spend. |
 | **Apple Watch** | a Shortcut, not an app. `tools/make_watch_shortcut.py` builds and signs `data/YOLK.shortcut` (gitignored, holds the key): ask for text → POST to `/api/watch` with header `X-YOLK-Key`, or to `/api/watch/<key>` (what the hand-built one uses; `watch_key` in `data/station.json`) → show her reply. The key opens only that one endpoint. Chat place is `watch` (short replies). Home Wi-Fi only, since it talks to `<LocalHostName>.local:8008`. Neither the imported nor the hand-built Shortcut reached the watch (the watch gets no user shortcuts at all; only Apple's starters), though it works on the iPhone. **So the watch uses `/w/<key>`**, a no-JavaScript chat page (`watch_page` in `server.py`) opened from a link the user texted themselves; the watch's web view shows it. A real watchOS app needs Xcode (not installed) |
-| `tools/` | asset makers (faces, bell, meditation audio) + `shell_helper.py` (LaunchAgent that syncs when SHELL is plugged in) |
+| `tools/` | asset makers (faces, bell, meditation audio) + `shell_helper.py` (LaunchAgent that syncs when SHELL is plugged in) + `keep_awake.py` (keeps the server running) |
 
 ## Rules
 
