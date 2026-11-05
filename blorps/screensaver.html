@@ -1,0 +1,249 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Blorp Screensaver</title>
+<meta name="description" content="Blorps drifting through a warp-speed starfield. A screensaver from the Blorp Museum.">
+<style>
+  html, body { margin: 0; height: 100%; background: #000; overflow: hidden; }
+  canvas { display: block; width: 100vw; height: 100vh; }
+  body.idle, body.idle canvas { cursor: none; }
+  .hud {
+    position: fixed; left: 50%; bottom: 18px; transform: translateX(-50%); max-width: calc(100vw - 32px);
+    background: #c0c0c0; color: #000; font: 13px Tahoma, Geneva, sans-serif;
+    border: 2px solid; border-color: #fff #404040 #404040 #fff; transition: opacity .4s;
+  }
+  body.idle .hud { opacity: 0; pointer-events: none; }
+  .hud .title { background: linear-gradient(90deg, #000080, #1084d0); color: #fff; font-weight: bold; padding: 3px 8px; }
+  .hud .row { display: flex; flex-wrap: wrap; gap: 6px; padding: 8px; align-items: center; }
+  .hud button, .hud a {
+    font: bold 13px Tahoma, Geneva, sans-serif; color: #000; text-decoration: none; cursor: pointer;
+    background: #c0c0c0; padding: 4px 10px; border: 2px solid; border-color: #fff #404040 #404040 #fff;
+  }
+  .hud button:active { border-color: #404040 #fff #fff #404040; }
+  .hud .tip { font-size: 12px; color: #333; padding: 0 8px 8px; }
+  :focus-visible { outline: 2px dotted #000080; outline-offset: 1px; }
+</style>
+</head>
+<body>
+<canvas id="c" aria-label="Blorps flying through space"></canvas>
+<div class="hud" id="hud">
+  <div class="title">🌌 BLORPSAVER.SCR</div>
+  <div class="row">
+    <button id="full">Full screen</button>
+    <button id="which"></button>
+    <button id="speed"></button>
+    <a href="index.html">« Back to the museum</a>
+  </div>
+  <div class="tip">Click the stars or press F for full screen · Space = warp speed · the buttons hide when you stop moving</div>
+</div>
+<script src="../moekedex/data.js"></script>
+<script>
+(() => {
+  const D = window.MOEDEX, N = D.tokens.length;
+  const COLL = "wptfgy1wqkagfmd05vz3zult";
+  const imgUrl = n => `https://www.scatter.art/api/instareveal/media?collectionId=${COLL}&tokenId=${n}&v=${D.v[n - 1]}&mimeType=image%2Fpng&filename=${n}.png`;
+  const store = (k, v) => { try { if (v === undefined) return localStorage.getItem(k); localStorage.setItem(k, v); } catch (e) {} return null; };
+  const $ = id => document.getElementById(id);
+  const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  // ---- which Blorps ----
+  const SKIN = D.types.indexOf("skin"), UNIQ = D.types.indexOf("unique");
+  const BS = D.values[SKIN].indexOf("blorp"), BIO = D.values[UNIQ].indexOf("bio luminescent blorp");
+  const ALL = [];
+  for (let n = 1; n <= N; n++) {
+    const p = D.tokens[n - 1];
+    for (let i = 0; i < p.length; i += 2) if ((p[i] === SKIN && p[i + 1] === BS) || (p[i] === UNIQ && p[i + 1] === BIO)) { ALL.push(n); break; }
+  }
+  // "My Collection" from the museum (same site, so same browser storage)
+  const readList = k => { try { return (JSON.parse(store(k) || "[]") || []).filter(n => ALL.includes(n)); } catch (e) { return []; } };
+  const MINE = [...new Set([...readList("blorp_wallet_owned"), ...readList("blorp_mine")])];
+  let useMine = MINE.length > 0 && store("blorpsaver_which") !== "all";
+  const pool = () => (useMine && MINE.length ? MINE : ALL);
+
+  // ---- images: keep a handful loaded, swap new ones in over time ----
+  const cache = new Map();
+  function img(n) {
+    if (cache.has(n)) return cache.get(n);
+    const im = new Image();
+    im.decoding = "async";
+    im.src = imgUrl(n);
+    cache.set(n, im);
+    if (cache.size > 60) cache.delete(cache.keys().next().value);
+    return im;
+  }
+  const pick = () => { const p = pool(); return p[Math.floor(Math.random() * p.length)]; };
+
+  // ---- canvas ----
+  const cv = $("c"), ctx = cv.getContext("2d");
+  let W = 0, H = 0, DPR = 1;
+  function resize() {
+    DPR = Math.min(2, window.devicePixelRatio || 1);
+    W = innerWidth; H = innerHeight;
+    cv.width = W * DPR; cv.height = H * DPR;
+    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  }
+  addEventListener("resize", resize); resize();
+
+  // ---- warp starfield ----
+  const STARS = 420, FAR = 1000;
+  const stars = [];
+  const newStar = s => {
+    s.x = (Math.random() - .5) * 2000; s.y = (Math.random() - .5) * 2000; s.z = Math.random() * FAR + 1; s.pz = s.z;
+    s.c = ["#ffffff", "#9fe0ff", "#3fa9ff", "#ffff99"][Math.floor(Math.random() * 4)];
+    return s;
+  };
+  for (let i = 0; i < STARS; i++) stars.push(newStar({}));
+
+  // ---- blorps ----
+  const SPRITES = 8;
+  const sprites = [];
+  function newSprite(s, first) {
+    s.n = pick(); s.im = img(s.n);
+    // start off-center so they fly outward past you, like big slow stars
+    const ang = Math.random() * Math.PI * 2, rad = 120 + Math.random() * 520;
+    s.x = Math.cos(ang) * rad * 1.4; s.y = Math.sin(ang) * rad;
+    s.z = first ? 250 + Math.random() * 900 : 700 + Math.random() * 500;
+    s.vx = Math.cos(ang) * 25; s.vy = Math.sin(ang) * 18;
+    s.spin = (Math.random() - .5) * .8; s.a = (Math.random() - .5) * .6;
+    s.wob = Math.random() * 6.28;
+    return s;
+  }
+  for (let i = 0; i < SPRITES; i++) sprites.push(newSprite({}, true));
+
+  // ---- bouncing logo, the classic way ----
+  const logo = { x: 80, y: 80, vx: 70, vy: 55, hue: 200 };
+
+  const SPEEDS = [{ name: "Cruise", v: 60 }, { name: "Fast", v: 160 }, { name: "Warp!!", v: 420 }];
+  let speedI = +(store("blorpsaver_speed") || 0) % SPEEDS.length;
+  let boost = 0;
+
+  let last = performance.now();
+  function frame(now) {
+    const dt = Math.min(.05, (now - last) / 1000); last = now;
+    const base = SPEEDS[speedI].v * (reduced ? .4 : 1);
+    boost += ((keyWarp ? 1 : 0) - boost) * Math.min(1, dt * 3);
+    const v = base + boost * 700;
+    const cx = W / 2, cy = H / 2, f = Math.min(W, H) * .9;
+
+    // trails: dark wash instead of a full clear
+    ctx.fillStyle = `rgba(0,0,12,${.35 + .35 * (1 - boost)})`;
+    ctx.fillRect(0, 0, W, H);
+
+    // stars
+    ctx.lineCap = "round";
+    for (const s of stars) {
+      s.pz = s.z; s.z -= v * dt * 3;
+      if (s.z < 1) { newStar(s); s.z = FAR; s.pz = FAR; continue; }
+      const sx = cx + s.x / s.z * f / 4, sy = cy + s.y / s.z * f / 4;
+      const px = cx + s.x / s.pz * f / 4, py = cy + s.y / s.pz * f / 4;
+      if (sx < -50 || sx > W + 50 || sy < -50 || sy > H + 50) { newStar(s); continue; }
+      const r = Math.max(.4, (1 - s.z / FAR) * 2.6);
+      ctx.strokeStyle = s.c; ctx.lineWidth = r;
+      ctx.beginPath(); ctx.moveTo(px, py); ctx.lineTo(sx, sy); ctx.stroke();
+    }
+
+    // blorps, far ones first
+    sprites.sort((a, b) => b.z - a.z);
+    for (const s of sprites) {
+      s.z -= v * dt; s.x += s.vx * dt; s.y += s.vy * dt; s.a += s.spin * dt; s.wob += dt * 2;
+      if (s.z < 40) { newSprite(s); continue; }
+      const k = f / s.z;
+      const sx = cx + s.x * k, sy = cy + (s.y + Math.sin(s.wob) * 30) * k;
+      const size = 220 * k, maxSize = Math.min(W, H) * .6;
+      if (size > maxSize) { newSprite(s); continue; }
+      if (size < 3 || !(s.im.complete && s.im.naturalWidth)) continue; // wait for the picture
+      // fade in from far away, fade out as they get close (before they fill the screen)
+      const fadeIn = Math.min(1, (1300 - s.z) / 250), fadeOut = Math.min(1, (maxSize - size) / (maxSize * .45));
+      const alpha = Math.max(0, Math.min(fadeIn, fadeOut));
+      ctx.save();
+      ctx.globalAlpha = alpha;
+      ctx.translate(sx, sy); ctx.rotate(Math.sin(s.a) * .5);
+      // glow
+      ctx.shadowColor = "#3fa9ff"; ctx.shadowBlur = 30;
+      ctx.fillStyle = "#0a2a66";
+      ctx.beginPath(); ctx.arc(0, 0, size / 2 + 4, 0, Math.PI * 2); ctx.fill();
+      ctx.shadowBlur = 0;
+      ctx.beginPath(); ctx.arc(0, 0, size / 2, 0, Math.PI * 2); ctx.clip();
+      ctx.drawImage(s.im, -size / 2, -size / 2, size, size);
+      ctx.restore();
+      if (size > 140) {
+        ctx.globalAlpha = alpha * Math.min(1, (size - 140) / 80);
+        ctx.font = "bold 14px 'Courier New', monospace"; ctx.textAlign = "center";
+        ctx.fillStyle = "#39ff14";
+        ctx.fillText("No. " + String(s.n).padStart(4, "0"), sx, sy + size / 2 + 20);
+        ctx.globalAlpha = 1;
+      }
+    }
+
+    // logo
+    ctx.font = "900 28px Impact, 'Arial Black', sans-serif"; ctx.textAlign = "left";
+    const text = "BLORP MUSEUM", tw = ctx.measureText(text).width, th = 28;
+    logo.x += logo.vx * dt; logo.y += logo.vy * dt;
+    let hit = false;
+    if (logo.x < 10) { logo.x = 10; logo.vx = Math.abs(logo.vx); hit = true; }
+    if (logo.x + tw > W - 10) { logo.x = W - 10 - tw; logo.vx = -Math.abs(logo.vx); hit = true; }
+    if (logo.y < 10 + th) { logo.y = 10 + th; logo.vy = Math.abs(logo.vy); hit = true; }
+    if (logo.y > H - 10) { logo.y = H - 10; logo.vy = -Math.abs(logo.vy); hit = true; }
+    if (hit) logo.hue = (logo.hue + 70 + Math.random() * 80) % 360;
+    ctx.fillStyle = "#000"; ctx.fillText(text, logo.x + 3, logo.y + 3);
+    ctx.fillStyle = `hsl(${logo.hue} 100% 65%)`; ctx.fillText(text, logo.x, logo.y);
+
+    requestAnimationFrame(frame);
+  }
+  ctx.fillStyle = "#000"; ctx.fillRect(0, 0, W, H);
+  requestAnimationFrame(frame);
+
+  // ---- controls ----
+  const which = $("which"), speed = $("speed");
+  function labels() {
+    which.textContent = useMine ? `💙 My Blorps (${MINE.length})` : `🛸 All Blorps (${ALL.length})`;
+    which.title = MINE.length ? "" : "Load your wallet in the museum's My Collection room to fly only your own Blorps";
+    speed.textContent = "Speed: " + SPEEDS[speedI].name;
+  }
+  which.addEventListener("click", () => {
+    if (!MINE.length) { which.textContent = "Load your wallet in My Collection first"; setTimeout(labels, 2200); return; }
+    useMine = !useMine; store("blorpsaver_which", useMine ? "mine" : "all"); labels();
+    sprites.forEach(s => { s.z = Math.max(s.z, FAR * .6); });
+  });
+  speed.addEventListener("click", () => { speedI = (speedI + 1) % SPEEDS.length; store("blorpsaver_speed", speedI); labels(); });
+  labels();
+
+  let wake = null;
+  async function keepAwake() {
+    try { if ("wakeLock" in navigator && !wake) { wake = await navigator.wakeLock.request("screen"); wake.addEventListener("release", () => { wake = null; }); } } catch (e) {}
+  }
+  document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible" && document.fullscreenElement) keepAwake(); });
+  function toggleFull() {
+    if (document.fullscreenElement) { document.exitFullscreen(); return; }
+    const el = document.documentElement;
+    (el.requestFullscreen || el.webkitRequestFullscreen || (() => {})).call(el);
+    keepAwake();
+  }
+  $("full").addEventListener("click", toggleFull);
+  cv.addEventListener("click", toggleFull);
+
+  let keyWarp = false;
+  addEventListener("keydown", e => {
+    if (e.key === " ") { keyWarp = true; e.preventDefault(); }
+    else if (e.key === "f" || e.key === "F") toggleFull();
+    poke();
+  });
+  addEventListener("keyup", e => { if (e.key === " ") keyWarp = false; });
+  cv.addEventListener("pointerdown", e => { if (e.pointerType !== "mouse") { keyWarp = true; setTimeout(() => keyWarp = false, 900); } });
+
+  // hide the buttons + cursor when nobody's touching anything
+  let idleT = null;
+  function poke() {
+    document.body.classList.remove("idle");
+    clearTimeout(idleT);
+    idleT = setTimeout(() => document.body.classList.add("idle"), 3000);
+  }
+  addEventListener("mousemove", poke); addEventListener("pointerdown", poke);
+  $("hud").addEventListener("focusin", () => { clearTimeout(idleT); document.body.classList.remove("idle"); });
+  poke();
+})();
+</script>
+</body>
+</html>

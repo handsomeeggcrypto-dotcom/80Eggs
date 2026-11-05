@@ -18,7 +18,7 @@ Each project folder has its own `CLAUDE.md`. Read it before working there.
 | `moecastle/` | **Defend Your LLC**, a Defend Your Castle remake starring the Moe Fights roster. `build_assets.py` makes `assets/` | live |
 | `moekedex/` | **Moekedex**, a Pokédex for the moemoe LLC NFTs | live |
 | `dreamthings/` | **Dream Things**, a dex for the Yumemono NFTs. `build_data.py` makes `data.js` | live |
-| `blorps/` | **The Blorp Museum**, a 90s-web art museum for the 205 Blorp (blue alien) Moes. Reads `moekedex/data.js`, so it needs no data of its own. "My Collection" and the guestbook save in the visitor's browser only | live |
+| `blorps/` | **The Blorp Museum**, a 90s-web art museum for the 205 Blorp (blue alien) Moes. Reads `moekedex/data.js`, so it needs no data of its own. "My Collection" and the guestbook save in the visitor's browser only. `screensaver.html` is the Blorp screensaver (warp starfield, flies your own Blorps if My Collection has any) | live |
 | `nap_time/` | **Nap Time** bedtime-story ARPG | live, behind a password |
 | `moemode/` | **MoeMode** "what should I do right now?" app | hidden |
 | `moepedal/` | **MoePedal**, the Mac as a weird guitar effects pedal: M-Audio Fast Track in, Arturia MiniLab knobs/keys, Alesis ControlPad footswitches (Web Audio + Web MIDI, Chrome only) | hidden |
