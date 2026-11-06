@@ -9,6 +9,8 @@
 The server checks every 10 minutes (check()). She sends at most one a day, between
 NOON-ish and 9:30pm, never right after you've talked to her, and for the ordinary
 reasons only every few days, so it stays rare. Reasons, most important first:
+  reminder  a reminder you asked for at a set time (journal note with "at"): sent at that time,
+            whatever the other limits say, up to LATE_OK late if the Mac was asleep
   tomorrow  a journal note is about tomorrow (evening before)
   streak    your meditation streak ends tonight if you don't (evening)
   quiet     you haven't talked to her in QUIET_DAYS days
@@ -39,6 +41,23 @@ QUIET_DAYS = 4
 JUST_TALKED = 2 * 3600                  # no text if you talked to her in the last 2 hours
 SONG_PLAYS = 5
 THINKING_CHANCE = 0.3                   # on an otherwise-eligible day
+LATE_OK = 3 * 3600                      # a timed reminder still goes out this late (Mac asleep at the time)
+
+
+def due(now=None):
+    """Timed reminders whose time has come: (why, key, what)."""
+    import journal
+    now = now or dt.datetime.now()
+    out = []
+    for n in journal.read():
+        if not n.get("at"):
+            continue
+        at = dt.datetime.strptime(n["on"] + " " + n["at"], "%Y-%m-%d %H:%M")
+        if 0 <= (now - at).total_seconds() < LATE_OK:
+            out.append(("reminder", f"at{n['id']}",
+                        f"they asked you to remind them, and it's time ({n['at']}): {n['note']}. "
+                        "make the reminder itself impossible to miss"))
+    return out
 
 
 def sent():
@@ -74,7 +93,7 @@ def reasons(now=None):
     import journal
     tomorrow = (now.date() + dt.timedelta(days=1)).isoformat()
     for n in journal.read():
-        if n["on"] == tomorrow and hour >= EVENING:
+        if n["on"] == tomorrow and hour >= EVENING and not n.get("at"):
             out.append(("tomorrow", f"note{n['id']}", f"remind them: {n['note']} (that's tomorrow)", True))
     med = server.meditation_stats()
     if med["streak"] >= 2 and not med["today"] and hour >= EVENING:
@@ -116,6 +135,10 @@ def pick(now=None, ignore_limits=False):
     hour = now.hour + now.minute / 60
     history = sent()
     today = now.date().isoformat()
+    done = {(s["why"], s["key"]) for s in history}
+    for why, key, what in due(now):                   # a reminder they asked for beats every rule below
+        if (why, key) not in done:
+            return why, key, what
     if not ignore_limits:
         if not (FIRST_HOUR <= hour < LAST_HOUR):
             return None

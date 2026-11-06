@@ -36,6 +36,7 @@ NOTE_MODEL = "claude-haiku-5-5"
 PLACES = {"desk": "the mac", "station": "the station", "shell": "shell", "watch": "the watch"}
 
 DATE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+TIME = re.compile(r"^([01]\d|2[0-3]):[0-5]\d$")
 _lock = threading.Lock()
 
 
@@ -44,10 +45,11 @@ def read():
     if JOURNAL.exists():
         for line in JOURNAL.read_text(encoding="utf-8").splitlines():
             parts = line.split("|")
-            if len(parts) in (4, 5) and parts[0].isdigit() and parts[1].isdigit():
-                day = parts[4] if len(parts) == 5 and DATE.match(parts[4]) else ""
+            if len(parts) in (4, 5, 6) and parts[0].isdigit() and parts[1].isdigit():
+                day = parts[4] if len(parts) >= 5 and DATE.match(parts[4]) else ""
+                at = parts[5] if len(parts) == 6 and day and TIME.match(parts[5]) else ""
                 notes.append({"id": int(parts[0]), "t": int(parts[1]), "where": parts[2], "note": parts[3],
-                              "on": day})
+                              "on": day, "at": at})
     return notes
 
 
@@ -55,6 +57,7 @@ def _write(notes):
     JOURNAL.parent.mkdir(parents=True, exist_ok=True)
     tmp = JOURNAL.with_suffix(".tmp")
     tmp.write_text("".join(f"{n['id']}|{n['t']}|{n['where']}|{n['note']}" + (f"|{n['on']}" if n.get("on") else "")
+                           + (f"|{n['at']}" if n.get("on") and n.get("at") else "")
                            + "\n" for n in notes), encoding="utf-8")
     tmp.replace(JOURNAL)
 
@@ -68,7 +71,8 @@ def clean(text):
 
 def change(add=(), forget=(), where="desk"):
     """Adds notes and crosses out notes by id. Returns the journal after.
-    Each note to add is text, or {"note": text, "on": "yyyy-mm-dd"} for one about a certain day."""
+    Each note to add is text, or {"note": text, "on": "yyyy-mm-dd"} for one about a certain day,
+    plus "at": "HH:MM" (24-hour) when she should text them a reminder at that time (nudge.py)."""
     with _lock:
         notes = read()
         gone = {int(i) for i in forget if str(i).isdigit()}
@@ -83,10 +87,12 @@ def change(add=(), forget=(), where="desk"):
         have = {n["note"] for n in notes}
         for a in add:
             day = (a.get("on") or "") if isinstance(a, dict) else ""
+            at = str((a.get("at") or "") if isinstance(a, dict) else "")
             a = clean(a.get("note", "") if isinstance(a, dict) else a)
             day = day if DATE.match(str(day)) else ""
+            at = at if day and TIME.match(at) else ""
             if a and a not in have:
-                notes.append({"id": next_id, "t": now, "where": where, "note": a, "on": day})
+                notes.append({"id": next_id, "t": now, "where": where, "note": a, "on": day, "at": at})
                 have.add(a)
                 next_id += 1
         _write(notes[-MAX_NOTES:])
@@ -105,7 +111,8 @@ def for_prompt():
     if not notes:
         return ("Your memory: nothing yet. You share one memory across all your bodies (the Mac, the "
                 "Station, SHELL and the Apple Watch). Anything they tell you now, you'll keep.")
-    lines = [f"- {when(n['t'])}, on {PLACES.get(n['where'], n['where'])}: {n['note']}" for n in notes]
+    lines = [f"- {when(n['t'])}, on {PLACES.get(n['where'], n['where'])}: {n['note']}"
+             + (f" [you'll text them a reminder {n['on']} at {n['at']}]" if n.get("at") else "") for n in notes]
     return ("Your memory. You share one memory across all your bodies (the Mac, the Station, SHELL and the Apple Watch), so "
             "something said on one is known on all of them. These are your notes about them, oldest first. "
             "Bring one up when it fits, like someone who really listened. Don't recite the list.\n"
@@ -123,12 +130,16 @@ as YOLK talking to them: lowercase, short, starting with
 "you" where it fits (like "you have a dentist appointment friday, nov 6" or "your sister's name is ana").
 Turn words like "tomorrow" or "friday" into the actual date. Today is {today}. When a note is about
 a certain day (an appointment, a trip, a birthday, a deadline), also give that day as "on".
+When they ask her to remind them at a certain time (or she promises to), write the note as the reminder
+itself (like "call the bank about the loan") and give "on" plus "at" as 24-hour HH:MM ("noon" is
+12:00, "in the morning" with no time is 09:00). She texts them at that time.
 
 Cross out (forget) notes that this conversation shows are wrong or out of date, or that they ask her to
 forget. When something changes, forget the old note and add a new one. Never write down passwords, card
 numbers, seed phrases or private keys.
 
-Answer with only JSON: {{"add": [{{"note": "...", "on": "yyyy-mm-dd or null"}}, ...], "forget": [id, ...]}}.
+Answer with only JSON: {{"add": [{{"note": "...", "on": "yyyy-mm-dd or null", "at": "HH:MM or null"}}, ...],
+"forget": [id, ...]}}.
 Both lists can be empty, and usually are.
 
 Current notes:
