@@ -327,6 +327,25 @@ def keep_backing_up():
     threading.Thread(target=loop, daemon=True).start()
 
 
+def keep_nudging():
+    """Every 10 minutes she considers texting first (nudge.py). Never in test runs."""
+    if os.environ.get("YOLK_DATA"):
+        return
+
+    def loop():
+        import nudge
+        time.sleep(60)
+        while True:
+            try:
+                done = nudge.check()
+                if done:
+                    print(f"Texted ({done[0]}): {done[1]}")
+            except Exception as e:
+                print("YOLK couldn't text:", e)
+            time.sleep(600)
+    threading.Thread(target=loop, daemon=True).start()
+
+
 # ------------------------------------------------------------------ extras
 def mac_battery():
     """Percent, or None on a Mac without a battery."""
@@ -683,4 +702,5 @@ if __name__ == "__main__":
     if addr:
         print(f"YOLK Station (tablet): http://{addr}:{PORT}/station   pairing code: {cfg['code']}")
     keep_backing_up()
+    keep_nudging()
     ThreadingHTTPServer(("0.0.0.0", PORT), Handler).serve_forever()

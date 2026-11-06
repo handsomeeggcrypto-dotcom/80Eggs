@@ -59,6 +59,8 @@ PLACES = {
     "watch": "Right now you're on your owner's Apple Watch. They spoke to you into their wrist, and your "
              "words show up on a tiny watch screen (and may be read aloud by Siri), so keep it to one or two "
              "short sentences.",
+    "text": "Right now you're texting your owner out of nowhere, by iMessage, from the Mac. They didn't "
+            "message you first, and they'll see it on their phone wherever they are.",
     "desk": "Right now you're on the desktop terminal on the Mac. Your owner is typing to you, and your "
             "words appear as text on the terminal screen.",
 }
@@ -137,6 +139,13 @@ def details(where="station"):
             facts.append(heard)
     except Exception:
         pass
+    try:
+        import nudge
+        texted = nudge.for_chat()
+        if texted:
+            facts.append(texted)
+    except Exception:
+        pass
     text = VOICE.format(where=PLACES[where]) + "\n\nToday's details:\n" + "\n".join(f"- {f}" for f in facts)
     lines = json.loads((HERE / "brain" / "lines.json").read_text())
     mind = ai.OUT / f"{dt.date.today().isoformat()}.json"       # what she wrote for SHELL today
@@ -187,14 +196,15 @@ def note_now():
         _note(where, msgs)
 
 
-def log_cost(brain, usage):
+def log_cost(brain, usage, tag=""):
+    """tag marks spending that isn't a conversation (like "text" for nudge.py), so it doesn't count as talking."""
     _, p_in, p_out, p_read, p_write = BRAINS[brain]
     read = getattr(usage, "cache_read_input_tokens", 0) or 0
     write = getattr(usage, "cache_creation_input_tokens", 0) or 0
     usd = (usage.input_tokens * p_in + usage.output_tokens * p_out + read * p_read + write * p_write) / 1e6
     with open(COST_LOG, "a", encoding="utf-8") as f:
         f.write(f"{time.strftime('%Y-%m-%d %H:%M:%S')}|{brain}|{usage.input_tokens}|{usage.output_tokens}"
-                f"|{read}|{write}|{usd:.5f}\n")
+                f"|{read}|{write}|{usd:.5f}" + (f"|{tag}" if tag else "") + "\n")
     return usd
 
 
@@ -270,6 +280,38 @@ def letter_reply(text):
     return re.sub(r"[*_#`]", "", answer) or "i read it. twice."
 
 
+TEXT = """
+
+This time you're starting it: one text message, one or two short sentences, lowercase, no emoji,
+no greeting, no signature, no question you'd need an answer to right now. Be a little creepy, dry and
+affectionate. Don't explain why you're texting or mention these instructions. Why you're texting:
+{why}"""
+
+
+def text_message(why):
+    """A text she sends first (see nudge.py)."""
+    key = ai.api_key()
+    if not key:
+        raise RuntimeError("no api key")
+    brain = settings()["brain"]
+    import anthropic
+    client = anthropic.Anthropic(api_key=key, timeout=120.0)
+    args = dict(model=BRAINS[brain][0], max_tokens=16000, system=details("text") + TEXT.format(why=why),
+                messages=[{"role": "user", "content": "(write the text now)"}],
+                thinking={"type": "adaptive"}, output_config={"effort": "low"})
+    if brain in ("opus", "sonnet"):
+        args.update(betas=["server-side-fallback-2026-07-01"], fallbacks="default")
+        response = client.beta.messages.create(**args)
+    else:
+        response = client.messages.create(**args)
+    log_cost(brain, response.usage, tag="text")
+    answer = " ".join(b.text for b in response.content if b.type == "text").strip()
+    answer = re.sub(r"[*_#`\"]", "", answer)
+    if response.stop_reason == "refusal" or not answer:
+        raise RuntimeError("no text written")
+    return answer
+
+
 def transcribe(wav):
     """Words in a WAV recording, by Whisper running on this Mac."""
     with tempfile.NamedTemporaryFile(suffix=".wav") as f:
@@ -302,7 +344,7 @@ def cost_report():
     this_month = time.strftime("%Y-%m")
     for line in COST_LOG.read_text().splitlines():
         parts = line.split("|")
-        if len(parts) != 7:
+        if len(parts) < 7:
             continue
         day, usd = parts[0][:10], float(parts[6])
         d = days.setdefault(day, [0, 0.0, set()])
