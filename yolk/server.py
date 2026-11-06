@@ -567,6 +567,14 @@ class Handler(BaseHTTPRequestHandler):
         path = self.path.split("?")[0]
         if not self.gate(path):
             return
+        if path == "/api/nudge/test":         # nudge.py --test: one text now, sent from here so macOS asks about YOLK
+            if self.client_address[0] not in ("127.0.0.1", "::1"):
+                return self.send(403, {"error": "only on the mac"})
+            import nudge
+            try:
+                return self.send(200, {"sent": nudge.test()})
+            except Exception as e:
+                return self.send(500, {"error": str(e)})
         if path.startswith("/w/"):           # the Apple Watch chat page's form
             import chat
             from urllib.parse import parse_qs

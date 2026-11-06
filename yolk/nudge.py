@@ -4,6 +4,7 @@
   python3 yolk/nudge.py            what she'd text about right now and why (sends nothing)
   python3 yolk/nudge.py --write    same, and has her write the text (sends nothing, ~1 cent)
   python3 yolk/nudge.py --log      the texts she's sent
+  python3 yolk/nudge.py --test     send one now, through the running server
 
 The server checks every 10 minutes (check()). She sends at most one a day, between
 NOON-ish and 9:30pm, never right after you've talked to her, and for the ordinary
@@ -148,6 +149,25 @@ end run"""
         raise RuntimeError(r.stderr.strip() or "osascript failed")
 
 
+def record(why, key, text):
+    with open(LOG, "a", encoding="utf-8") as f:
+        f.write(f"{int(time.time())}|{why}|{key}|{' '.join(text.split())}\n")
+
+
+def test():
+    """One text right now (the server runs this for --test). Returns what was sent."""
+    import chat
+    import daily
+    who = daily.config().get("text_to")
+    if not who:
+        raise RuntimeError("no text_to in data/daily.json")
+    text = chat.text_message("this is the very first text you've ever sent them from the mac. "
+                             "they just set it up and are waiting to see if it arrives.")
+    send(who, text)
+    record("test", time.strftime("%Y-%m-%d"), text)
+    return text
+
+
 def check():
     """Called by the server every 10 minutes. Sends at most one text."""
     import daily
@@ -161,8 +181,7 @@ def check():
     import chat
     text = chat.text_message(what)
     send(cfg["text_to"], text)
-    with open(LOG, "a", encoding="utf-8") as f:
-        f.write(f"{int(time.time())}|{why}|{key}|{' '.join(text.split())}\n")
+    record(why, key, text)
     return why, text
 
 
@@ -177,7 +196,14 @@ def for_chat():
 
 
 if __name__ == "__main__":
-    if "--log" in sys.argv:
+    if "--test" in sys.argv:
+        import urllib.request
+        req = urllib.request.Request("http://127.0.0.1:8008/api/nudge/test", data=b"{}", method="POST")
+        try:
+            print("sent:", json.loads(urllib.request.urlopen(req, timeout=180).read())["sent"])
+        except urllib.error.HTTPError as e:
+            print("didn't send:", json.loads(e.read()).get("error"))
+    elif "--log" in sys.argv:
         for s in sent():
             print(time.strftime("%Y-%m-%d %H:%M", time.localtime(s["t"])), f"{s['why']:9s}", s["text"])
         print(f"{len(sent())} texts")
