@@ -62,6 +62,18 @@
   #deadface { position: absolute; right: 40px; top: 40px; width: 120px; height: 120px;
               -webkit-filter: drop-shadow(5px 0 0 #ff3d6e); filter: drop-shadow(5px 0 0 #ff3d6e); }
 
+  /* ---- numbers station ---- */
+  #numbers { background: #000; text-align: center; }
+  #numstatic { position: absolute; top: 0; left: 0; width: 100%; height: 100%; image-rendering: pixelated; opacity: .35; }
+  #numhead { position: relative; margin-top: 50px; font-size: 30px; color: #ffc21a; background: rgba(0,0,0,.6); display: inline-block; padding: 4px 14px; letter-spacing: .2em; }
+  #numgroup { position: relative; margin-top: 70px; font-size: 150px; color: #ffc21a; letter-spacing: .15em;
+              text-shadow: 5px 0 #ff3d6e, -5px 0 #3df5ff; min-height: 1.2em; }
+  #numsub { position: relative; margin-top: 20px; font-size: 28px; color: #8a6410; min-height: 1.3em; }
+  #numbtns { position: absolute; left: 0; right: 0; bottom: 40px; }
+  #numbtns button { font: inherit; font-size: 30px; border: 0; padding: 14px 30px; margin: 0 14px; }
+  #numstop { background: #ffc21a; color: #0a0806; }
+  #numoff { background: #3a2c0c; color: #f2eadb; }
+
   /* ---- meditation ---- */
   #med { background: #000; text-align: center; }
   .medbtn { display: inline-block; font: inherit; font-size: 30px; color: #0a0806; background: #ffc21a;
@@ -141,6 +153,17 @@
   <img id="deadmoe" alt="">
   <img id="deadface" src="faces/big/shock.png" alt="">
   <div id="deadtext"></div>
+</div>
+
+<div id="numbers" class="screen hidden">
+  <canvas id="numstatic" width="160" height="100"></canvas>
+  <div id="numhead">YOLK NUMBERS STATION &middot; 81.0</div>
+  <div id="numgroup"></div>
+  <div id="numsub"></div>
+  <div id="numbtns">
+    <button id="numstop">stop</button>
+    <button id="numoff">turn the numbers off</button>
+  </div>
 </div>
 
 <div id="med" class="screen hidden">
@@ -283,6 +306,7 @@ function show(id) {
   $("talk").className = "screen" + (id === "talk" ? "" : " hidden");
   $("dead").className = "screen" + (id === "dead" ? "" : " hidden");
   $("med").className = "screen" + (id === "med" ? "" : " hidden");
+  $("numbers").className = "screen" + (id === "numbers" ? "" : " hidden");
   mode = id;
 }
 
@@ -673,6 +697,119 @@ function deadChannel() {
   }, 70);
 }
 
+// ------------------------------------------------------------ numbers station
+// Now and then (numberstation.py on the Mac decides when) she reads out groups of
+// digits like a shortwave numbers station. "stop" ends this one; "turn the numbers
+// off" switches them off for good (back on from the Mac: the terminal's "numbers station").
+var num = { b: null, stop: true, frame: null, ctx: null, noise: null, last: "" };
+
+function numAudio() {
+  try {
+    if (!num.ctx) { var A = window.AudioContext || window.webkitAudioContext; if (!A) return null; num.ctx = new A(); }
+    if (num.ctx.resume) num.ctx.resume();
+    return num.ctx;
+  } catch (e) { return null; }
+}
+
+function numNoise(on) {
+  var a = numAudio();
+  if (num.noise) { try { num.noise.stop(0); } catch (e) {} num.noise = null; }
+  if (!on || !a) return;
+  var buf = a.createBuffer(1, a.sampleRate * 2, a.sampleRate), d = buf.getChannelData(0);
+  for (var i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+  var src = a.createBufferSource(), g = a.createGain();
+  src.buffer = buf; src.loop = true; g.gain.value = 0.06;
+  src.connect(g); g.connect(a.destination);
+  src.start(0);
+  num.noise = src;
+}
+
+function numChime() {
+  var a = numAudio();
+  if (!a) return;
+  [784, 659, 523, 659].forEach(function (f, i) {
+    var o = a.createOscillator(), g = a.createGain(), t = a.currentTime + i * 0.45;
+    o.type = "sine"; o.frequency.value = f;
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(0.25, t + 0.03);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.4);
+    o.connect(g); g.connect(a.destination);
+    o.start(t); o.stop(t + 0.42);
+  });
+}
+
+function numStatic(on) {
+  clearInterval(num.frame);
+  if (!on) return;
+  var c = $("numstatic"), ctx = c.getContext("2d"), img = ctx.createImageData(c.width, c.height);
+  num.frame = setInterval(function () {
+    var px = img.data;
+    for (var i = 0; i < px.length; i += 4) { var v = Math.random() * 255 | 0; px[i] = px[i + 1] = px[i + 2] = v; px[i + 3] = 255; }
+    ctx.putImageData(img, 0, 0);
+  }, 90);
+}
+
+function numSay(text, quiet, cb) {          // her voice, or just a pause when it's on quiet
+  if (num.stop) return;
+  var go = function () { if (!num.stop) setTimeout(cb, 500); };
+  if (quiet) setTimeout(go, 1800); else speak(text, go);
+}
+
+function numEnd(mode) {
+  if (!num.b) return;
+  var id = num.b.id;
+  num.stop = true; num.b = null;
+  try { audio.pause(); } catch (e) {}
+  numNoise(false); numStatic(false);
+  post("/api/numbers", mode ? { played: id, mode: mode } : { played: id });
+  if (mode === "off") {
+    $("numgroup").textContent = "";
+    $("numsub").textContent = "numbers off. turn them back on from the mac.";
+    setTimeout(function () { show("ambient"); idleLife(); }, 2500);
+  } else { show("ambient"); idleLife(); }
+}
+
+function numPlay(b, quiet) {
+  num.b = b; num.stop = false; num.last = b.id;
+  show("numbers");
+  clearTimeout(blinkT);
+  $("numgroup").textContent = ""; $("numsub").textContent = quiet ? "(silent)" : "";
+  numStatic(true);
+  if (!quiet) numNoise(true);
+  var round = 0, i = 0;
+  var spoken = b.spoken.split(". ");
+  function group() {
+    if (num.stop) return;
+    if (i >= b.groups.length) {
+      round++; i = 0;
+      if (round < 2) return numSay("again.", quiet, function () { $("numgroup").textContent = ""; group(); });
+      $("numgroup").textContent = "";
+      $("numsub").textContent = "end of transmission";
+      return numSay("end of transmission.", quiet, function () { setTimeout(function () { numEnd(); }, 1500); });
+    }
+    $("numgroup").textContent = b.groups[i];
+    numSay(spoken[i].replace(/\.$/, "") + ".", quiet, function () { i++; group(); });
+  }
+  setTimeout(function () {
+    if (num.stop) return;
+    if (!quiet) numChime();
+    setTimeout(function () {
+      $("numsub").textContent = "yolk calling";
+      numSay("yolk calling. yolk calling.", quiet, function () { $("numsub").textContent = quiet ? "(silent)" : ""; group(); });
+    }, quiet ? 400 : 2000);
+  }, 2000);
+}
+
+function numCheck() {
+  get("/api/numbers", function (d) {
+    if (!d || !d.broadcast || mode !== "ambient" || num.b || d.broadcast.id === num.last) return;
+    numPlay(d.broadcast, d.mode === "quiet");
+  });
+}
+
+$("numstop").onclick = function (e) { e.stopPropagation(); numEnd(); };
+$("numoff").onclick = function (e) { e.stopPropagation(); numEnd("off"); };
+
 // ------------------------------------------------------------ YOLK's eye
 // Movement only. Twice a second the camera frame is shrunk to 64x48 grey
 // pixels and compared with the previous one; the only thing kept is what
@@ -859,6 +996,8 @@ setInterval(tick, 1000);
 setInterval(refresh, 10 * 60000);
 idleLife();
 scheduleDead();
+setInterval(numCheck, 60000);
+setTimeout(numCheck, 5000);
 if (eyePref()) eyeStart(); else eyeLabel("off");
 if (location.hash === "#dead") setTimeout(deadChannel, 1500);   // for testing
 </script>

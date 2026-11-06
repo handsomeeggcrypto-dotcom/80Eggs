@@ -393,6 +393,40 @@ async function memories() {
   $("extra").innerHTML = "";
 }
 
+// the Numbers Station on the tablet (yolk/numberstation.py): on, quiet, off, play now, decode
+async function numberStation() {
+  const words = { on: "on, with sound", quiet: "on quiet. screen only, no sound", off: "off" };
+  let s = await api("/api/numbers", {});
+  await say(`the numbers station is ${words[s.mode]}. on the tablet, evenings, once a day at most.`, "sus");
+  while (true) {
+    const c = await choose(["turn it on (with sound)", "make it quiet (screen only)", "turn it off",
+                            "play one now", "decode the last one", "never mind"]);
+    if (c === 0 || c === 1 || c === 2) {
+      s = await api("/api/numbers", { mode: ["on", "quiet", "off"][c] });
+      await say(s.mode === "off" ? "off. the airwaves are quiet. for now." :
+                s.mode === "quiet" ? "quiet. the numbers will show, but i won't say them." :
+                "on. listen for me in the evenings.", "ok");
+    } else if (c === 3) {
+      if (s.mode === "off") { await say("it's off. turn it on first.", "sus"); continue; }
+      await api("/api/numbers", { now: true });
+      await say("transmitting. the tablet will pick it up within a minute.", "dream");
+    } else if (c === 4) {
+      const r = await api("/api/numbers", { decode: true });
+      if (!r.last) { await say("nothing's been broadcast yet.", "ok"); continue; }
+      const digits = r.last.groups.join("");
+      $("extra").innerHTML = `<div class="letter">${r.last.groups.join(" ")}<br><br>a=01 b=02 ... z=26, 00 = space. join the groups, read the digits in pairs.</div>`;
+      await say("you could have worked it out. fine. it said: " + decodeNums(digits), "shock");
+      await next();
+      $("extra").innerHTML = "";
+    } else return;
+  }
+}
+function decodeNums(d) {
+  let out = "";
+  for (let i = 0; i + 1 < d.length; i += 2) { const n = +d.slice(i, i + 2); out += n === 0 ? " " : n <= 26 ? String.fromCharCode(96 + n) : "?"; }
+  return out.trim();
+}
+
 // her Sunday letter (yolk/sunday.py), the newest one
 async function sundayLetter() {
   let l = {};
@@ -440,7 +474,7 @@ async function main() {
 
   const topics = ["talk to me", "how are you?", "how am i doing?", "ask the oracle", "tell me a secret", "let's talk moes",
                   "leave SHELL a dream", "remind me tomorrow", "edit my habits", "how's SHELL?", "pair a tablet",
-                  "what do you remember?", "read your sunday letter", "bye, yolk"];
+                  "what do you remember?", "read your sunday letter", "numbers station", "bye, yolk"];
   while (true) {
     await say(pick(["what do you want to talk about?", "so.", "anything else?", "i'm listening."]), mood);
     const c = await choose(topics);
@@ -457,6 +491,7 @@ async function main() {
     else if (c === 10) await pairTablet();
     else if (c === 11) await memories();
     else if (c === 12) await sundayLetter();
+    else if (c === 13) await numberStation();
     else { await say(pick(L.goodbye), num("affection") >= 10 ? "love" : "ok"); await remember({}); await choose(["wake YOLK again"]); }
     await remember({ affection: num("affection") + 1 });
   }

@@ -510,6 +510,9 @@ class Handler(BaseHTTPRequestHandler):
             path = "/station.html"
         if path == "/api/ambient":
             return self.send(200, ambient())
+        if path == "/api/numbers":           # the Station asks every minute (numberstation.py)
+            import numberstation
+            return self.send(200, numberstation.status())
         if path == "/api/say":
             from urllib.parse import parse_qs, urlparse
             text = (parse_qs(urlparse(self.path).query).get("t") or [""])[0].strip()[:300]
@@ -674,6 +677,11 @@ class Handler(BaseHTTPRequestHandler):
             notes = journal.change(forget=[data.get("id")])
             sync()
             return self.send(200, {"left": len(notes)})
+        if path == "/api/numbers":           # the Numbers Station: played / mode / now / decode
+            import numberstation
+            if data.get("decode") and self.client_address[0] not in ("127.0.0.1", "::1"):
+                data.pop("decode")              # the answer stays on the Mac
+            return self.send(200, numberstation.handle(data))
         if path == "/api/meditate":
             mins = int(data.get("minutes", 0) or 0)
             if not 1 <= mins <= 180:
