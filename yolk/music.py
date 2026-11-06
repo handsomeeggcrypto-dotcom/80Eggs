@@ -29,8 +29,9 @@ SKIP_MS = 30 * 1000        # stopped within 30 seconds of a song longer than a m
 
 
 def song(path):
-    """(artist, title) for a real song, or None for YOLK's own clips and meditation audio."""
-    if path.startswith(("/Music/YOLK Radio/", "/Music/YOLK Daily/", "/YOLK/")):
+    """(artist, title) for a real song, or None for YOLK's own clips and meditation sessions."""
+    path = re.sub(r"^/<[^>]+>", "", path)        # some plays are logged as /<HDD0>/Music/...
+    if path.startswith(("/Music/YOLK Radio/", "/Music/YOLK Daily/", "/Music/Meditation Sessions/", "/YOLK/")):
         return None
     import radio
     return radio.song_name(path.lstrip("/"))

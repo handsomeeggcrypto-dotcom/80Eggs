@@ -98,8 +98,11 @@ YOLK_ON_USB = save
 
 local function need() return st.hatched == 0 and FIRST or NEXT end
 
--- switches Rockbox's playback log on (returns true if it was off)
+-- switches Rockbox's playback log on (returns true if it was off). Once the log
+-- exists it's on, so the big settings tables are only loaded the first time.
 local function log_on()
+    local f = io.open(LOG, "r")
+    if f then f:close(); return false end
     local was_off = false
     pcall(function()
         require "rbsettings"
@@ -161,6 +164,19 @@ local function picture(n)
         or img(DEX .. "bradley.bmp")
 end
 
+-- a step-by-step trail in /YOLK/hatch/trace.txt, so a freeze on the iPod can be traced
+local function trace(step)
+    local f = io.open(DIR .. "trace.txt", "w")
+    if f then f:write(step .. "\n"); f:close() end
+end
+
+-- 1..MOES, even if the iPod's random numbers come out negative
+local function random_moe()
+    local n = math.random(MOES) % MOES
+    if n < 0 then n = n + MOES end
+    return n + 1
+end
+
 local function have(n)
     for _, m in ipairs(mine) do if m == n then return true end end
     return false
@@ -184,8 +200,9 @@ end
 ---------------------------------------------------------------- screens
 local said = nil
 
-local function draw(dx)
+local function draw(dx, full)                  -- full: draw the egg ready to hatch
     local warm, goal = st.warm, need()
+    if full then warm = goal end
     local stage = warm >= goal and 4 or warm * 4 / goal
     rect(BG, 0, 0, W, H)
     text(YOLK, "HATCHERY", "center", 4)
@@ -212,26 +229,30 @@ end
 
 local function hatch()
     said = nil
-    for i = 1, 16 do                                  -- it shakes harder and harder
-        local d = (i / 4 + 1) * (i % 2 == 0 and 1 or -1)
-        draw(d)
-        rb.get_plugin_action(HZ / 14)
-    end
-    rect(GLOW, 0, 0, W, H); rb.lcd_update(); rb.get_plugin_action(HZ / 6)
-    rect(CREAM, 0, 0, W, H); rb.lcd_update(); rb.get_plugin_action(HZ / 6)
-    local n = math.random(1, MOES)
+    trace("1 pick")
+    local n = random_moe()
     for _ = 1, 6 do                                   -- new ones first, if it can
         if not have(n) then break end
-        n = math.random(1, MOES)
+        n = random_moe()
     end
     local twin = have(n)
+    trace("2 save #" .. n)                            -- kept before any animation, so nothing can lose it
     st.warm = st.warm - need()
     st.hatched = st.hatched + 1
     mine[#mine + 1] = n
     local f = io.open(DIR .. "moes.txt", "a")
     if f then f:write(n .. "\n"); f:close() end
     save()
+    trace("3 shake #" .. n)
+    for i = 1, 16 do                                  -- it shakes harder and harder
+        local d = (i / 4 + 1) * (i % 2 == 0 and 1 or -1)
+        draw(d, true)
+        rb.get_plugin_action(HZ / 14)
+    end
+    rect(GLOW, (W - 96) / 2, 26 + CH, 96, 120); rb.lcd_update(); rb.get_plugin_action(HZ / 8)
+    trace("4 show #" .. n)
     local m = show_moe(n, twin and "IT HATCHED. A TWIN." or "IT HATCHED.")
+    trace("5 shown #" .. n)
     local lines = {
         MYTHIC = "a mythic. from an egg. i'm shaking.", LEGENDARY = "legendary. i knew it was a good egg.",
         EPIC = "epic. it looks at you like you're its mom.", RARE = "rare. it's already judging your music.",
@@ -243,6 +264,7 @@ local function hatch()
         local a = rb.get_plugin_action(-1)
         if a == A.PLA_SELECT_REL or a == A.PLA_UP or a == A.PLA_RIGHT then break end
     end
+    trace("6 done #" .. n)
 end
 
 local function collection()
@@ -261,6 +283,12 @@ local function collection()
 end
 
 ---------------------------------------------------------------- run
+local HOLD = {
+    "it's warm. it can hear your music.", "something in there likes this.", "don't shake it. ok, a little.",
+    "it's listening. play it something.", "it kicked. eggs don't kick.", "it's dreaming in 320 by 240.",
+}
+
+local function main()
 math.randomseed(rb.current_tick() + (os.time and os.time() or 0))
 load()
 if st.started == 0 then                       -- the very first time: count from now on, not old plays
@@ -273,11 +301,6 @@ local got = listen()
 if got >= 60 then said = "+" .. (got / 60) .. " min. it felt that."
 elseif was_off then said = "i'm listening now. play music." end
 save()
-
-local HOLD = {
-    "it's warm. it can hear your music.", "something in there likes this.", "don't shake it. ok, a little.",
-    "it's listening. play it something.", "it kicked. eggs don't kick.", "it's dreaming in 320 by 240.",
-}
 draw()
 rb.get_plugin_action(HZ / 5)
 while true do
@@ -293,4 +316,27 @@ while true do
     end
 end
 save()
+end
+
+-- if anything goes wrong, say so in colors you can read (and keep it in error.txt for the Mac)
+local ok, err = pcall(main)
+if not ok then
+    err = tostring(err)
+    local f = io.open(DIR .. "error.txt", "a")
+    if f then f:write((os.time and os.time() or 0) .. " " .. err .. "\n"); f:close() end
+    rect(BG, 0, 0, W, H)
+    text(YOLK, "the egg glitched. it's ok.", "center", 6)
+    local cols, y = (W - 16) / CW, 12 + CH * 2
+    for i = 1, #err, cols do
+        text(CREAM, err:sub(i, i + cols - 1), 8, y)
+        y = y + CH + 2
+        if y > H - CH * 3 then break end
+    end
+    text(DIM, "press select", "center", H - CH - 6)
+    rb.lcd_update()
+    while true do
+        local a = rb.get_plugin_action(-1)
+        if a == A.PLA_SELECT_REL or a == A.PLA_UP then break end
+    end
+end
 rb.lcd_set_drawmode(3)
