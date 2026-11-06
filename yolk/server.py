@@ -414,7 +414,35 @@ def ambient():
             "daily": (daily.OUT / "daily.txt").read_text(encoding="utf-8") if (daily.OUT / "daily.txt").exists() else "",
         }
         _ambient["at"] = time.time()
-    return {**_ambient["data"], "meditation": meditation_stats()}
+    return {**_ambient["data"], "meditation": meditation_stats(), "reminders": holding()}
+
+
+def holding(limit=4):
+    """Reminders and dated notes she's keeping for today or later, soonest first, for the Station."""
+    import datetime
+    import journal
+    now = datetime.datetime.now()
+    today = now.date()
+    out = []
+    for n in journal.read():
+        if not n.get("on") or n["on"] < today.isoformat():
+            continue
+        day = datetime.date.fromisoformat(n["on"])
+        if n.get("at"):
+            at = datetime.datetime.combine(day, datetime.datetime.strptime(n["at"], "%H:%M").time())
+            if at < now - datetime.timedelta(hours=3):      # sent (or missed) already
+                continue
+            h, m = at.hour, at.minute
+            clock = "noon" if (h, m) == (12, 0) else "midnight" if (h, m) == (0, 0) else \
+                f"{h % 12 or 12}{':%02d' % m if m else ''} {'am' if h < 12 else 'pm'}"
+        else:
+            clock = ""
+        name = "today" if day == today else "tomorrow" if day == today + datetime.timedelta(days=1) else \
+            day.strftime("%a %b ").lower() + str(day.day)
+        out.append({"note": n["note"], "when": (name + (" at " + clock if clock else "")),
+                    "timed": bool(n.get("at")), "sort": n["on"] + (n.get("at") or "99:99")})
+    out.sort(key=lambda r: r["sort"])
+    return [{k: v for k, v in r.items() if k != "sort"} for r in out[:limit]]
 
 
 # ------------------------------------------------------------------ http

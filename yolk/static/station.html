@@ -30,6 +30,12 @@
   #weather { font-size: 34px; color: #f2eadb; margin-top: 22px; }
   #weather .dim, .dim { color: #8a6410; }
   #streak { font-size: 30px; color: #ffc21a; margin-top: 14px; min-height: 1.2em; }
+  /* reminders she's holding (journal notes with a day, from /api/ambient) */
+  #holding { margin-top: 24px; font-size: 27px; }
+  #holding .head { font-size: 22px; color: #8a6410; letter-spacing: .12em; margin-bottom: 4px; }
+  #holding .r { margin-bottom: 2px; }
+  #holding .w { color: #ffc21a; }
+  #holding .w.soft { color: #8a6410; }
   .moe { margin-top: auto; display: -webkit-flex; display: flex; -webkit-align-items: flex-end; align-items: flex-end; }
   .moe img { width: 130px; border: 3px solid #ffc21a; margin-right: 18px; background: #16120c; }
   .moe .label { font-size: 22px; color: #8a6410; }
@@ -113,6 +119,10 @@
           -webkit-transition: opacity 1s; transition: opacity 1s; }
   video#cam { position: absolute; width: 2px; height: 2px; opacity: 0; pointer-events: none; }
 
+  /* night mode: a dark veil over the old screen while she watches the dark (NIGHT_FROM to NIGHT_TO) */
+  #night { position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: #000; opacity: 0; z-index: 6;
+           pointer-events: none; -webkit-transition: opacity 4s; transition: opacity 4s; }
+
   #offline { position: absolute; left: 0; right: 0; top: 0; padding: 6px; text-align: center; font-size: 22px;
              background: #3a0c14; color: #ff3d6e; }
 
@@ -130,6 +140,7 @@
     <div id="date"></div>
     <div id="weather"></div>
     <div id="streak"></div>
+    <div id="holding" class="hidden"></div>
     <div class="moe" id="moe"></div>
   </div>
   <div class="right" id="yolkspot">
@@ -190,6 +201,7 @@
 </div>
 
 <div id="away"></div>
+<div id="night"></div>
 <button id="eyebtn">eye: off</button>
 <div id="eyemeter"></div>
 <div id="eyehelp" class="hidden"></div>
@@ -256,6 +268,7 @@ function drawAmbient() {
   if (amb.meditation && amb.meditation.streak) parts.push("meditation: " + amb.meditation.streak + " day" + (amb.meditation.streak > 1 ? "s" : "") + (amb.meditation.today ? " (done today)" : ""));
   if (amb.streak) parts.push(amb.streak.habit + ": " + amb.streak.days + " days");
   $("streak").textContent = parts.join("  .  ");
+  drawHolding(amb.reminders || []);
   var m = amb.moe;
   if (m) {
     var t = m.traits[0];
@@ -265,6 +278,25 @@ function drawAmbient() {
       "</div></div>";
   }
 }
+
+// what she's keeping warm: upcoming reminders, soonest first
+function esc(t) { return String(t).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); }
+function drawHolding(rs) {
+  var box = $("holding");
+  if (!rs.length) { box.className = "hidden"; return; }
+  var html = '<div class="head">KEEPING WARM FOR YOU</div>';
+  for (var i = 0; i < rs.length; i++) {
+    html += '<div class="r"><span class="w' + (rs[i].timed ? "" : " soft") + '">' + esc(rs[i].when) + "</span> &middot; " +
+            esc(rs[i].note) + "</div>";
+  }
+  box.innerHTML = html;
+  box.className = "";
+}
+
+// night mode: dim the old screen at night while she's idle; talking lifts it
+var NIGHT_FROM = 22, NIGHT_TO = 7, NIGHT_DIM = 0.72;
+function isNight() { var h = new Date().getHours(); return h >= NIGHT_FROM || h < NIGHT_TO; }
+function nightCheck() { $("night").style.opacity = (mode === "ambient" && isNight()) ? NIGHT_DIM : 0; }
 
 function refresh() {
   get("/api/ambient", function (d) { amb = d; drawAmbient(); });
@@ -308,6 +340,7 @@ function show(id) {
   $("med").className = "screen" + (id === "med" ? "" : " hidden");
   $("numbers").className = "screen" + (id === "numbers" ? "" : " hidden");
   mode = id;
+  nightCheck();
 }
 
 function say(text, face, cb) {
@@ -370,6 +403,7 @@ function sleepNow() {
   micClose();
   show("ambient");
   idleLife();
+  setTimeout(refresh, 3 * 60000);   // a reminder set while talking shows up once she's written it down
 }
 
 // everything else (oracle, secrets, how are you...) lives in "talk to me" now
@@ -994,6 +1028,8 @@ refresh();
 tick();
 setInterval(tick, 1000);
 setInterval(refresh, 10 * 60000);
+nightCheck();
+setInterval(nightCheck, 60000);
 idleLife();
 scheduleDead();
 setInterval(numCheck, 60000);
