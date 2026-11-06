@@ -140,6 +140,13 @@ def details(where="station"):
     except Exception:
         pass
     try:
+        import eggwatch
+        egg = eggwatch.for_chat()
+        if egg:
+            facts.append(egg)
+    except Exception:
+        pass
+    try:
         import nudge
         texted = nudge.for_chat()
         if texted:

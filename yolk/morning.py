@@ -113,6 +113,13 @@ def compose(day=None):
     c = crypto(cfg)
     if c:
         lines.append(f"📈 {c}")
+    try:
+        import eggwatch
+        egg = eggwatch.for_morning()
+        if egg:
+            lines.append(egg)
+    except Exception:
+        pass
     if mind and mind.get("daily"):
         lines += ["", mind["daily"]]
     return "\n".join(lines)

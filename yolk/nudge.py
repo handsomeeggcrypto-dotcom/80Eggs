@@ -13,6 +13,7 @@ reasons only every few days, so it stays rare. Reasons, most important first:
   streak    your meditation streak ends tonight if you don't (evening)
   quiet     you haven't talked to her in QUIET_DAYS days
   song      one song played over and over on SHELL this week
+  nestegg   Safe Scout (Nest Egg's practice bot) moved 10% in a day or hit a new high (eggwatch.py)
   thinking  nothing in particular; sometimes she just brings up something she remembers
 Claude writes the words in her voice (chat.text_message). The server sends it, so the
 first one makes macOS ask "YOLK wants to control Messages". Turn them off with
@@ -92,6 +93,13 @@ def reasons(now=None):
             (artist, title), n = songs[0]
             out.append(("song", f"{artist} - {title}",
                         f"they played {title} by {artist} {n} times this week on SHELL", False))
+    except Exception:
+        pass
+    try:
+        import eggwatch
+        egg = eggwatch.nudge_reason()
+        if egg:
+            out.append(("nestegg", egg[0], egg[1], False))
     except Exception:
         pass
     notes = journal.read()
