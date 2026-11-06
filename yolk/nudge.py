@@ -136,6 +136,8 @@ def pick(now=None, ignore_limits=False):
             return why, key, what
         if not urgent and since_last < GAP_DAYS:
             continue
+        if not urgent and now.weekday() == 6:          # Sunday belongs to the letter (sunday.py)
+            continue
         if why == "song" and any(s["why"] == "song" and time.time() - s["t"] < 14 * 86400 for s in history):
             continue
         if why == "thinking" and random.Random("think" + today).random() > THINKING_CHANCE:

@@ -74,6 +74,7 @@
   .notes { list-style: none; padding: 0; margin: 18px 0 0; font-size: 22px; max-height: 40vh; overflow-y: auto; }
   .notes li { margin-bottom: 6px; }
   .notes li span { color: var(--dim); }
+  .letter { margin: 18px 0 0; font-size: 22px; line-height: 1.4; max-height: 45vh; overflow-y: auto; white-space: normal; }
 
   .stats { margin-top: 18px; }
   .stats .days { display: flex; gap: 10px; margin-bottom: 14px; }
@@ -392,6 +393,23 @@ async function memories() {
   $("extra").innerHTML = "";
 }
 
+// her Sunday letter (yolk/sunday.py), the newest one
+async function sundayLetter() {
+  let l = {};
+  try { l = await api("/api/letter"); } catch (e) { }
+  if (!l.text) {
+    await say("no letter yet. i write on sunday evenings. i'm already taking notes.", "sus");
+    await next();
+    return;
+  }
+  const esc = t => t.replace(/[&<>]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" })[c]);
+  const day = new Date(l.day + "T12:00:00").toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" }).toLowerCase();
+  $("extra").innerHTML = `<div class="letter">${esc(l.text).replace(/\n/g, "<br>")}</div>`;
+  await say(`${day}. i wrote it for you. it's also on your phone.`, "love");
+  await next();
+  $("extra").innerHTML = "";
+}
+
 // real-AI YOLK (yolk/chat.py), typed; "never mind" or an empty line goes back to the menu
 async function talk() {
   await say(pick(["ok. type to me. i'm listening.", "go ahead. i read fast.", "talk. i'm all yolk."]), "good");
@@ -422,7 +440,7 @@ async function main() {
 
   const topics = ["talk to me", "how are you?", "how am i doing?", "ask the oracle", "tell me a secret", "let's talk moes",
                   "leave SHELL a dream", "remind me tomorrow", "edit my habits", "how's SHELL?", "pair a tablet",
-                  "what do you remember?", "bye, yolk"];
+                  "what do you remember?", "read your sunday letter", "bye, yolk"];
   while (true) {
     await say(pick(["what do you want to talk about?", "so.", "anything else?", "i'm listening."]), mood);
     const c = await choose(topics);
@@ -438,6 +456,7 @@ async function main() {
     else if (c === 9) await aboutShell();
     else if (c === 10) await pairTablet();
     else if (c === 11) await memories();
+    else if (c === 12) await sundayLetter();
     else { await say(pick(L.goodbye), num("affection") >= 10 ? "love" : "ok"); await remember({}); await choose(["wake YOLK again"]); }
     await remember({ affection: num("affection") + 1 });
   }

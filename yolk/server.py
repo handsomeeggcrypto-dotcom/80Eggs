@@ -328,7 +328,8 @@ def keep_backing_up():
 
 
 def keep_nudging():
-    """Every 10 minutes she considers texting first (nudge.py). Never in test runs."""
+    """Every 10 minutes she considers texting first (nudge.py) and, on Sunday evening,
+    sends the weekly letter (sunday.py). Never in test runs."""
     if os.environ.get("YOLK_DATA"):
         return
 
@@ -337,6 +338,9 @@ def keep_nudging():
         time.sleep(60)
         while True:
             try:
+                import sunday
+                if sunday.check():                  # Sunday evening: the weekly letter
+                    print("Sent the Sunday letter")
                 done = nudge.check()
                 if done:
                     print(f"Texted ({done[0]}): {done[1]}")
@@ -535,6 +539,11 @@ class Handler(BaseHTTPRequestHandler):
             queued = [l for l in QUEUE.read_text(encoding="utf-8").splitlines() if l.strip()] if QUEUE.exists() else []
             return self.send(200, {"memory": mem, "shell": connected, "queued": len(queued),
                                    "battery": mac_battery(), "now": int(time.time())})
+        if path == "/api/letter":             # her newest Sunday letter (sunday.py); this Mac only
+            if self.client_address[0] not in ("127.0.0.1", "::1"):
+                return self.send(403, {"error": "only on the mac"})
+            import sunday
+            return self.send(200, sunday.latest() or {})
         if path == "/api/journal":            # what she remembers; personal, so this Mac only
             if self.client_address[0] not in ("127.0.0.1", "::1"):
                 return self.send(403, {"error": "only on the mac"})
