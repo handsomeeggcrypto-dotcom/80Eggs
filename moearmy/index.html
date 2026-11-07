@@ -540,6 +540,154 @@ const SFX = {
 function setMute(m) {
   muted = m; store.set(MUTE_KEY, m ? "1" : "0");
   $("mute").textContent = m ? "SND OFF" : "SND ON";
+  if (MUSIC.gain) MUSIC.gain.gain.value = m ? 0 : MUSIC_VOL;
+}
+
+// ---------- music ----------
+// Game Boy style: two pulse-wave channels, a soft bass and a noise drum, played by a little step sequencer.
+// Songs are written one 16th-note step per token: a note like G4, "." holds the note before, "_" is a rest.
+// Drums: k = kick, s = snare, g = gong. Add new songs to SONGS (one per level later on).
+const MUSIC_VOL = 0.45;   // a little under the sound effects, so hits and pops still stand out
+const SONGS = {
+  // "Operation I.L.Y.": a marching tune on the five-note (pentatonic) scale, G A B D E
+  march: {
+    bpm: 132,
+    sections: {
+      A: {
+        lead: `D5 . . B4 D5 . E5 . G5 . . . E5 . D5 .   B4 . A4 . G4 . A4 . B4 . . . _ . _ .
+               D5 . . B4 D5 . E5 . G5 . . . A5 . G5 .   E5 . D5 . E5 . G5 . A5 . . . _ . _ .
+               G5 . E5 . D5 . E5 . G5 . . A5 G5 . E5 .  D5 . B4 . A4 . B4 . D5 . . . _ . _ .
+               E5 . D5 . B4 . A4 . G4 . A4 . B4 . D5 .  G4 . . . . . . . G4 . G4 . G4 . _ .`,
+        roots: "G D G C E D C G",
+        drums: "march march march march march march march stomp",
+      },
+      B: {
+        lead: `E4 . E4 . G4 . . E4 D4 . E4 . . . _ .   E4 . E4 . G4 . . A4 B4 . A4 . . . _ .
+               B4 . B4 . D5 . . B4 A4 . G4 . E4 . G4 .  A4 . . . . . . . _ . _ . _ . _ .
+               E4 . E4 . G4 . . E4 D4 . E4 . . . _ .   E4 . E4 . G4 . . A4 B4 . A4 . . . _ .
+               B4 . D5 . E5 . D5 . B4 . A4 . G4 . A4 .  G4 . . . . . . . _ . _ . _ . _ .`,
+        roots: "E E G D E E C G",
+        drums: "march march march roll march march march roll",
+      },
+    },
+    order: "A A B A",
+    intro: "roll",
+  },
+};
+const DRUM_BARS = {
+  march: "k . . . s . . . k . . . s . . .",
+  stomp: "k . . . s . . . k . k . s . _ .",
+  roll: "k . . . s . s . s s s s s s s s",
+};
+const NOTE_I = { C: 0, D: 2, E: 4, F: 5, G: 7, A: 9, B: 11 };
+const noteHz = (n) => 440 * Math.pow(2, (NOTE_I[n[0]] + (n[1] === "#" ? 1 : 0) + (+n[n.length - 1] + 1) * 12 - 69) / 12);
+const FIFTH = { C: "G", D: "A", E: "B", G: "D", A: "E", B: "F#" };
+
+// turn a song into one list of steps per channel
+function buildSong(song) {
+  const lead = [], harm = [], bass = [], drum = [];
+  const add = (sec) => {
+    lead.push(...sec.lead.trim().split(/\s+/));
+    sec.roots.split(" ").forEach((root) => {
+      for (let i = 0; i < 16; i++) {
+        // oom-pah bass: root on the beat, its fifth on the half beat; the second pulse plays soft off-beat stabs
+        bass.push(i % 4 === 0 ? root + "2" : i % 4 === 2 ? FIFTH[root] + "2" : ".");
+        harm.push(i % 4 === 2 ? FIFTH[root] + "4" : i % 4 === 3 ? "_" : ".");
+      }
+    });
+    sec.drums.split(" ").forEach((b) => drum.push(...DRUM_BARS[b].split(" ")));
+  };
+  const intro = DRUM_BARS[song.intro].split(" ");
+  intro[0] = "g";
+  for (let i = 0; i < 16; i++) { lead.push("_"); harm.push("_"); bass.push("_"); }
+  drum.push(...intro);
+  const loopAt = lead.length;
+  song.order.split(" ").forEach((k) => add(song.sections[k]));
+  return { lead, harm, bass, drum, loopAt, step: 60 / song.bpm / 4 };
+}
+
+const MUSIC = { gain: null, timer: null, song: null, i: 0, next: 0, waves: {}, noise: null };
+function pulseWave(duty) {   // the Game Boy's thin pulse sound
+  if (MUSIC.waves[duty]) return MUSIC.waves[duty];
+  const n = 40, re = new Float32Array(n), im = new Float32Array(n);
+  for (let k = 1; k < n; k++) re[k] = (2 / (k * Math.PI)) * Math.sin(Math.PI * k * duty);
+  return (MUSIC.waves[duty] = AC.createPeriodicWave(re, im));
+}
+function musicSetup() {
+  if (MUSIC.gain || !AC) return;
+  MUSIC.gain = AC.createGain();
+  MUSIC.gain.gain.value = muted ? 0 : MUSIC_VOL;
+  MUSIC.gain.connect(AC.destination);
+  const len = AC.sampleRate;
+  MUSIC.noise = AC.createBuffer(1, len, AC.sampleRate);
+  const d = MUSIC.noise.getChannelData(0);
+  for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
+}
+function voice(hz, t, dur, wave, vol) {
+  const o = AC.createOscillator(), g = AC.createGain();
+  if (typeof wave === "string") o.type = wave; else o.setPeriodicWave(wave);
+  o.frequency.setValueAtTime(hz, t);
+  g.gain.setValueAtTime(vol, t);
+  g.gain.setValueAtTime(vol, t + dur * 0.7);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  o.connect(g); g.connect(MUSIC.gain);
+  o.start(t); o.stop(t + dur + 0.02);
+}
+function drum(kind, t) {
+  if (kind === "k") {   // kick: a quick falling thump
+    const o = AC.createOscillator(), g = AC.createGain();
+    o.frequency.setValueAtTime(150, t); o.frequency.exponentialRampToValueAtTime(45, t + 0.1);
+    g.gain.setValueAtTime(0.22, t); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.12);
+    o.connect(g); g.connect(MUSIC.gain); o.start(t); o.stop(t + 0.14);
+    return;
+  }
+  const src = AC.createBufferSource(), f = AC.createBiquadFilter(), g = AC.createGain();
+  src.buffer = MUSIC.noise;
+  const gong = kind === "g", dur = gong ? 1.6 : 0.07;
+  f.type = gong ? "lowpass" : "highpass"; f.frequency.value = gong ? 900 : 1800;
+  g.gain.setValueAtTime(gong ? 0.12 : 0.09, t); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  src.connect(f); f.connect(g); g.connect(MUSIC.gain);
+  src.start(t, Math.random() * 0.5); src.stop(t + dur + 0.02);
+  if (gong) { voice(98, t, 1.8, "triangle", 0.12); voice(147, t, 1.4, "sine", 0.05); }
+}
+function noteLen(track, i) {   // how many steps a note lasts, counting the "." holds after it
+  let n = 1;
+  while (track[(i + n) % track.length] === "." && n < 64) n++;
+  return n;
+}
+function musicTick() {
+  const S = MUSIC.song;
+  while (MUSIC.next < AC.currentTime + 0.15) {
+    const i = MUSIC.i, t = MUSIC.next;
+    const play = (track, wave, vol, gate) => {
+      const n = track[i];
+      if (n && n !== "." && n !== "_") voice(noteHz(n), t, S.step * noteLen(track, i) * gate, wave, vol);
+    };
+    play(S.lead, pulseWave(0.25), 0.07, 0.9);
+    play(S.harm, pulseWave(0.125), 0.035, 0.8);
+    play(S.bass, "triangle", 0.16, 0.85);
+    if (S.drum[i] && S.drum[i] !== "." && S.drum[i] !== "_") drum(S.drum[i], t);
+    MUSIC.next += S.step;
+    MUSIC.i = i + 1 >= S.lead.length ? S.loopAt : i + 1;
+  }
+}
+function startMusic(name) {
+  if (!AC) return;
+  musicSetup();
+  stopMusic();
+  MUSIC.song = buildSong(SONGS[name]);
+  MUSIC.i = 0;
+  resumeMusic();
+}
+function resumeMusic() {
+  if (!AC || !MUSIC.song || MUSIC.timer) return;
+  MUSIC.next = AC.currentTime + 0.05;
+  MUSIC.timer = setInterval(() => musicTick(), 25);
+  musicTick();
+}
+function stopMusic() {
+  clearInterval(MUSIC.timer);
+  MUSIC.timer = null;
 }
 
 // ---------- ground ----------
@@ -930,6 +1078,7 @@ function openTrophies(from) {
 
 function endGame() {
   state = "over"; overTimer = 1.1;
+  stopMusic();
   SFX.over();
   const best = Math.max(G.score, +(store.get(BEST_KEY) || 0));
   store.set(BEST_KEY, best);
@@ -1314,11 +1463,13 @@ function startGame() {
   G.guard = !!player().guard;
   G.crayon = !!player().crayon;
   G.blue = !!player().blue;
+  startMusic("march");
   state = "play"; paused = false;
   show(null);
   banner("STAGE 1", "LOVE THEM ALL");
 }
 function toTitle() {
+  stopMusic();
   newGame(true);
   state = "title";
   const best = +(store.get(BEST_KEY) || 0);
@@ -1575,6 +1726,7 @@ function setPaused(p) {
   if (state !== "play") return;
   paused = p;
   show(p ? "pause" : null);
+  if (p) stopMusic(); else resumeMusic();
 }
 
 // ---------- input ----------
@@ -1657,7 +1809,7 @@ requestAnimationFrame(frame);
 
 // for testing: ?debug exposes the game
 if (/[?&]debug\b/.test(location.search)) window.__army = {
-  get G() { return G; }, startGame, get state() { return state; },
+  get G() { return G; }, startGame, get state() { return state; }, MUSIC, SONGS, buildSong,
   run(sec) { for (let i = 0; i < sec * 60 && state === "play"; i++) update(1 / 60); },   // play on without a screen
 };
 })();
