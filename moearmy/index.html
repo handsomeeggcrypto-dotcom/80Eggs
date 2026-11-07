@@ -140,6 +140,7 @@ const lb = typeof Scores !== "undefined" ? Scores : null;
 
 function resize() {
   const vw = window.innerWidth, vh = window.innerHeight;
+  if (!vw || !vh) return;   // hidden or not laid out yet: keep the last good size
   H = clamp(Math.round(W * vh / vw), 290, 390);
   SCALE = Math.min(vw / W, vh / H);
   R = clamp(Math.ceil(SCALE * (window.devicePixelRatio || 1)), 2, 4);
@@ -260,17 +261,20 @@ function loadCustom(url) {
 }
 
 // Who you can play as. Unlockable players slot in here later, e.g.
-// { id: "general", name: "GENERAL MOE", head: "photo", unlock: (stats) => stats.bestStage >= 5 }
-const STAGE_KEY = "moearmy_best_stage";
+// { id: "general", name: "GENERAL MOE", head: "photo", unlock: { stage: 5, text: "REACH STAGE 5" } }
+// unlock can ask for { mice: n } (mice loved, added up over every game) or { stage: n } (best stage reached)
+const STAGE_KEY = "moearmy_best_stage", MICE_KEY = "moearmy_mice_total";
 const PLAYERS = [
   { id: "soldier", name: "SOLDIER MOE", head: "photo" },
   { id: "pixel", name: "PIXEL MOE", head: "pixel" },
-  { id: "bradley", name: "CEO BRADLEY", head: "bradley", unlock: { stage: 3, text: "REACH STAGE 3" } },
+  { id: "bradley", name: "CEO BRADLEY", head: "bradley", unlock: { mice: 100, text: "LOVE 100 MICE" } },
   { id: "custom", name: "YOUR MOE", head: "custom" },
 ];
 let playerId = store.get(PLAYER_KEY) || (store.get("moearmy_face") === "pixel" ? "pixel" : "soldier");
 const bestStage = () => +(store.get(STAGE_KEY) || 0);
-const unlocked = (p) => !p.unlock || bestStage() >= p.unlock.stage;
+const miceTotal = () => +(store.get(MICE_KEY) || 0);
+const unlocked = (p) => !p.unlock ||
+  (p.unlock.mice ? miceTotal() >= p.unlock.mice : bestStage() >= p.unlock.stage);
 const available = () => PLAYERS.filter((p) => p.id !== "custom" || CUSTOM);   // shown in the picker, locked or not
 const player = () => available().find((p) => p.id === playerId && unlocked(p)) || PLAYERS[0];
 let viewId = playerId;   // who the title picker is showing (can be a locked player)
@@ -637,7 +641,7 @@ function hurtPlayer() {
 function loveEnemy(e) {
   e.loved = true; e.lt = 0;
   G.score += e.pts; G.loved++;
-  if (e.type === "mouse") G.mice++;
+  if (e.type === "mouse") { G.mice++; loveMouseTotal(); }
   pop(e.x, e.y - 8, "+" + e.pts);
   burst(e.x, e.y, e.type === "tank" ? 18 : 6, Math.random() < 0.5 ? SMALL_HEART : PINK_HEART, e.type === "tank" ? 90 : 55);
   if (e.type === "tank") {
@@ -650,18 +654,27 @@ function loveEnemy(e) {
   }
 }
 
+// progress toward unlockables, kept in this browser
+function celebrate(was) {   // was: which players were locked before this moment
+  const fresh = PLAYERS.find((p) => was.includes(p.id) && unlocked(p));
+  if (!fresh) return;
+  setTimeout(() => {
+    if (state !== "play") return;
+    banner(fresh.name, "UNLOCKED!", 3);
+    SFX.power();
+  }, 900);
+}
+const lockedNow = () => PLAYERS.filter((p) => !unlocked(p)).map((p) => p.id);
 function reachStage(n) {
-  const before = bestStage();
-  if (n <= before) return;
+  if (n <= bestStage()) return;
+  const was = lockedNow();
   store.set(STAGE_KEY, n);
-  const fresh = PLAYERS.find((p) => p.unlock && before < p.unlock.stage && n >= p.unlock.stage);
-  if (fresh) {
-    setTimeout(() => {
-      if (state !== "play") return;
-      banner(fresh.name, "UNLOCKED!", 3);
-      SFX.power();
-    }, 2600);
-  }
+  celebrate(was);
+}
+function loveMouseTotal() {
+  const was = lockedNow();
+  store.set(MICE_KEY, miceTotal() + 1);
+  celebrate(was);
 }
 
 function endGame() {
@@ -1034,7 +1047,8 @@ function renderPicker() {
   const list = available();
   const p = list.find((q) => q.id === viewId) || player();
   const locked = !unlocked(p);
-  $("pName").innerHTML = p.name + (locked ? "<br><b>LOCKED: " + p.unlock.text + "</b>" : "");
+  const prog = locked && p.unlock.mice ? " (" + Math.min(miceTotal(), p.unlock.mice) + "/" + p.unlock.mice + ")" : "";
+  $("pName").innerHTML = p.name + (locked ? "<br><b>LOCKED: " + p.unlock.text + prog + "</b>" : "");
   $("enlistBtn").textContent = CUSTOM ? "NEW PICTURE" : "ENLIST YOUR MOE";
   const c = $("pCv").getContext("2d");
   c.setTransform(1, 0, 0, 1, 0, 0);
@@ -1346,7 +1360,10 @@ toTitle();
 requestAnimationFrame(frame);
 
 // for testing: ?debug exposes the game
-if (/[?&]debug\b/.test(location.search)) window.__army = { get G() { return G; }, startGame, get state() { return state; } };
+if (/[?&]debug\b/.test(location.search)) window.__army = {
+  get G() { return G; }, startGame, get state() { return state; },
+  run(sec) { for (let i = 0; i < sec * 60 && state === "play"; i++) update(1 / 60); },   // play on without a screen
+};
 })();
 </script>
 </body>
