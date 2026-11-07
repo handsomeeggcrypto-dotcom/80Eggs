@@ -44,7 +44,17 @@
   .stat { font-size: calc(var(--s) * 6px); line-height: 2; color: #e9f2d0; }
   .stat b { color: #ffd42a; font-weight: normal; }
   #rank { color: #8fd3ff; }
-  #bradley { width: calc(var(--s) * 33px); height: calc(var(--s) * 33px); image-rendering: pixelated; }
+  #bradley { width: calc(var(--s) * 22px); height: calc(var(--s) * 22px); image-rendering: pixelated; }
+  #title { gap: calc(var(--s) * 4px); }
+  .picker { display: flex; align-items: center; gap: calc(var(--s) * 4px); }
+  #pCv { width: calc(var(--s) * 50px); height: calc(var(--s) * 61px); image-rendering: auto; }
+  #pName { line-height: 1; }
+  #editor { background: #12180cf2; gap: calc(var(--s) * 4px); }
+  #edCv { width: calc(var(--s) * 130px); height: calc(var(--s) * 175px); image-rendering: auto; touch-action: none;
+    background: repeating-conic-gradient(#3a4a24 0 25%, #2c381b 0 50%) 0 0 / calc(var(--s) * 10px) calc(var(--s) * 10px);
+    box-shadow: 0 0 0 calc(var(--s) * 1px) #ffd42a; }
+  #edZoom { width: calc(var(--s) * 120px); accent-color: #ffd42a; }
+  #edMsg { color: #ff9fca; }
 </style>
 </head>
 <body>
@@ -56,10 +66,17 @@
       <canvas id="bradley" width="11" height="11"></canvas>
       <div class="logo">MOEMOE<br>ARMY<small>OPERATION I.L.Y.</small></div>
       <div class="ily">moemoe means ily</div>
-      <div class="how">DRAG TO MOVE<br>HEARTS FIRE ON THEIR OWN<br>FREE CAGED MOES TO GROW<br>YOUR SQUAD<br>LOVE THE ANTI MOEMOE MICE</div>
-      <div class="big blink" id="tapStart">TAP TO ENLIST</div>
+      <div class="how">DRAG TO MOVE, HEARTS FIRE ON THEIR OWN<br>FREE CAGED MOES TO GROW YOUR SQUAD<br>LOVE THE ANTI MOEMOE MICE</div>
+      <div class="picker noStart">
+        <button class="alt" id="pPrev">&lt;</button>
+        <canvas id="pCv" width="144" height="176"></canvas>
+        <button class="alt" id="pNext">&gt;</button>
+      </div>
+      <div class="stat noStart" id="pName"></div>
+      <div class="row"><button id="enlistBtn">ENLIST YOUR MOE</button></div>
+      <div class="big blink" id="tapStart">TAP TO PLAY</div>
       <div class="stat" id="bestTitle"></div>
-      <div class="row"><button class="alt" id="lbTitle">LEADERBOARD</button><button class="alt" id="faceBtn">FACE: PIXEL</button></div>
+      <div class="row"><button class="alt" id="lbTitle">LEADERBOARD</button></div>
     </div>
 
     <div class="screen" id="over">
@@ -72,6 +89,17 @@
         <button class="alt" id="lbOver">LEADERBOARD</button>
       </div>
       <div class="row"><button class="alt" id="getMoe" style="display:none">GET A MOE</button></div>
+    </div>
+
+    <div class="screen noStart" id="editor">
+      <div class="big" id="edTitle">ENLIST YOUR MOE</div>
+      <div class="how" id="edHelp"></div>
+      <canvas id="edCv" width="260" height="350"></canvas>
+      <input type="range" id="edZoom" min="0" max="100" value="50">
+      <div class="row" id="edTools"><button class="alt" id="edAuto">AUTO ERASE</button><button class="alt" id="edUndo">UNDO</button></div>
+      <div class="row"><button class="alt" id="edBack">CANCEL</button><button id="edNext">NEXT</button></div>
+      <div class="how" id="edMsg"></div>
+      <input type="file" id="edFile" accept="image/*" hidden>
     </div>
 
     <div class="screen" id="pause">
@@ -94,7 +122,8 @@ const SITE_URL = "https://www.81eggs.com/moearmy/";
 const BOARD = "moe-army";
 const BEST_KEY = "moearmy_best", MUTE_KEY = "moearmy_mute";
 
-const cv = document.getElementById("cv"), ctx = cv.getContext("2d");
+const cv = document.getElementById("cv");
+let ctx = cv.getContext("2d");   // swapped briefly to draw the player preview
 const stageEl = document.getElementById("stage");
 const $ = (id) => document.getElementById(id);
 const W = 180;
@@ -204,31 +233,62 @@ const BODY_F = LEGS.map((l) => sprite(BODY.concat(l)));
 const BODY_W = white(BODY_F[0]);
 const HEAD_PHOTO = new Image();
 HEAD_PHOTO.src = "assets/head_photo.png";
-let faceMode = store.get("moearmy_face") === "pixel" ? "pixel" : "photo";
 const photoReady = () => HEAD_PHOTO.complete && HEAD_PHOTO.naturalWidth > 0;
+let HEAD_PHOTO_W = null;
+HEAD_PHOTO.onload = () => { HEAD_PHOTO_W = tinted(HEAD_PHOTO, "#fff"); renderPicker(); };
 
-// (x, y) is the middle of the soldier: head from y-20, uniform from y+3, boots end at y+14
-function drawMoe(x, y, frame, flash) {
+// your own Moe: a head you upload and cut out on the title screen. Saved on this device only.
+const CUSTOM_KEY = "moearmy_custom", PLAYER_KEY = "moearmy_player";
+const HW = 130, HH = 125;   // the head frame in editor pixels; drawn 26 x 25 in the game
+let CUSTOM = null, CUSTOM_W = null;
+function loadCustom(url) {
+  if (!url) { CUSTOM = CUSTOM_W = null; return; }
+  const im = new Image();
+  im.onload = () => { CUSTOM = im; CUSTOM_W = tinted(im, "#fff"); renderPicker(); };
+  im.src = url;
+}
+
+// Who you can play as. Unlockable players slot in here later, e.g.
+// { id: "general", name: "GENERAL MOE", head: "photo", unlock: (stats) => stats.bestStage >= 5 }
+const PLAYERS = [
+  { id: "soldier", name: "SOLDIER MOE", head: "photo" },
+  { id: "pixel", name: "PIXEL MOE", head: "pixel" },
+  { id: "custom", name: "YOUR MOE", head: "custom" },
+];
+let playerId = store.get(PLAYER_KEY) || (store.get("moearmy_face") === "pixel" ? "pixel" : "soldier");
+const available = () => PLAYERS.filter((p) => p.id !== "custom" || CUSTOM);
+const player = () => available().find((p) => p.id === playerId) || PLAYERS[0];
+
+// (x, y) is the middle of the soldier: head from y-20, uniform from y+3, boots end at y+14.
+// kind: "photo" (the standard soldier face), "pixel" or "custom"
+function drawMoe(x, y, frame, flash, kind) {
   const hx = Math.round(x - 12), hy = Math.round(y - 20);
   ctx.drawImage(BODY_F[frame % 2], hx + 4, hy + 23);
-  drawHead(hx, hy);
+  drawHead(hx, hy, kind || "photo", flash);
   if (flash) {
     ctx.globalAlpha = flash;
     ctx.drawImage(BODY_W, hx + 4, hy + 23);
-    ctx.drawImage(HEAD_PX_W, hx, hy);
     ctx.globalAlpha = 1;
   }
 }
-function drawHead(hx, hy) {
-  if (faceMode === "photo" && photoReady()) {
-    const w = 26, h = w * HEAD_PHOTO.naturalHeight / HEAD_PHOTO.naturalWidth;
-    ctx.imageSmoothingEnabled = true;
-    ctx.imageSmoothingQuality = "high";
-    ctx.drawImage(HEAD_PHOTO, hx + 1, hy + 24 - h, w, h);
-    ctx.imageSmoothingEnabled = false;
-  } else {
-    ctx.drawImage(HEAD_PX, hx, hy);
+function drawHead(hx, hy, kind, flash) {
+  let img = null, wimg = null, x, y, w, h;
+  if (kind === "custom" && CUSTOM) {
+    img = CUSTOM; wimg = CUSTOM_W; x = hx - 1; y = hy - 1; w = 26; h = 25;
+  } else if (kind !== "pixel" && photoReady()) {
+    img = HEAD_PHOTO; wimg = HEAD_PHOTO_W;
+    w = 26; h = w * HEAD_PHOTO.naturalHeight / HEAD_PHOTO.naturalWidth; x = hx + 1; y = hy + 24 - h;
   }
+  if (!img) {
+    ctx.drawImage(HEAD_PX, hx, hy);
+    if (flash) { ctx.globalAlpha = flash; ctx.drawImage(HEAD_PX_W, hx, hy); ctx.globalAlpha = 1; }
+    return;
+  }
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = "high";
+  ctx.drawImage(img, x, y, w, h);
+  if (flash && wimg) { ctx.globalAlpha = flash; ctx.drawImage(wimg, x, y, w, h); ctx.globalAlpha = 1; }
+  ctx.imageSmoothingEnabled = false;
 }
 
 const HEART = sprite([
@@ -460,7 +520,7 @@ function drawCage(c) {
   const x = Math.round(c.x - 14), y = Math.round(c.y - 14);
   const sx = c.shake > 0 ? Math.round(rnd(-1, 1)) : 0;
   ctx.fillStyle = "#3d2a14"; ctx.fillRect(x + sx + 1, y + 3, 26, 23);
-  drawHead(x + 2 + sx, y + 3);
+  drawHead(x + 2 + sx, y + 3, "photo");
   ctx.fillStyle = "#5e3a18"; ctx.fillRect(x + sx, y, 28, 3); ctx.fillRect(x + sx, y + 25, 28, 3);
   ctx.fillStyle = "#8a5a2b";
   for (let i = 0; i < 5; i++) ctx.fillRect(x + sx + i * 6 + 1, y + 2, 2, 24);
@@ -854,7 +914,8 @@ function draw() {
   // squad, then you
   for (const m of G.squad.slice().sort((a, b) => a.y - b.y)) drawMoe(m.x, m.y, Math.floor(m.step));
   if (!(G.inv > 0 && Math.floor(G.inv * 12) % 2 === 0)) {
-    drawMoe(G.px, G.py, Math.floor(G.step), G.power > 0 && Math.floor(G.t * 10) % 2 ? 0.35 : 0);
+    drawGlow(G.px, G.py, G.t);
+    drawMoe(G.px, G.py, Math.floor(G.step), G.power > 0 && Math.floor(G.t * 10) % 2 ? 0.35 : 0, player().head);
   }
 
   for (const h of G.hearts) ctx.drawImage(HEART, Math.round(h.x - 4), Math.round(h.y - 4));
@@ -901,9 +962,19 @@ function draw() {
   }
 }
 
+// a gold glow under your feet, so you stand out from the squad
+function drawGlow(x, y, t) {
+  ctx.fillStyle = "rgba(255, 212, 42, " + (0.3 + Math.sin(t * 5) * 0.1) + ")";
+  ctx.beginPath(); ctx.ellipse(x, y + 15, 15, 5, 0, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = "rgba(255, 212, 42, " + (0.75 + Math.sin(t * 5) * 0.2) + ")";
+  ctx.beginPath(); ctx.ellipse(x, y + 15, 11, 3.5, 0, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = "rgba(255, 250, 215, 0.85)";
+  ctx.beginPath(); ctx.ellipse(x, y + 15, 6, 1.8, 0, 0, Math.PI * 2); ctx.fill();
+}
+
 // ---------- screens ----------
 function show(id) {
-  ["title", "over", "pause"].forEach((s) => $(s).classList.toggle("on", s === id));
+  ["title", "over", "pause", "editor"].forEach((s) => $(s).classList.toggle("on", s === id));
 }
 function startGame() {
   audio();
@@ -917,8 +988,214 @@ function toTitle() {
   state = "title";
   const best = +(store.get(BEST_KEY) || 0);
   $("bestTitle").innerHTML = best ? "BEST <b>" + best + "</b>" : "";
+  renderPicker();
   show("title");
 }
+
+function renderPicker() {
+  const p = player();
+  $("pName").textContent = p.name;
+  $("enlistBtn").textContent = CUSTOM ? "NEW PICTURE" : "ENLIST YOUR MOE";
+  const c = $("pCv").getContext("2d");
+  c.setTransform(1, 0, 0, 1, 0, 0);
+  c.clearRect(0, 0, 144, 176);
+  c.setTransform(4, 0, 0, 4, 0, 0);
+  c.imageSmoothingEnabled = false;
+  const main = ctx;
+  ctx = c;
+  drawGlow(18, 23, 0);
+  drawMoe(18, 23, 0, 0, p.head);
+  ctx = main;
+}
+function cyclePlayer(d) {
+  const list = available();
+  const i = Math.max(0, list.findIndex((p) => p.id === player().id));
+  playerId = list[(i + d + list.length) % list.length].id;
+  store.set(PLAYER_KEY, playerId);
+  renderPicker();
+}
+
+// ---------- the "enlist your Moe" editor ----------
+// Step 1 (frame): drag and zoom your picture so the head fills the frame, chin on the collar.
+// Step 2 (erase): tap the background to erase it, drag to rub out bits, or AUTO ERASE.
+const edCv = $("edCv"), edx = edCv.getContext("2d");
+const ED_H = 175;   // editor canvas height in frame pixels: the head frame plus a body underneath
+const ed = { img: null, step: "frame", s: 1, base: 1, ox: 0, oy: 0, work: null, undo: [], ptr: null };
+
+function edMsg(t) { $("edMsg").textContent = t || ""; }
+$("enlistBtn").onclick = () => { $("edFile").value = ""; $("edFile").click(); };
+$("edFile").onchange = () => {
+  const f = $("edFile").files && $("edFile").files[0];
+  if (!f) return;
+  const im = new Image();
+  im.onload = () => { ed.img = im; edFrame(true); show("editor"); };
+  im.onerror = () => { $("pName").textContent = "CAN'T OPEN THAT PICTURE"; };
+  im.src = URL.createObjectURL(f);
+};
+
+function edFrame(fresh) {
+  ed.step = "frame";
+  const iw = ed.img.naturalWidth, ih = ed.img.naturalHeight;
+  if (fresh) {
+    // a PFP's head is usually about 3/4 of the picture wide, in the top half
+    ed.base = Math.min(HW / (0.85 * iw), HH / (0.7 * ih));
+    $("edZoom").value = 50;
+    ed.s = ed.base;
+    ed.ox = HW / 2 - iw * 0.5 * ed.s;
+    ed.oy = HH * 0.5 - ih * 0.4 * ed.s;
+  }
+  $("edHelp").innerHTML = "DRAG YOUR MOE AND ZOOM<br>SO THE HEAD FILLS THE BOX<br>AND THE CHIN SITS ON THE COLLAR";
+  $("edZoom").style.display = ""; $("edTools").style.display = "none";
+  $("edBack").textContent = "CANCEL"; $("edNext").textContent = "NEXT";
+  edMsg(""); edDraw();
+}
+function edErase() {
+  ed.step = "erase";
+  ed.work = document.createElement("canvas");
+  ed.work.width = HW; ed.work.height = HH;
+  const w = ed.work.getContext("2d");
+  w.imageSmoothingQuality = "high";
+  w.drawImage(ed.img, ed.ox, ed.oy, ed.img.naturalWidth * ed.s, ed.img.naturalHeight * ed.s);
+  ed.undo = [];
+  $("edHelp").innerHTML = "TAP THE BACKGROUND TO ERASE IT<br>DRAG TO RUB OUT LITTLE BITS<br>(SEE-THROUGH PICTURES ARE READY)";
+  $("edZoom").style.display = "none"; $("edTools").style.display = "";
+  $("edBack").textContent = "BACK"; $("edNext").textContent = "DONE";
+  edMsg(""); edDraw();
+}
+function edDraw() {
+  edx.setTransform(1, 0, 0, 1, 0, 0);
+  edx.clearRect(0, 0, edCv.width, edCv.height);
+  edx.setTransform(edCv.width / HW, 0, 0, edCv.width / HW, 0, 0);
+  // the uniform underneath, so you can see where the chin goes
+  edx.imageSmoothingEnabled = false;
+  edx.drawImage(BODY_F[0], HW / 2 - 40, HH - 5, 80, 60);
+  edx.imageSmoothingEnabled = true;
+  edx.imageSmoothingQuality = "high";
+  if (ed.step === "frame") {
+    edx.save();
+    edx.beginPath(); edx.rect(0, 0, HW, HH); edx.clip();
+    edx.drawImage(ed.img, ed.ox, ed.oy, ed.img.naturalWidth * ed.s, ed.img.naturalHeight * ed.s);
+    edx.restore();
+    // the standard soldier head, faintly, as a size guide
+    if (photoReady()) {
+      const h = 130 * HEAD_PHOTO.naturalHeight / HEAD_PHOTO.naturalWidth;
+      edx.globalAlpha = 0.2;
+      edx.drawImage(HEAD_PHOTO, 10, HH + 5 - h, 130, h);
+      edx.globalAlpha = 1;
+    }
+    edx.strokeStyle = "#ffd42a"; edx.lineWidth = 1; edx.setLineDash([4, 3]);
+    edx.strokeRect(0.5, 0.5, HW - 1, HH - 1);
+    edx.setLineDash([]);
+  } else {
+    edx.drawImage(ed.work, 0, 0);
+  }
+}
+
+function edPoint(e) {
+  const r = edCv.getBoundingClientRect();
+  return { x: (e.clientX - r.left) * HW / r.width, y: (e.clientY - r.top) * ED_H / r.height };
+}
+edCv.addEventListener("pointerdown", (e) => {
+  e.preventDefault();
+  const p = edPoint(e);
+  ed.ptr = { id: e.pointerId, x: p.x, y: p.y, sx: p.x, sy: p.y, moved: false };
+  try { edCv.setPointerCapture(e.pointerId); } catch (err) {}
+  if (ed.step === "erase") edSnapshot();
+});
+edCv.addEventListener("pointermove", (e) => {
+  const P = ed.ptr;
+  if (!P || P.id !== e.pointerId) return;
+  const p = edPoint(e);
+  if (Math.hypot(p.x - P.sx, p.y - P.sy) > 2.5) P.moved = true;
+  if (ed.step === "frame") {
+    ed.ox += p.x - P.x; ed.oy += p.y - P.y;
+    edDraw();
+  } else if (P.moved) {
+    const w = ed.work.getContext("2d");
+    w.globalCompositeOperation = "destination-out";
+    w.lineCap = "round"; w.lineWidth = 7;
+    w.beginPath(); w.moveTo(P.x, P.y); w.lineTo(p.x, p.y); w.stroke();
+    w.globalCompositeOperation = "source-over";
+    edDraw();
+  }
+  P.x = p.x; P.y = p.y;
+});
+const edUp = (e) => {
+  const P = ed.ptr;
+  if (!P || P.id !== e.pointerId) return;
+  ed.ptr = null;
+  if (ed.step === "erase" && !P.moved && P.sy < HH) { edFlood([[Math.floor(P.sx), Math.floor(P.sy)]], 38); edDraw(); }
+};
+edCv.addEventListener("pointerup", edUp);
+edCv.addEventListener("pointercancel", edUp);
+
+$("edZoom").oninput = () => {
+  // zoom around the middle of the frame
+  const old = ed.s;
+  ed.s = ed.base * Math.pow(2, ($("edZoom").value - 50) / 25);
+  const cx = HW / 2, cy = HH / 2;
+  ed.ox = cx - (cx - ed.ox) * ed.s / old;
+  ed.oy = cy - (cy - ed.oy) * ed.s / old;
+  edDraw();
+};
+function edSnapshot() {
+  ed.undo.push(ed.work.getContext("2d").getImageData(0, 0, HW, HH));
+  if (ed.undo.length > 25) ed.undo.shift();
+}
+$("edUndo").onclick = () => {
+  if (!ed.undo.length) return;
+  ed.work.getContext("2d").putImageData(ed.undo.pop(), 0, 0);
+  edDraw();
+};
+$("edAuto").onclick = () => {
+  edSnapshot();
+  const seeds = [];
+  for (let x = 0; x < HW; x += 2) { seeds.push([x, 0]); }
+  for (let y = 0; y < HH; y += 2) { seeds.push([0, y]); seeds.push([HW - 1, y]); }
+  edFlood(seeds, 30);
+  edDraw();
+  edMsg("ATE TOO MUCH? TAP UNDO");
+};
+// erase every pixel joined to the seeds that is close in colour to the seed it started from
+function edFlood(seeds, tol) {
+  const w = ed.work.getContext("2d");
+  const id = w.getImageData(0, 0, HW, HH), d = id.data;
+  const seen = new Uint8Array(HW * HH);
+  const lim = tol * tol * 3;
+  for (const [sx, sy] of seeds) {
+    const s0 = (sy * HW + sx);
+    if (sx < 0 || sy < 0 || sx >= HW || sy >= HH || seen[s0] || d[s0 * 4 + 3] === 0) continue;
+    const r0 = d[s0 * 4], g0 = d[s0 * 4 + 1], b0 = d[s0 * 4 + 2];
+    const stack = [s0];
+    seen[s0] = 1;
+    while (stack.length) {
+      const i = stack.pop(), o = i * 4;
+      const dr = d[o] - r0, dg = d[o + 1] - g0, db = d[o + 2] - b0;
+      if (d[o + 3] !== 0 && dr * dr + dg * dg + db * db > lim) continue;
+      d[o + 3] = 0;
+      const x = i % HW, y = (i - x) / HW;
+      if (x > 0 && !seen[i - 1]) { seen[i - 1] = 1; stack.push(i - 1); }
+      if (x < HW - 1 && !seen[i + 1]) { seen[i + 1] = 1; stack.push(i + 1); }
+      if (y > 0 && !seen[i - HW]) { seen[i - HW] = 1; stack.push(i - HW); }
+      if (y < HH - 1 && !seen[i + HW]) { seen[i + HW] = 1; stack.push(i + HW); }
+    }
+  }
+  w.putImageData(id, 0, 0);
+}
+$("edBack").onclick = () => { if (ed.step === "erase") edFrame(false); else toTitle(); };
+$("edNext").onclick = () => {
+  if (ed.step === "frame") { edErase(); return; }
+  const url = ed.work.toDataURL("image/png");
+  store.set(CUSTOM_KEY, url);
+  const kept = store.get(CUSTOM_KEY) === url;
+  loadCustom(url);
+  playerId = "custom";
+  store.set(PLAYER_KEY, playerId);
+  toTitle();
+  if (!kept) $("pName").textContent = "YOUR MOE (THIS VISIT ONLY)";
+};
+$("pPrev").onclick = () => cyclePlayer(-1);
+$("pNext").onclick = () => cyclePlayer(1);
 function showOver() {
   const best = +(store.get(BEST_KEY) || 0);
   $("overStats").innerHTML =
@@ -949,7 +1226,7 @@ function setPaused(p) {
 let drag = null;
 const busy = () => lb && lb.isOpen();
 stageEl.addEventListener("pointerdown", (e) => {
-  if (busy() || e.target.tagName === "BUTTON") return;
+  if (busy() || e.target.tagName === "BUTTON" || e.target.closest(".noStart")) return;
   audio();
   if (state === "title") { startGame(); return; }
   if (state === "play" && paused) { setPaused(false); return; }
@@ -973,7 +1250,7 @@ window.addEventListener("keydown", (e) => {
   if (busy()) return;
   keys[e.code] = true;
   if (e.code.startsWith("Arrow") || e.code === "Space") e.preventDefault();
-  if ((e.code === "Enter" || e.code === "Space") && state === "title") startGame();
+  if ((e.code === "Enter" || e.code === "Space") && state === "title" && !$("editor").classList.contains("on")) startGame();
   else if ((e.code === "Enter" || e.code === "Space") && state === "over" && overTimer <= 0) startGame();
   else if ((e.code === "KeyP" || e.code === "Escape") && state === "play") setPaused(!paused);
   else if (e.code === "KeyL" && state !== "play" && lb) lb.open(BOARD);
@@ -988,12 +1265,7 @@ $("lbTitle").onclick = () => lb && lb.open(BOARD);
 $("lbOver").onclick = () => lb && lb.open(BOARD);
 $("getMoe").onclick = () => SCATTER_URL && window.open(SCATTER_URL, "_blank", "noopener");
 $("mute").onclick = () => { audio(); setMute(!muted); };
-const showFace = () => { $("faceBtn").textContent = "FACE: " + faceMode.toUpperCase(); };
-$("faceBtn").onclick = () => {
-  faceMode = faceMode === "pixel" ? "photo" : "pixel";
-  store.set("moearmy_face", faceMode); showFace();
-};
-showFace();
+loadCustom(store.get(CUSTOM_KEY));
 setMute(muted);
 
 // big Bradley on the title
