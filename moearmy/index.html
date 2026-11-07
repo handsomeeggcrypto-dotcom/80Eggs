@@ -55,6 +55,26 @@
     box-shadow: 0 0 0 calc(var(--s) * 1px) #ffd42a; }
   #edZoom { width: calc(var(--s) * 120px); accent-color: #ffd42a; }
   #edMsg { color: #ff9fca; }
+  #trophies { background: #12180cf5; justify-content: flex-start; gap: calc(var(--s) * 4px); }
+  #troList { flex: 1; min-height: 0; width: 100%; overflow-y: auto; touch-action: pan-y; display: flex; flex-direction: column;
+    gap: calc(var(--s) * 3px); padding: calc(var(--s) * 1px); box-sizing: border-box; }
+  .tro { display: flex; align-items: center; gap: calc(var(--s) * 4px); text-align: left; padding: calc(var(--s) * 3px);
+    background: #ffffff0a; box-shadow: inset 0 0 0 calc(var(--s) * 1px) #ffffff1a; }
+  .tro.got { background: #ffd42a17; box-shadow: inset 0 0 0 calc(var(--s) * 1px) #ffd42a99; }
+  .tro canvas { width: calc(var(--s) * 24px); height: calc(var(--s) * 24px); flex: none; }
+  .tro b { display: block; font-weight: normal; font-size: calc(var(--s) * 5.5px); line-height: 1.4; color: #8a917c; }
+  .tro.got b { color: #ffd42a; }
+  .tro span, .tro i { display: block; font-style: normal; font-size: calc(var(--s) * 4.5px); line-height: 1.6; color: #c9d2b0; }
+  .tro i { color: #ff9fca; }
+  #toast { position: absolute; left: 50%; top: calc(var(--s) * 18px); transform: translate(-50%, -400%); transition: transform 0.3s;
+    display: flex; align-items: center; gap: calc(var(--s) * 4px); padding: calc(var(--s) * 3px) calc(var(--s) * 5px);
+    background: #14121a; box-shadow: 0 0 0 calc(var(--s) * 1px) #ffd42a, calc(var(--s) * 2px) calc(var(--s) * 2px) 0 #000;
+    pointer-events: none; z-index: 5; max-width: 92%; box-sizing: border-box; }
+  #trophies.on ~ #mute { display: none; }
+  #toast.on { transform: translate(-50%, 0); }
+  #toastCv { width: calc(var(--s) * 20px); height: calc(var(--s) * 20px); flex: none; }
+  #toast b { display: block; font-weight: normal; font-size: calc(var(--s) * 5px); color: #ff9fca; line-height: 1.6; }
+  #toastName { display: block; font-size: calc(var(--s) * 5.5px); color: #ffd42a; line-height: 1.4; }
 </style>
 </head>
 <body>
@@ -76,7 +96,7 @@
       <div class="row"><button id="enlistBtn">ENLIST YOUR MOE</button></div>
       <div class="big blink" id="tapStart">TAP TO PLAY</div>
       <div class="stat" id="bestTitle"></div>
-      <div class="row"><button class="alt" id="lbTitle">LEADERBOARD</button></div>
+      <div class="row"><button class="alt" id="lbTitle">LEADERBOARD</button><button class="alt" id="troTitle">TROPHIES</button></div>
     </div>
 
     <div class="screen" id="over">
@@ -90,7 +110,7 @@
         <button class="alt" id="lbOver">LEADERBOARD</button>
       </div>
       <div class="row"><button class="alt" id="getMoe" style="display:none">GET A MOE</button></div>
-      <div class="row"><button class="alt" id="menuOver">MAIN MENU</button></div>
+      <div class="row"><button class="alt" id="menuOver">MAIN MENU</button><button class="alt" id="troOver">TROPHIES</button></div>
     </div>
 
     <div class="screen noStart" id="editor">
@@ -110,6 +130,15 @@
       <div class="big blink">TAP TO GO ON</div>
       <div class="row"><button class="alt" id="menuPause">MAIN MENU</button></div>
     </div>
+
+    <div class="screen noStart" id="trophies">
+      <div class="big">TROPHY CASE</div>
+      <div class="stat" id="troCount"></div>
+      <div id="troList"></div>
+      <div class="row"><button class="alt" id="troBack">BACK</button></div>
+    </div>
+
+    <div id="toast"><canvas id="toastCv" width="32" height="32"></canvas><div><b>TROPHY GET!</b><span id="toastName"></span></div></div>
 
     <button class="alt" id="mute">SND ON</button>
   </div>
@@ -599,6 +628,7 @@ function newGame(demo) {
     px: W / 2, py: H - 60, fireT: 0, power: 0, shake: 0, step: 0,
     hearts: [], ebul: [], enemies: [], cages: [], squad: [], parts: [], pops: [], pickups: [], deco: [],
     spawnT: 1.5, cageT: 5, decoT: 0, scroll: 0, banner: null, loved: 0, mice: 0, rescued: 0,
+    glooms: 0, overloads: 0, wasHit: false,
   };
   for (let i = 0; i < 18; i++) addDeco(rnd(0, H));
   if (demo) for (let i = 0; i < 4; i++) addSquad(G.px, H + 20);
@@ -663,7 +693,7 @@ function hit(a, ax, ay, aw, ah, b, bx, by, bw, bh) {
 
 function hurtPlayer() {
   if (G.inv > 0 || G.demo) return;
-  G.lives--; G.inv = 1.6; G.shake = 0.35;
+  G.lives--; G.inv = 1.6; G.shake = 0.35; G.wasHit = true;
   SFX.hurt();
   dots(G.px, G.py, 14, "#fff");
   if (G.lives <= 0) endGame();
@@ -672,7 +702,14 @@ function hurtPlayer() {
 function loveEnemy(e) {
   e.loved = true; e.lt = 0;
   G.score += e.pts; G.loved++;
-  if (e.type === "mouse") { G.mice++; loveMouseTotal(); }
+  if (e.type === "mouse") {
+    G.mice++; loveMouseTotal();
+    award("letter");
+    if (miceTotal() >= 500) award("cheese");
+    if (G.mice >= 1000) award("frens");
+  }
+  if (e.type === "gloom" && ++G.glooms >= 25) award("umbrella");
+  if (e.type === "tank") { award("tread"); if (player().id === "bradley") award("pin"); }
   pop(e.x, e.y - 8, "+" + e.pts);
   burst(e.x, e.y, e.type === "tank" ? 18 : 6, Math.random() < 0.5 ? SMALL_HEART : PINK_HEART, e.type === "tank" ? 90 : 55);
   if (e.type === "tank") {
@@ -708,12 +745,139 @@ function loveMouseTotal() {
   celebrate(was);
 }
 
+// ---------- trophies (kept in this browser) ----------
+const TROPHY_KEY = "moearmy_trophies", GAMES_KEY = "moearmy_games";
+function iconCanvas(w, h, paint) { const c = document.createElement("canvas"); c.width = w; c.height = h; paint(c.getContext("2d")); return c; }
+const TROPHIES = [
+  { id: "letter", name: "LOVE LETTER", how: "LOVE YOUR FIRST MOUSE", lore: "Signed, sealed, loved.", icon: sprite([
+    "kkkkkkkkkkkk", "kwkwwwwwwkwk", "kwwkwwwwkwwk", "kwwwkPPkwwwk", "kwwwPPPPwwwk", "kwwwwPPwwwwk", "kwwwwwwwwwwk", "kkkkkkkkkkkk"]) },
+  { id: "key", name: "RUSTY CAGE KEY", how: "FREE A CAGED MOE", lore: "Nobody gets left in a cage.", icon: sprite([
+    "..kkk.......", ".kyyyk......", "kyk.kykkkkkk", "kyk.kyyyyyyk", ".kyyykkkykyk", "..kkk...kkkk"], { y: "#d9a441" }) },
+  { id: "whistle", name: "SQUAD WHISTLE", how: "FILL ALL 8 SQUAD SPOTS", lore: "Tweet tweet, everybody in line.", icon: sprite([
+    "....rr......", "...r..r.....", "..r....kkkkk", ".r....kmmmmk", ".r..kkmmkkmk", "..rkmmmmmmmk", "...kmmmmmmk.", "...kmmmmmk..",
+    "....kkkkk..."]) },
+  { id: "tread", name: "TANK TREAD BRACELET", how: "LOVE A MOUSE TANK", lore: "Fashion from the front lines.", icon: sprite([
+    "...kkkkkk...", "..kcCcCcCk..", ".kCkkkkkkck.", ".kck....kCk.", ".kCk.PP.kck.", ".kck....kCk.", ".kCkkkkkkck.",
+    "..kcCcCcCk..", "...kkkkkk..."]) },
+  { id: "umbrella", name: "SUNNY UMBRELLA", how: "LOVE 25 GLOOM CLOUDS IN ONE GAME", lore: "Forecast: 100% chance of love.", icon: sprite([
+    ".....k.....", "...kkykk...", "..kyyyyyk..", ".kyyoyyoyk.", "kyyoyyyoyyk", "kkkkkbkkkkk", ".....b.....", ".....b.....",
+    ".....b..b..", "......bb..."]) },
+  { id: "battery", name: "OVERLOADED BATTERY", how: "GRAB 3 LOVE OVERLOADS IN ONE GAME", lore: "Do not lick.", icon: sprite([
+    "...kkkk.....", "..kkkkkk....", "..kyyyyk..w.", "..kyyPyk.w.w", "..kyPPyk..w.", "..kPPPPk....", "..kyyPPk....",
+    "..kyyPyk..w.", "..kyPyyk.w.w", "..kyyyyk..w.", "..kkkkkk...."]) },
+  { id: "socks", name: "SPOTLESS SOCKS", how: "REACH STAGE 3 WITHOUT GETTING HIT", lore: "Not a single scuff.", icon: sprite([
+    "...kkkkk..w.", "...kwwwk.www", "...kBBBk..w.", "...kwwwk....", "...kwwwk....", "...kwwwk....", "..kwwwwk....",
+    ".kwwwwwk....", "kwwwwwk.....", "kBBwwk......", ".kkkk......."]) },
+  { id: "pin", name: "BRADLEY PIN OF BRAVERY", how: "LOVE A MOUSE TANK AS CEO BRADLEY", lore: "Awarded by the CEO himself.",
+    icon: iconCanvas(11, 15, (x) => {
+      x.drawImage(sprite(["rrr...BBB", "rrrr.BBBB", ".rrrrBBB.", "..rrBBB.."]), 1, 0);
+      x.drawImage(BRADLEY, 0, 4);
+    }) },
+  { id: "crayon", name: "HALF-EATEN CRAYON", how: "PASS STAGE 10", lore: "Recovered from the Battle of Cheeseburg.", icon: sprite([
+    "..k.kkkkkkk.....", ".krkrrwrrrrkk...", "..krrrwrrrrrrkk.", ".krrrrwrrrrrrrrk", "..krrrwrrrrrrkk.", ".krkrrwrrrrkk...",
+    "..k.kkkkkkk....."]) },
+  { id: "rainbow", name: "RAINBOW SCRIBBLE", how: "HIT 3 MICE WITH ONE CRAYON HEART", lore: "Colored way outside the lines.",
+    icon: iconCanvas(14, 8, (x) => {
+      const cols = ["#ff5a5a", "#ff9b2e", "#ffd42a", "#3fc25a", "#4aa8ff", "#b06ad8"];
+      for (let py = 0; py < 8; py++) for (let px = 0; px < 14; px++) {
+        const i = Math.floor(7 - Math.hypot(px + 0.5 - 7, py + 0.5 - 8));
+        if (i >= 0 && i < 6) { x.fillStyle = cols[i]; x.fillRect(px, py, 1, 1); }
+      }
+    }) },
+  { id: "cheese", name: "GOLDEN CHEESE WEDGE", how: "LOVE 500 MICE IN TOTAL", lore: "The mice want it back. They can visit.", icon: sprite([
+    "..........k.", "........kkyk", "......kkyyyk", "....kkyyyyyk", "..kkyyoyyyyk", "kkyyyyyyyoyk", "kyyyyyyyyyyk", "kyoyyyyoyyyk",
+    "kyyyyyyyyyyk", "kkkkkkkkkkkk"]) },
+  { id: "frens", name: "THE FRENS SHIP", how: "LOVE 1000 MICE IN ONE GAME", lore: "All aboard. Everyone is frens now.", icon: sprite([
+    ".....k......", ".....kP.....", ".....kPP....", ".....kPPP...", ".....kPPPP..", ".....kPPPPP.", ".....k......", "kkkkkkkkkkkk",
+    "kbbbbbbbbbbk", ".kbybbybbbk.", "..kkkkkkkk..", "BBB.BBB.BBB."]) },
+  { id: "egg", name: "GOLDEN EGG", how: "SCORE 50,000 IN ONE GAME", lore: "Hatched from pure love.", icon: sprite([
+    "...kkkk...", "..kyyywk..", ".kyyyywwk.", ".kyyyyywk.", "kyyyyyyyyk", "kyyyyyyyyk", "kyoyyyyyyk", "kooyyyyyyk", ".kooyyyyk.",
+    "..kkkkkk.."]) },
+  { id: "boots", name: "BOOT CAMP BOOTS", how: "PLAY 25 GAMES", lore: "Finally broken in.", icon: sprite([
+    "..kkk....kkk", "..kGk....kGk", "..kGk....kGk", "..kGk....kGk", "kkkGk..kkkGk", "kGGGk..kGGGk", "kkkkk..kkkkk"]) },
+  { id: "soggy", name: "SOGGY PARTICIPATION RIBBON", how: "END A GAME WITHOUT LOVING A MOUSE", lore: "You showed up. That counts.",
+    icon: sprite([
+    "..kkkkk...", ".kBBBBBk..", "kBBwwwBBk.", "kBwBBBwBk.", "kBBwwwBBk.", ".kBBBBBk..", "..kBkBk...", "..kBkBk.B.", "..kBkBk...",
+    "..kk.kk..B"]) },
+  { id: "photo", name: "ENLISTMENT PHOTO", how: "ENLIST YOUR OWN MOE", lore: "Say moemoe!", icon: sprite([
+    "kkkkkkkkkk", "kwwwwwwwwk", "kwBBBBBBwk", "kwBkBBkBwk", "kwBBBBBBwk", "kwBPkkPBwk", "kwBBBBBBwk", "kwwwwwwwwk", "kwwwwwwwwk",
+    "kkkkkkkkkk"]) },
+  { id: "megaphone", name: "PINK MEGAPHONE", how: "SHARE A SCORE ON X", lore: "Tell the whole timeline.", icon: sprite([
+    "........kk..", "......kkPk..", "....kkPPPk.w", "kkkkPPPPPk..", "kqqkPPPPPk.w", "kqqkPPPPPk..", "kkkkPPPPPk.w", "..k.kkPPPk..",
+    "..k...kkPk..", "..kk....kk.."]) },
+  { id: "bag", name: "SCATTER SHOPPING BAG", how: "TAP GET A MOE", lore: "Supporting the troops.", icon: sprite([
+    "...kkkk...", "..k....k..", "..k....k..", "kkkkkkkkkk", "kPPPPPPPPk", "kPyyPPyyPk", "kPyyyyyyPk", "kPPyyyyPPk", "kPPPyyPPPk",
+    "kkkkkkkkkk"]) },
+];
+let trophyGot = {};
+try { trophyGot = JSON.parse(store.get(TROPHY_KEY) || "{}") || {}; } catch (e) {}
+const toastQ = [];
+let toastBusy = false;
+function award(id) {
+  if (trophyGot[id] || !TROPHIES.some((t) => t.id === id)) return;
+  trophyGot[id] = Date.now();
+  store.set(TROPHY_KEY, JSON.stringify(trophyGot));
+  toastQ.push(id);
+  if (!toastBusy) nextToast();
+}
+function nextToast() {
+  const id = toastQ.shift(), t = TROPHIES.find((q) => q.id === id);
+  if (!t) { toastBusy = false; return; }
+  toastBusy = true;
+  drawIcon($("toastCv"), t, true);
+  $("toastName").textContent = t.name;
+  $("toast").classList.add("on");
+  SFX.free();
+  setTimeout(() => { $("toast").classList.remove("on"); setTimeout(nextToast, 400); }, 2600);
+}
+function drawIcon(cv, t, got) {
+  const x = cv.getContext("2d"), ic = t.icon;
+  const k = Math.max(1, Math.floor(Math.min(cv.width / ic.width, cv.height / ic.height)));
+  x.clearRect(0, 0, cv.width, cv.height);
+  x.imageSmoothingEnabled = false;
+  x.drawImage(ic, Math.floor((cv.width - ic.width * k) / 2), Math.floor((cv.height - ic.height * k) / 2), ic.width * k, ic.height * k);
+  if (!got) {   // not earned yet: a dark shape
+    x.globalCompositeOperation = "source-atop"; x.fillStyle = "#3d4832"; x.fillRect(0, 0, cv.width, cv.height);
+    x.globalCompositeOperation = "source-over";
+  }
+}
+let trophyFrom = "title";
+function openTrophies(from) {
+  trophyFrom = from;
+  const n = TROPHIES.filter((t) => trophyGot[t.id]).length;
+  $("troCount").innerHTML = "<b>" + n + "</b> OF <b>" + TROPHIES.length + "</b> EARNED";
+  const list = $("troList");
+  list.innerHTML = "";
+  for (const t of TROPHIES) {
+    const got = !!trophyGot[t.id];
+    const row = document.createElement("div");
+    row.className = "tro" + (got ? " got" : "");
+    const cv = document.createElement("canvas");
+    cv.width = 32; cv.height = 32;
+    drawIcon(cv, t, got);
+    const words = document.createElement("div");
+    words.innerHTML = "<b></b><span></span>" + (got ? "<i></i>" : "");
+    words.querySelector("b").textContent = t.name;
+    words.querySelector("span").textContent = (got ? "" : "HOW: ") + t.how;
+    if (got) words.querySelector("i").textContent = t.lore;
+    row.append(cv, words);
+    list.append(row);
+  }
+  list.scrollTop = 0;
+  show("trophies");
+}
+
 function endGame() {
   state = "over"; overTimer = 1.1;
   SFX.over();
   const best = Math.max(G.score, +(store.get(BEST_KEY) || 0));
   store.set(BEST_KEY, best);
   if (lb) lb.gameOver(BOARD, G.score);
+  const games = +(store.get(GAMES_KEY) || 0) + 1;
+  store.set(GAMES_KEY, games);
+  if (games >= 25) award("boots");
+  if (G.mice === 0) award("soggy");
+  if (G.score >= 50000) award("egg");
 }
 
 // ---------- update ----------
@@ -806,6 +970,9 @@ function update(dt) {
     G.score += 500 * (G.stage - 1);
     banner("STAGE " + G.stage, "+" + 500 * (G.stage - 1) + " BONUS");
     reachStage(G.stage);
+    if (G.stage >= 3 && !G.wasHit) award("socks");
+    if (G.stage >= 11) award("crayon");
+    if (G.score >= 50000) award("egg");
   }
 
   // enemies
@@ -882,6 +1049,7 @@ function update(dt) {
       if (e.loved || e.y < -4 || (h.hits && h.hits.includes(e))) continue;
       if (hit(h, h.x, h.y, 7, 7, e, e.x, e.y, e.w * 0.9, e.h * 0.9)) {
         if (h.pierce && --h.pierce > 0) h.hits.push(e); else h.dead = true;
+        if (h.hits && e.type === "mouse" && (h.mHits = (h.mHits || 0) + 1) >= 3) award("rainbow");
         e.hp--; e.flash = 0.06;
         dots(h.x, h.y - 2, 2, "#ffd42a");
         if (e.hp <= 0) loveEnemy(e); else if (e.type === "tank") SFX.hit();
@@ -898,6 +1066,8 @@ function update(dt) {
           dots(c.x, c.y, 20, "#8a5a2b");
           burst(c.x, c.y, 5, SMALL_HEART, 50);
           addSquad(c.x, c.y);
+          award("key");
+          if (G.squad.length >= SLOTS.length) award("whistle");
           G.rescued++; G.score += 250;
           pop(c.x, c.y - 18, "+1 MOE!", "#ff9fca");
           SFX.free();
@@ -933,7 +1103,7 @@ function update(dt) {
   for (const p of G.pickups) {
     if (hit(p, p.x, p.y, 12, 12, null, G.px, G.py - 2, 16, 24)) {
       p.dead = true;
-      if (p.type === "power") { G.power = 10; SFX.power(); banner("LOVE OVERLOAD!", "TRIPLE HEARTS", 1.8); }
+      if (p.type === "power") { G.power = 10; SFX.power(); if (++G.overloads >= 3) award("battery"); banner("LOVE OVERLOAD!", "TRIPLE HEARTS", 1.8); }
       else { G.lives = Math.min(5, G.lives + 1); SFX.free(); pop(p.x, p.y - 10, "+1 LIFE", "#ff9fca"); }
     }
   }
@@ -1066,7 +1236,7 @@ function drawGlow(x, y, t) {
 
 // ---------- screens ----------
 function show(id) {
-  ["title", "over", "pause", "editor"].forEach((s) => $(s).classList.toggle("on", s === id));
+  ["title", "over", "pause", "editor", "trophies"].forEach((s) => $(s).classList.toggle("on", s === id));
 }
 function startGame() {
   audio();
@@ -1295,6 +1465,7 @@ $("edNext").onclick = () => {
   if (ed.step === "frame") { edErase(); return; }
   const url = ed.work.toDataURL("image/png");
   store.set(CUSTOM_KEY, url);
+  award("photo");
   const kept = store.get(CUSTOM_KEY) === url;
   loadCustom(url);
   playerId = "custom";
@@ -1322,6 +1493,7 @@ function share() {
     " in MOEMOE ARMY 💛\nmoemoe means ily. Enlist:";
   window.open("https://x.com/intent/post?text=" + encodeURIComponent(msg) + "&url=" + encodeURIComponent(SITE_URL),
     "_blank", "noopener");
+  award("megaphone");
 }
 
 function setPaused(p) {
@@ -1358,8 +1530,8 @@ window.addEventListener("keydown", (e) => {
   if (busy()) return;
   keys[e.code] = true;
   if (e.code.startsWith("Arrow") || e.code === "Space") e.preventDefault();
-  if ((e.code === "Enter" || e.code === "Space") && state === "title" && !$("editor").classList.contains("on")) startGame();
-  else if ((e.code === "Enter" || e.code === "Space") && state === "over" && overTimer <= 0) startGame();
+  if ((e.code === "Enter" || e.code === "Space") && state === "title" && $("title").classList.contains("on")) startGame();
+  else if ((e.code === "Enter" || e.code === "Space") && state === "over" && overTimer <= 0 && $("over").classList.contains("on")) startGame();
   else if ((e.code === "KeyP" || e.code === "Escape") && state === "play") setPaused(!paused);
   else if (e.code === "KeyL" && state !== "play" && lb) lb.open(BOARD);
 });
@@ -1373,7 +1545,10 @@ $("menuPause").onclick = () => { paused = false; toTitle(); };
 $("share").onclick = share;
 $("lbTitle").onclick = () => lb && lb.open(BOARD);
 $("lbOver").onclick = () => lb && lb.open(BOARD);
-$("getMoe").onclick = () => SCATTER_URL && window.open(SCATTER_URL, "_blank", "noopener");
+$("getMoe").onclick = () => { if (SCATTER_URL) { window.open(SCATTER_URL, "_blank", "noopener"); award("bag"); } };
+$("troTitle").onclick = () => openTrophies("title");
+$("troOver").onclick = () => openTrophies("over");
+$("troBack").onclick = () => show(trophyFrom);
 $("mute").onclick = () => { audio(); setMute(!muted); };
 loadCustom(store.get(CUSTOM_KEY));
 setMute(muted);
