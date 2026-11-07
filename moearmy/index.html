@@ -66,7 +66,7 @@
   .tro.got b { color: #ffd42a; }
   .tro span, .tro i { display: block; font-style: normal; font-size: calc(var(--s) * 4.5px); line-height: 1.6; color: #c9d2b0; }
   .tro i { color: #ff9fca; }
-  #toast { position: absolute; left: 50%; top: calc(var(--s) * 18px); transform: translate(-50%, -400%); transition: transform 0.3s;
+  #toast { position: absolute; left: 50%; top: calc(var(--s) * 24px); transform: translate(-50%, -400%); transition: transform 0.3s;
     display: flex; align-items: center; gap: calc(var(--s) * 4px); padding: calc(var(--s) * 3px) calc(var(--s) * 5px);
     background: #14121a; box-shadow: 0 0 0 calc(var(--s) * 1px) #ffd42a, calc(var(--s) * 2px) calc(var(--s) * 2px) 0 #000;
     pointer-events: none; z-index: 5; max-width: 92%; box-sizing: border-box; }
@@ -611,7 +611,8 @@ function drawCage(c) {
   ctx.fillStyle = "#8a5a2b";
   for (let i = 0; i < 5; i++) ctx.fillRect(x + sx + i * 6 + 1, y + 2, 2, 24);
   ctx.fillRect(x + sx + 1, y + 1, 26, 1);
-  if (Math.floor(c.t * 3) % 2 === 0) {
+  if (c.n > 1) text("x" + c.n, x + 14, y - 9, "#ff9fca", "center");
+  else if (Math.floor(c.t * 3) % 2 === 0) {
     ctx.fillStyle = "#fff"; ctx.fillRect(x + 23, y - 8, 7, 7);
     ctx.fillStyle = "#d93a2b"; ctx.fillRect(x + 26, y - 7, 1, 3); ctx.fillRect(x + 26, y - 3, 1, 1);
   }
@@ -621,6 +622,15 @@ function drawCage(c) {
 let G = null, state = "title", paused = false;
 let overTimer = 0;
 const SLOTS = [[-22, 12], [22, 12], [-44, 22], [44, 22], [0, 30], [-66, 30], [66, 30], [-22, 40]];
+// The first 8 Moes march in a V around you. Everyone after that joins the army ranks along the bottom of the
+// screen, filling it from the bottom up, and the ranks lean a little toward you as you move.
+const MAX_ARMY = 120, RANK = 10;
+function slotPos(i) {
+  if (i < SLOTS.length) return [clamp(G.px + SLOTS[i][0], 10, W - 10), Math.min(G.py + SLOTS[i][1], H - 14)];
+  const j = i - SLOTS.length, rank = Math.floor(j / RANK), col = j % RANK;
+  const lean = (G.px - W / 2) * 0.12 + Math.sin(G.t * 1.5 + rank) * 1.5;
+  return [clamp(9 + col * 18 + (rank % 2 ? 9 : 0) + lean, 8, W - 8), H - 14 - rank * 16];
+}
 
 function newGame(demo) {
   G = {
@@ -628,7 +638,7 @@ function newGame(demo) {
     px: W / 2, py: H - 60, fireT: 0, power: 0, shake: 0, step: 0,
     hearts: [], ebul: [], enemies: [], cages: [], squad: [], parts: [], pops: [], pickups: [], deco: [],
     spawnT: 1.5, cageT: 5, decoT: 0, scroll: 0, banner: null, loved: 0, mice: 0, rescued: 0,
-    glooms: 0, overloads: 0, wasHit: false,
+    glooms: 0, overloads: 0, wasHit: false, maxArmy: 0,
   };
   for (let i = 0; i < 18; i++) addDeco(rnd(0, H));
   if (demo) for (let i = 0; i < 4; i++) addSquad(G.px, H + 20);
@@ -753,9 +763,12 @@ const TROPHIES = [
     "kkkkkkkkkkkk", "kwkwwwwwwkwk", "kwwkwwwwkwwk", "kwwwkPPkwwwk", "kwwwPPPPwwwk", "kwwwwPPwwwwk", "kwwwwwwwwwwk", "kkkkkkkkkkkk"]) },
   { id: "key", name: "RUSTY CAGE KEY", how: "FREE A CAGED MOE", lore: "Nobody gets left in a cage.", icon: sprite([
     "..kkk.......", ".kyyyk......", "kyk.kykkkkkk", "kyk.kyyyyyyk", ".kyyykkkykyk", "..kkk...kkkk"], { y: "#d9a441" }) },
-  { id: "whistle", name: "SQUAD WHISTLE", how: "FILL ALL 8 SQUAD SPOTS", lore: "Tweet tweet, everybody in line.", icon: sprite([
+  { id: "whistle", name: "SQUAD WHISTLE", how: "HAVE 8 MOES IN YOUR ARMY", lore: "Tweet tweet, everybody in line.", icon: sprite([
     "....rr......", "...r..r.....", "..r....kkkkk", ".r....kmmmmk", ".r..kkmmkkmk", "..rkmmmmmmmk", "...kmmmmmmk.", "...kmmmmmk..",
     "....kkkkk..."]) },
+  { id: "flag", name: "GRAND ARMY FLAG", how: "HAVE 100 MOES IN YOUR ARMY", lore: "Visible from space.", icon: sprite([
+    "kkkkkkkkkk..", "kyyyyyyyyyk.", "kyyPPyPPyyk.", "kyyPPPPPyyk.", "kyyyPPPyyyk.", "kyyyyPyyyyk.", "kkkkkkkkkk..", "kb..........",
+    "kb..........", "kb..........", "kb..........", "kk.........."]) },
   { id: "tread", name: "TANK TREAD BRACELET", how: "LOVE A MOUSE TANK", lore: "Fashion from the front lines.", icon: sprite([
     "...kkkkkk...", "..kcCcCcCk..", ".kCkkkkkkck.", ".kck....kCk.", ".kCk.PP.kck.", ".kck....kCk.", ".kCkkkkkkck.",
     "..kcCcCcCk..", "...kkkkkk..."]) },
@@ -915,16 +928,18 @@ function update(dt) {
     }
     if (!G.demo) SFX.shoot();
   }
+  const reserve = Math.max(0, G.squad.length - SLOTS.length);
+  const slow = Math.max(1, Math.sqrt(reserve));   // the ranks fire less often each as they grow, so a huge army stays fair
+  G.maxArmy = Math.max(G.maxArmy, G.squad.length);
   G.squad.forEach((m, i) => {
-    const s = SLOTS[i];
-    const tx = clamp(G.px + s[0], 10, W - 10), ty = Math.min(G.py + s[1], H - 14);
+    const [tx, ty] = slotPos(i);
     const k = 1 - Math.exp(-8 * dt);
     m.x += (tx - m.x) * k; m.y += (ty - m.y) * k;
     m.step += dt * 6;
     m.fireT -= dt;
     if (m.fireT <= 0) {
       const gap = Math.max(0.35, 0.7 - (G.stage - 1) * 0.06);
-      m.fireT = G.power > 0 ? gap / 2 : gap;
+      m.fireT = (G.power > 0 ? gap / 2 : gap) * (i < SLOTS.length ? 1 : slow * rnd(0.8, 1.2));
       addHeart({ x: m.x, y: m.y - 22, vx: 0, vy: -hv });
     }
   });
@@ -954,9 +969,13 @@ function update(dt) {
   }
   G.cageT -= dt;
   if (G.cageT <= 0) {
-    G.cageT = rnd(9, 14);
-    if (G.squad.length + G.cages.length < SLOTS.length) {
-      G.cages.push({ x: rnd(18, W - 18), y: -16, hp: 6, t: 0, shake: 0 });
+    G.cageT = rnd(5, 8);
+    const waiting = G.cages.reduce((a, c) => a + c.n, 0);
+    if (G.squad.length + waiting < MAX_ARMY) {
+      // later cages hold more Moes, and sometimes a big one turns up with a crowd inside
+      const big = G.stage >= 2 && Math.random() < 0.25;
+      const n = Math.min(MAX_ARMY - G.squad.length - waiting, big ? 8 + G.stage * 3 : 1 + G.stage);
+      G.cages.push({ x: rnd(18, W - 18), y: -16, hp: 6 + Math.min(n, 12), t: 0, shake: 0, n });
     }
   }
   if (!G.bossOut && G.stageT > 30) {
@@ -1065,11 +1084,12 @@ function update(dt) {
           c.dead = true;
           dots(c.x, c.y, 20, "#8a5a2b");
           burst(c.x, c.y, 5, SMALL_HEART, 50);
-          addSquad(c.x, c.y);
+          for (let k = 0; k < c.n; k++) addSquad(c.x + rnd(-8, 8), c.y + rnd(-6, 6));
           award("key");
           if (G.squad.length >= SLOTS.length) award("whistle");
-          G.rescued++; G.score += 250;
-          pop(c.x, c.y - 18, "+1 MOE!", "#ff9fca");
+          if (G.squad.length >= 100) award("flag");
+          G.rescued += c.n; G.score += 250 * c.n;
+          pop(c.x, c.y - 18, "+" + c.n + (c.n > 1 ? " MOES!" : " MOE!"), "#ff9fca");
           SFX.free();
         }
         break;
@@ -1088,6 +1108,8 @@ function update(dt) {
       if (hit(b, b.x, b.y, b.w * 0.7, b.h * 0.7, m, m.x, m.y - 2, 10, 16)) {
         b.dead = true;
         if (G.guard) { dots(m.x, m.y - 8, 6, "#ffd23f"); pop(m.x, m.y - 24, "SAFE", "#ffd23f"); break; }
+        // the back ranks stand shoulder to shoulder: most shots just bounce off the crowd
+        if (i >= SLOTS.length && Math.random() < 0.88) { dots(m.x, m.y - 8, 3, "#fff"); break; }
         G.squad.splice(i, 1);
         dots(m.x, m.y, 10, "#fff");
         pop(m.x, m.y - 24, "AWW", "#c4cde8");
@@ -1481,6 +1503,7 @@ function showOver() {
     "SCORE <b>" + G.score + "</b><br>" +
     "MICE LOVED <b>" + G.mice + "</b><br>" +
     "MOES FREED <b>" + G.rescued + "</b><br>" +
+    "BIGGEST ARMY <b>" + G.maxArmy + "</b><br>" +
     "STAGE <b>" + G.stage + "</b> · BEST <b>" + best + "</b>";
   $("rank").textContent = "";
   $("getMoe").style.display = SCATTER_URL ? "" : "none";
@@ -1489,7 +1512,7 @@ function showOver() {
   setTimeout(fill, 1500); setTimeout(fill, 4000);
 }
 function share() {
-  const msg = "I won over " + G.mice + " of the Anti Moemoe mouse army with love and scored " + G.score +
+  const msg = "I led an army of " + G.maxArmy + " Moes, won over " + G.mice + " of the Anti Moemoe mouse army with love and scored " + G.score +
     " in MOEMOE ARMY 💛\nmoemoe means ily. Enlist:";
   window.open("https://x.com/intent/post?text=" + encodeURIComponent(msg) + "&url=" + encodeURIComponent(SITE_URL),
     "_blank", "noopener");
