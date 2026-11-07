@@ -88,7 +88,7 @@
 "use strict";
 
 // ---------- setup ----------
-const SCATTER_URL = "";          // the moemoe collection on Scatter (GET A MOE button hides while this is empty)
+const SCATTER_URL = "https://www.scatter.art/c/moemoe-llc?shill=egg";   // GET A MOE button (hidden if empty)
 const SITE_URL = "https://www.81eggs.com/moearmy/";
 const BOARD = "moe-army";
 const BEST_KEY = "moearmy_best", MUTE_KEY = "moearmy_mute";
@@ -286,8 +286,8 @@ const HAPPY_CLOUD = sprite([
   "..SSSSSSSSSSSS..",
 ]);
 
-// the Anti Moemoe mouse army: the cut-out mouse head (assets/mouse_head.png) on a darker uniform
-// with a red armband. Loved mice switch to the Moe army's green and blush pink.
+// the Anti Moemoe mouse army: the bandana mouse head (assets/mouse_head.png) on a dark grey uniform
+// with tan trim, a shoulder strap and a cream armband. Loved mice switch to the Moe army's green and blush pink.
 const MOUSE_HEAD = new Image();
 MOUSE_HEAD.src = "assets/mouse_head.png";
 const mouseReady = () => MOUSE_HEAD.complete && MOUSE_HEAD.naturalWidth > 0;
@@ -303,17 +303,18 @@ function tinted(img, col) {
 }
 MOUSE_HEAD.onload = () => { MOUSE_W = tinted(MOUSE_HEAD, "#fff"); MOUSE_PINK = tinted(MOUSE_HEAD, "#ff7eb6"); };
 const MOUSE_BODY_ROWS = BODY.map((r, i) => {
-  const a = r.split("");
-  if (i >= 3 && i <= 5) a[13] = "r";                 // armband
-  if (i === 4) { a[10] = "k"; a[11] = "y"; }          // round Anti Moemoe badge
-  if (i === 7) { a[1] = a[2] = a[13] = a[14] = "f"; } // furry grey hands
+  const a = r.split("").map((c) => (c === "r" || c === "b" ? "t" : c));   // tan collar trim and buttons
+  if (i >= 1 && i <= 8 && a[3 + i] !== ".") a[3 + i] = "s";             // strap, shoulder to hip
+  if (i >= 3 && i <= 5) a[13] = "c";                                     // cream armband
+  if (i === 4) { a[10] = "k"; a[11] = "k"; }                             // black Anti Moemoe badge
+  if (i === 7) { a[1] = a[2] = a[13] = a[14] = "f"; }                    // furry grey hands
   return a.join("");
 });
-const MOUSE_FUR = { f: "#cfc6cc" };
-const MOUSE_BODY = LEGS.map((l) => sprite(MOUSE_BODY_ROWS.concat(l), Object.assign({ g: "#5b6438", G: "#3a4023" }, MOUSE_FUR)));
-const MOUSE_BODY_LOVED = LEGS.map((l) => sprite(MOUSE_BODY_ROWS.concat(l), Object.assign({ r: "#ff7eb6" }, MOUSE_FUR)));
+const MOUSE_FUR = { f: "#cfc6cc", t: "#d9c08a", s: "#b89a62", c: "#efe3c4" };
+const MOUSE_BODY = LEGS.map((l) => sprite(MOUSE_BODY_ROWS.concat(l), Object.assign({ g: "#4a4d5a", G: "#2d2f38" }, MOUSE_FUR)));
+const MOUSE_BODY_LOVED = LEGS.map((l) => sprite(MOUSE_BODY_ROWS.concat(l), Object.assign({}, MOUSE_FUR, { c: "#ff7eb6" })));
 const MOUSE_BODY_W = white(MOUSE_BODY[0]);
-const MOUSE_HW = 30;   // head drawn 30 game pixels wide
+const MOUSE_HW = 32;   // head drawn 32 game pixels wide
 
 function drawMouseHead(cx, bottom, w, flash, loved) {
   if (!mouseReady()) return;

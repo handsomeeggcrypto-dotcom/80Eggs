@@ -95,15 +95,14 @@ def main():
 
 
 # The mouse has clean black outlines, so a hand-traced outline (source-picture coords) is the whole cut:
-# ears, cap and face down to the chin. Whiskers and the cigarette are left out.
+# ears, bandana and face down to the chin. Whiskers and the cigarette are left out.
 MOUSE_SRC = os.path.expanduser("~/Desktop/moearmy/mouse.webp")
-MOUSE_OUTLINE = [
-    (420, 95), (480, 85), (520, 85), (600, 100), (700, 120), (800, 170), (870, 230), (885, 280),
-    (950, 265), (1020, 285), (1065, 335), (1085, 420), (1078, 500), (1055, 560), (1010, 615),
-    (950, 648), (890, 650), (880, 690), (870, 720), (830, 775), (780, 810), (720, 845), (640, 875),
-    (560, 885), (480, 870), (410, 840), (350, 805), (310, 770), (265, 720), (270, 690), (250, 645),
-    (180, 630), (110, 580), (60, 500), (42, 420), (55, 330), (100, 265), (160, 225), (220, 205),
-    (270, 205), (300, 165), (360, 115),
+MOUSE_OUTLINE = [   # the bandana mouse: ears, bandana and knot (tails cut short), face down to the chin
+    (170, 220), (230, 205), (330, 215), (410, 255), (455, 262), (500, 250), (590, 235), (640, 242),
+    (700, 258), (760, 255), (850, 215), (950, 220), (1030, 268), (1065, 340), (1072, 430), (1052, 520),
+    (1010, 580), (950, 612), (895, 618), (880, 660), (870, 705), (840, 750), (790, 795), (720, 828),
+    (640, 842), (560, 835), (470, 810), (400, 778), (340, 745), (300, 725), (275, 690), (255, 650),
+    (240, 610), (200, 575), (130, 535), (80, 460), (65, 370), (95, 285),
 ]
 MOUSE_WIDTH = 150   # drawn about 30 game pixels wide (the ears make it wider than a Moe head)
 
