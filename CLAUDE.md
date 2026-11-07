@@ -16,6 +16,7 @@ Each project folder has its own `CLAUDE.md`. Read it before working there.
 | `bubbles/` | **Tomochi Pop** bubble shooter (folder name kept from "Bubble Pop") | live |
 | `moetorcycles/` | **MOEtorcycles** endless runner | live |
 | `moecastle/` | **Defend Your LLC**, a Defend Your Castle remake starring the Moe Fights roster. `build_assets.py` makes `assets/` | live |
+| `moearmy/` | **MOEMOE ARMY**, a phone-first top-down shooter for the moemoe army PFP push on Scatter: you fire yellow (Bradley) hearts instead of bullets, free caged Moes to grow a V-formation squad, and "love" grumps, clouds and tanks. Leaderboard `moe-army`, Share on X button. `SCATTER_URL` at the top turns on the GET A MOE button. `?debug` exposes `window.__army` | not linked yet |
 | `moekedex/` | **Moekedex**, a Pokédex for the moemoe LLC NFTs | live |
 | `dreamthings/` | **Dream Things**, a dex for the Yumemono NFTs. `build_data.py` makes `data.js` | live |
 | `blorps/` | **The Blorp Museum**, a 90s-web art museum for the 205 Blorp (blue alien) Moes. Reads `moekedex/data.js`, so it needs no data of its own. "My Collection" and the guestbook save in the visitor's browser only. `screensaver.html` is the Blorp screensaver (warp starfield, flies your own Blorps if My Collection has any). `patrol.html` is **Blorp Patrol** (**this Mac only for now**: it's in `.vercelignore` and the museum only shows its button on localhost), a jetpack game: fly into the mothership tube with the right answer (spot the human, find this Blorp, name the trait, pick the rarest). `?debug` exposes `window.__patrol` for testing | live |
@@ -29,7 +30,7 @@ Each project folder has its own `CLAUDE.md`. Read it before working there.
 | `moe_fights.html` | Moe Fights. **The master copy is `~/Desktop/MoeFights_beta.html`**, so edit that one and copy it here | live |
 | `director_moe.html` | Moe Fights scene studio | hidden |
 | `nest.html` | **The Nest**, Claude's own page (see below) | live, via "Groups" |
-| `scores.js` + `api/scores.py` | **Shared leaderboards** for Tomochi Pop (Classic, Rush), MOEtorcycles (Normal, Portal) and Defend Your LLC. `api/` is a Vercel Python function backed by Upstash Redis | live |
+| `scores.js` + `api/scores.py` | **Shared leaderboards** for Tomochi Pop (Classic, Rush), MOEtorcycles (Normal, Portal), Defend Your LLC and MOEMOE ARMY. `api/` is a Vercel Python function backed by Upstash Redis | live |
 | `retro.js` | **The 90s kit**: one `<script src="/retro.js" data-kit="stars sparkles ring counter">` line gives a page the starfield, mouse sparkles, visitor counter and the **80Eggs Webring** bar. The ring's order is `RING` at the top of the file, so add new pages there. On the Blorp Museum, Moekedex, Dream Things, Sudoku and the Nest so far (full-screen games are in the ring but don't show the bar) | live |
 | `api/telegram.py` | **Telegram bot**: `/pop` posts the Tomochi Pop menu picture + a Play button; `/scores` posts the top 5 of the Tomochi Pop leaderboards (the bot is for the Tomochi group, so no MOEtorcycles). Token is `TELEGRAM_BOT_TOKEN` in Vercel; webhook points at `/api/telegram`. Add commands to `COMMANDS` | live |
 | `crypto.html`, `eggdefend.html`, `smokebreak.html`, `sudoku.html`, `typing.html` | Small single-file games and tools | live |

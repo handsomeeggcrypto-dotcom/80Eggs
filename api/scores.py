@@ -18,7 +18,7 @@ import urllib.request
 from http.server import BaseHTTPRequestHandler
 from urllib.parse import parse_qs, urlparse
 
-BOARDS = {"tomochi-classic", "tomochi-rush", "moto-normal", "moto-portal", "llc-defend"}
+BOARDS = {"tomochi-classic", "tomochi-rush", "moto-normal", "moto-portal", "llc-defend", "moe-army"}
 MAX_SCORE = 10000000
 TOP_N = 10
 KEEP = 1000           # entries kept per board
