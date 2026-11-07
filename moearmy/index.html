@@ -89,6 +89,7 @@
         <button class="alt" id="lbOver">LEADERBOARD</button>
       </div>
       <div class="row"><button class="alt" id="getMoe" style="display:none">GET A MOE</button></div>
+      <div class="row"><button class="alt" id="menuOver">MAIN MENU</button></div>
     </div>
 
     <div class="screen noStart" id="editor">
@@ -105,6 +106,7 @@
     <div class="screen" id="pause">
       <div class="logo" style="font-size:calc(var(--s)*12px)">PAUSED</div>
       <div class="big blink">TAP TO GO ON</div>
+      <div class="row"><button class="alt" id="menuPause">MAIN MENU</button></div>
     </div>
 
     <button class="alt" id="mute">SND ON</button>
@@ -267,7 +269,8 @@ const STAGE_KEY = "moearmy_best_stage", MICE_KEY = "moearmy_mice_total";
 const PLAYERS = [
   { id: "soldier", name: "SOLDIER MOE", head: "photo" },
   { id: "pixel", name: "PIXEL MOE", head: "pixel" },
-  { id: "bradley", name: "CEO BRADLEY", head: "bradley", unlock: { mice: 100, text: "LOVE 100 MICE" } },
+  { id: "bradley", name: "CEO BRADLEY", head: "bradley", unlock: { mice: 100, text: "LOVE 100 MICE" },
+    perk: "NO MOE LEFT BEHIND", guard: true },   // guard: mouse shots bounce off your squad
   { id: "custom", name: "YOUR MOE", head: "custom" },
 ];
 let playerId = store.get(PLAYER_KEY) || (store.get("moearmy_face") === "pixel" ? "pixel" : "soldier");
@@ -885,6 +888,7 @@ function update(dt) {
       const m = G.squad[i];
       if (hit(b, b.x, b.y, b.w * 0.7, b.h * 0.7, m, m.x, m.y - 2, 10, 16)) {
         b.dead = true;
+        if (G.guard) { dots(m.x, m.y - 8, 6, "#ffd23f"); pop(m.x, m.y - 24, "SAFE", "#ffd23f"); break; }
         G.squad.splice(i, 1);
         dots(m.x, m.y, 10, "#fff");
         pop(m.x, m.y - 24, "AWW", "#c4cde8");
@@ -1029,6 +1033,7 @@ function show(id) {
 function startGame() {
   audio();
   newGame(false);
+  G.guard = !!player().guard;
   state = "play"; paused = false;
   show(null);
   banner("STAGE 1", "LOVE THEM ALL");
@@ -1048,7 +1053,8 @@ function renderPicker() {
   const p = list.find((q) => q.id === viewId) || player();
   const locked = !unlocked(p);
   const prog = locked && p.unlock.mice ? " (" + Math.min(miceTotal(), p.unlock.mice) + "/" + p.unlock.mice + ")" : "";
-  $("pName").innerHTML = p.name + (locked ? "<br><b>LOCKED: " + p.unlock.text + prog + "</b>" : "");
+  $("pName").innerHTML = p.name + (locked ? "<br><b>LOCKED: " + p.unlock.text + prog + "</b>" : "") +
+    (p.perk ? "<br>PERK: " + p.perk : "");
   $("enlistBtn").textContent = CUSTOM ? "NEW PICTURE" : "ENLIST YOUR MOE";
   const c = $("pCv").getContext("2d");
   c.setTransform(1, 0, 0, 1, 0, 0);
@@ -1322,6 +1328,8 @@ window.addEventListener("blur", () => { for (const k in keys) keys[k] = false; s
 document.addEventListener("visibilitychange", () => { if (document.hidden) setPaused(true); });
 
 $("again").onclick = () => startGame();
+$("menuOver").onclick = () => toTitle();
+$("menuPause").onclick = () => { paused = false; toTitle(); };
 $("share").onclick = share;
 $("lbTitle").onclick = () => lb && lb.open(BOARD);
 $("lbOver").onclick = () => lb && lb.open(BOARD);
