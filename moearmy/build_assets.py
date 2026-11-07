@@ -4,6 +4,7 @@
   ~/Desktop/moearmy/mouse.webp   ->  assets/mouse_head.png   (the Anti Moemoe mouse army)
   ~/Desktop/moearmy/mouse_loved.webp -> assets/mouse_loved.png (the same mouse, heart eyes, once loved)
   ~/Desktop/moearmy/bradley.jpg  ->  assets/bradley_head.png (CEO Bradley, an unlockable player)
+  ~/Desktop/moearmy/crayons.jpg  ->  assets/crayons_head.png (Commander Crayons, an unlockable player)
   ~/Desktop/moearmy/heart_official.webp -> assets/heart_face.png (the official moemoe heart, on the menus)
 
 Cuts each head out of its tank background and saves it small with a see-through background.
@@ -200,9 +201,34 @@ def heart():
     print("wrote", path, img.size)
 
 
+# Commander Crayons: hard hat + monster hood on a busy crayon drawing, so a hand-traced outline is the whole cut.
+CRAYONS_SRC = os.path.expanduser("~/Desktop/moearmy/crayons.jpg")
+CRAYONS_OUTLINE = [
+    (45, 140), (50, 105), (68, 70), (100, 35), (140, 14), (180, 6), (222, 9), (258, 24), (285, 50),
+    (300, 80), (306, 104), (332, 110), (362, 120), (366, 131), (346, 141), (312, 150), (316, 175),
+    (318, 205), (312, 238), (300, 262), (288, 285), (268, 302), (132, 302), (110, 290), (80, 268),
+    (64, 236), (55, 205), (52, 178),
+]
+CRAYONS_WIDTH = 150
+
+
+def crayons():
+    img = Image.open(CRAYONS_SRC).convert("RGB")
+    mask = Image.new("L", img.size, 0)
+    ImageDraw.Draw(mask).polygon(CRAYONS_OUTLINE, fill=255)
+    mask = mask.filter(ImageFilter.MinFilter(3)).filter(ImageFilter.GaussianBlur(0.8))
+    img.putalpha(mask)
+    img = img.crop(mask.point(lambda v: 255 if v > 127 else 0).getbbox())
+    img = img.resize((CRAYONS_WIDTH, round(img.height * CRAYONS_WIDTH / img.width)), Image.LANCZOS)
+    path = os.path.join(OUT, "crayons_head.png")
+    img.save(path, optimize=True)
+    print("wrote", path, img.size)
+
+
 if __name__ == "__main__":
     main()
     mouse()
     mouse(os.path.expanduser("~/Desktop/moearmy/mouse_loved.webp"), "mouse_loved.png")
     bradley()
     heart()
+    crayons()

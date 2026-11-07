@@ -243,6 +243,18 @@ const RED_ROWS = BODY.map((r, i) => {
   return a.join("");
 });
 const BODY_RED = LEGS.map((l) => sprite(RED_ROWS.concat(l), { g: "#d8352a", G: "#8e1d17", r: "#14121a", s: "#d8d8d8" }));
+// Commander Crayons: blue monster hoodie with purple spots and a grey front
+const CRAYON_ROWS = BODY.map((r, i) => {
+  const a = r.split("").map((c, j) => (c === "b" || c === "y" || (c === "r" && i === 4) ? "e" : c === "r" ? "g" : c));
+  for (const [y, x] of [[1, 4], [2, 9], [4, 6], [5, 10], [6, 5], [7, 8], [2, 2], [5, 2], [6, 13], [8, 6]]) if (i === y && a[x] === "g") a[x] = "p";
+  return a.join("");
+});
+const BODY_CRAYON = LEGS.map((l) => sprite(CRAYON_ROWS.concat(l), { g: "#4a63d8", G: "#2c3b94", p: "#b06ad8", e: "#a9adb5" }));
+const CRAYONS_HEAD = new Image();
+CRAYONS_HEAD.src = "assets/crayons_head.png";
+let CRAYONS_HEAD_W = null;
+CRAYONS_HEAD.onload = () => { CRAYONS_HEAD_W = tinted(CRAYONS_HEAD, "#fff"); renderPicker(); };
+const BODIES = { bradley: () => BODY_RED, crayons: () => BODY_CRAYON };
 const BRADLEY_HEAD = new Image();
 BRADLEY_HEAD.src = "assets/bradley_head.png";
 let BRADLEY_HEAD_W = null;
@@ -273,6 +285,8 @@ const PLAYERS = [
   { id: "pixel", name: "PIXEL MOE", head: "pixel" },
   { id: "bradley", name: "CEO BRADLEY", head: "bradley", unlock: { mice: 100, text: "LOVE 100 MICE" },
     perk: "NO MOE LEFT BEHIND", guard: true },   // guard: mouse shots bounce off your squad
+  { id: "crayons", name: "COMMANDER CRAYONS", head: "crayons", unlock: { stage: 4, text: "REACH STAGE 4" },
+    perk: "HEARTS PIERCE 3 MICE", crayon: true },   // crayon: rainbow hearts that keep going
   { id: "custom", name: "YOUR MOE", head: "custom" },
 ];
 let playerId = store.get(PLAYER_KEY) || (store.get("moearmy_face") === "pixel" ? "pixel" : "soldier");
@@ -288,7 +302,7 @@ let viewId = playerId;   // who the title picker is showing (can be a locked pla
 // kind: "photo" (the standard soldier face), "pixel" or "custom"
 function drawMoe(x, y, frame, flash, kind) {
   const hx = Math.round(x - 12), hy = Math.round(y - 20);
-  ctx.drawImage((kind === "bradley" ? BODY_RED : BODY_F)[frame % 2], hx + 4, hy + 23);
+  ctx.drawImage((BODIES[kind] ? BODIES[kind]() : BODY_F)[frame % 2], hx + 4, hy + 23);
   drawHead(hx, hy, kind || "photo", flash);
   if (flash) {
     ctx.globalAlpha = flash;
@@ -301,6 +315,9 @@ function drawHead(hx, hy, kind, flash) {
   if (kind === "bradley" && BRADLEY_HEAD.complete && BRADLEY_HEAD.naturalWidth) {
     img = BRADLEY_HEAD; wimg = BRADLEY_HEAD_W;
     w = 25; h = w * BRADLEY_HEAD.naturalHeight / BRADLEY_HEAD.naturalWidth; x = hx; y = hy + 25 - h;
+  } else if (kind === "crayons" && CRAYONS_HEAD.complete && CRAYONS_HEAD.naturalWidth) {
+    img = CRAYONS_HEAD; wimg = CRAYONS_HEAD_W;
+    w = 28; h = w * CRAYONS_HEAD.naturalHeight / CRAYONS_HEAD.naturalWidth; x = hx - 1; y = hy + 25 - h;
   } else if (kind === "custom" && CUSTOM) {
     img = CUSTOM; wimg = CUSTOM_W; x = hx - 1; y = hy - 1; w = 26; h = 25;
   } else if (kind !== "pixel" && photoReady()) {
@@ -330,6 +347,15 @@ const HEART = sprite([
   "...ooo...",
   "....o....",
 ]);
+const CRAYON_COLS = [["#ff5a5a", "#b02a2a"], ["#ff9b2e", "#b55e10"], ["#3fc25a", "#22803a"], ["#4aa8ff", "#2a62b8"], ["#b06ad8", "#6e3a92"]];
+const CRAYON_HEARTS = CRAYON_COLS.map(([y, o]) => sprite([
+  ".yyy.yyy.", "yyyyyyyyy", "yywkywkyy", "yykkykkyy", "yyyyyyyyy", ".oyyyyyo.", "..ooooo..", "...ooo...", "....o....",
+], { y, o }));
+let crayonN = 0;
+function addHeart(h) {   // every heart goes through here, so Commander Crayons can colour them in
+  if (G.crayon) { h.c = crayonN++ % CRAYON_COLS.length; h.pierce = 3; h.hits = []; }
+  G.hearts.push(h);
+}
 const SMALL_HEART = sprite([".y.y.", "yyyyy", ".yyy.", "..y.."]);
 const PINK_HEART = sprite([".P.P.", "PPPPP", ".PPP.", "..P.."]);
 const BRADLEY = sprite([
@@ -718,10 +744,10 @@ function update(dt) {
   G.fireT -= dt;
   if (G.fireT <= 0) {
     G.fireT = Math.max(0.12, 0.26 - (G.stage - 1) * 0.025);
-    G.hearts.push({ x: G.px, y: G.py - 22, vx: 0, vy: -hv });
+    addHeart({ x: G.px, y: G.py - 22, vx: 0, vy: -hv });
     if (G.power > 0) {
-      G.hearts.push({ x: G.px - 5, y: G.py - 20, vx: -hv * 0.27, vy: -hv * 0.95 });
-      G.hearts.push({ x: G.px + 5, y: G.py - 20, vx: hv * 0.27, vy: -hv * 0.95 });
+      addHeart({ x: G.px - 5, y: G.py - 20, vx: -hv * 0.27, vy: -hv * 0.95 });
+      addHeart({ x: G.px + 5, y: G.py - 20, vx: hv * 0.27, vy: -hv * 0.95 });
     }
     if (!G.demo) SFX.shoot();
   }
@@ -735,7 +761,7 @@ function update(dt) {
     if (m.fireT <= 0) {
       const gap = Math.max(0.35, 0.7 - (G.stage - 1) * 0.06);
       m.fireT = G.power > 0 ? gap / 2 : gap;
-      G.hearts.push({ x: m.x, y: m.y - 22, vx: 0, vy: -hv });
+      addHeart({ x: m.x, y: m.y - 22, vx: 0, vy: -hv });
     }
   });
 
@@ -853,9 +879,10 @@ function update(dt) {
   // hearts hit things
   for (const h of G.hearts) {
     for (const e of G.enemies) {
-      if (e.loved || e.y < -4) continue;
+      if (e.loved || e.y < -4 || (h.hits && h.hits.includes(e))) continue;
       if (hit(h, h.x, h.y, 7, 7, e, e.x, e.y, e.w * 0.9, e.h * 0.9)) {
-        h.dead = true; e.hp--; e.flash = 0.06;
+        if (h.pierce && --h.pierce > 0) h.hits.push(e); else h.dead = true;
+        e.hp--; e.flash = 0.06;
         dots(h.x, h.y - 2, 2, "#ffd42a");
         if (e.hp <= 0) loveEnemy(e); else if (e.type === "tank") SFX.hit();
         break;
@@ -974,7 +1001,16 @@ function draw() {
     drawMoe(G.px, G.py, Math.floor(G.step), G.power > 0 && Math.floor(G.t * 10) % 2 ? 0.35 : 0, player().head);
   }
 
-  for (const h of G.hearts) ctx.drawImage(HEART, Math.round(h.x - 4), Math.round(h.y - 4));
+  for (const h of G.hearts) {
+    if (h.c == null) { ctx.drawImage(HEART, Math.round(h.x - 4), Math.round(h.y - 4)); continue; }
+    ctx.fillStyle = CRAYON_COLS[h.c][0];   // a wiggly crayon scribble behind the heart
+    for (let k = 1; k <= 4; k++) {
+      ctx.globalAlpha = 0.5 - k * 0.1;
+      ctx.fillRect(Math.round(h.x - h.vx * k * 0.025 + Math.sin(h.y * 0.3 + k) * 1.5), Math.round(h.y + 4 + k * 2), 2, 2);
+    }
+    ctx.globalAlpha = 1;
+    ctx.drawImage(CRAYON_HEARTS[h.c], Math.round(h.x - 4), Math.round(h.y - 4));
+  }
   for (const b of G.ebul) {
     const img = b.type === "drop" ? DROP : FROWN;
     ctx.drawImage(img, Math.round(b.x - img.width / 2), Math.round(b.y - img.height / 2));
@@ -1036,6 +1072,7 @@ function startGame() {
   audio();
   newGame(false);
   G.guard = !!player().guard;
+  G.crayon = !!player().crayon;
   state = "play"; paused = false;
   show(null);
   banner("STAGE 1", "LOVE THEM ALL");
@@ -1054,7 +1091,8 @@ function renderPicker() {
   const list = available();
   const p = list.find((q) => q.id === viewId) || player();
   const locked = !unlocked(p);
-  const prog = locked && p.unlock.mice ? " (" + Math.min(miceTotal(), p.unlock.mice) + "/" + p.unlock.mice + ")" : "";
+  const prog = !locked ? "" : p.unlock.mice ? " (" + Math.min(miceTotal(), p.unlock.mice) + "/" + p.unlock.mice + ")"
+    : bestStage() ? " (BEST " + bestStage() + ")" : "";
   $("pName").innerHTML = p.name + (locked ? "<br><b>LOCKED: " + p.unlock.text + prog + "</b>" : "") +
     (p.perk ? "<br>PERK: " + p.perk : "");
   $("enlistBtn").textContent = CUSTOM ? "NEW PICTURE" : "ENLIST YOUR MOE";
