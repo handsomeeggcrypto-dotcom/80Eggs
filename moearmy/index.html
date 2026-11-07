@@ -4,9 +4,9 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <title>MOEMOE ARMY</title>
-<meta name="description" content="moemoe means ily. Lead the Moe army, free your squad and win every grump over with love.">
+<meta name="description" content="moemoe means ily. Lead the Moe army, free your squad and win the Anti Moemoe mouse army over with love.">
 <meta property="og:title" content="MOEMOE ARMY">
-<meta property="og:description" content="moemoe means ily. Win every grump over with love.">
+<meta property="og:description" content="moemoe means ily. Win the mouse army over with love.">
 <meta name="theme-color" content="#1d2414">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -55,7 +55,7 @@
       <canvas id="bradley" width="11" height="11"></canvas>
       <div class="logo">MOEMOE<br>ARMY<small>OPERATION I.L.Y.</small></div>
       <div class="ily">moemoe means ily</div>
-      <div class="how">DRAG TO MOVE<br>HEARTS FIRE ON THEIR OWN<br>FREE CAGED MOES TO GROW<br>YOUR SQUAD</div>
+      <div class="how">DRAG TO MOVE<br>HEARTS FIRE ON THEIR OWN<br>FREE CAGED MOES TO GROW<br>YOUR SQUAD<br>LOVE THE ANTI MOEMOE MICE</div>
       <div class="big blink" id="tapStart">TAP TO ENLIST</div>
       <div class="stat" id="bestTitle"></div>
       <div class="row"><button class="alt" id="lbTitle">LEADERBOARD</button><button class="alt" id="faceBtn">FACE: PIXEL</button></div>
@@ -286,36 +286,57 @@ const HAPPY_CLOUD = sprite([
   "..SSSSSSSSSSSS..",
 ]);
 
-const GRUMP_ROWS = [
-  "...DDDDDD...",
-  "..DddddddD..",
-  ".DddddddddD.",
-  "DDDDDDDDDDDD",
-  ".mkkmmmmkkm.",
-  ".mmkkmmkkmm.",
-  ".mmkkmmkkmm.",
-  ".mmmmmmmmmm.",
-  ".mmmkkkkmmm.",
-  "..mkmmmmkm..",
-  ".UuuuuuuuuU.",
-  "UuuuuuuuuuuU",
-  ".UuuuuuuuuU.",
-];
-const GRUMP_LEGS = ["..kk....kk..", "...kk..kk..."];
-const GRUMP = GRUMP_LEGS.map((l) => sprite(GRUMP_ROWS.concat([l])));
-const GRUMP_W = white(GRUMP[0]);
-const HAPPY_FACE = [
-  ".wwwwwwwwww.",
-  ".wwkwwwwkwww",
-  ".wkwkwwkwkww",
-  ".wpwwwwwwpw.",
-  ".wwwwwwwwww.",
-  ".wwkwwwwkww.",
-  "..wwkkkkww..",
-];
-const HAPPY_GRUMP = GRUMP_LEGS.map((l) => sprite(
-  GRUMP_ROWS.slice(0, 3).concat(["DDDDDDDDDDDD"], HAPPY_FACE, GRUMP_ROWS.slice(10), [l]),
-  { D: "#ff7eb6", d: "#ffc0dc", u: "#7a9a3c", U: "#4f6a24" }));
+// the Anti Moemoe mouse army: the cut-out mouse head (assets/mouse_head.png) on a darker uniform
+// with a red armband. Loved mice switch to the Moe army's green and blush pink.
+const MOUSE_HEAD = new Image();
+MOUSE_HEAD.src = "assets/mouse_head.png";
+const mouseReady = () => MOUSE_HEAD.complete && MOUSE_HEAD.naturalWidth > 0;
+let MOUSE_W = null, MOUSE_PINK = null;
+function tinted(img, col) {
+  const o = document.createElement("canvas");
+  o.width = img.naturalWidth; o.height = img.naturalHeight;
+  const x = o.getContext("2d");
+  x.drawImage(img, 0, 0);
+  x.globalCompositeOperation = "source-in";
+  x.fillStyle = col; x.fillRect(0, 0, o.width, o.height);
+  return o;
+}
+MOUSE_HEAD.onload = () => { MOUSE_W = tinted(MOUSE_HEAD, "#fff"); MOUSE_PINK = tinted(MOUSE_HEAD, "#ff7eb6"); };
+const MOUSE_BODY_ROWS = BODY.map((r, i) => {
+  const a = r.split("");
+  if (i >= 3 && i <= 5) a[13] = "r";                 // armband
+  if (i === 4) { a[10] = "k"; a[11] = "y"; }          // round Anti Moemoe badge
+  if (i === 7) { a[1] = a[2] = a[13] = a[14] = "f"; } // furry grey hands
+  return a.join("");
+});
+const MOUSE_FUR = { f: "#cfc6cc" };
+const MOUSE_BODY = LEGS.map((l) => sprite(MOUSE_BODY_ROWS.concat(l), Object.assign({ g: "#5b6438", G: "#3a4023" }, MOUSE_FUR)));
+const MOUSE_BODY_LOVED = LEGS.map((l) => sprite(MOUSE_BODY_ROWS.concat(l), Object.assign({ r: "#ff7eb6" }, MOUSE_FUR)));
+const MOUSE_BODY_W = white(MOUSE_BODY[0]);
+const MOUSE_HW = 30;   // head drawn 30 game pixels wide
+
+function drawMouseHead(cx, bottom, w, flash, loved) {
+  if (!mouseReady()) return;
+  const h = w * MOUSE_HEAD.naturalHeight / MOUSE_HEAD.naturalWidth;
+  const x = cx - w / 2, y = bottom - h;
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = "high";
+  ctx.drawImage(MOUSE_HEAD, x, y, w, h);
+  if (flash && MOUSE_W) ctx.drawImage(MOUSE_W, x, y, w, h);
+  if (loved && MOUSE_PINK) { ctx.globalAlpha = 0.3; ctx.drawImage(MOUSE_PINK, x, y, w, h); ctx.globalAlpha = 1; }
+  ctx.imageSmoothingEnabled = false;
+}
+// (x, y) is the middle of the mouse, like drawMoe
+function drawMouse(e, flash) {
+  const x = Math.round(e.x), y = Math.round(e.y);
+  const f = Math.floor(e.step) % 2;
+  // tail, curling out from behind
+  ctx.fillStyle = e.loved ? "#ff9fca" : "#e8a0a8";
+  const tw = Math.floor(e.step * 0.5) % 2;
+  ctx.fillRect(x + 7, y + 11, 3, 1); ctx.fillRect(x + 10, y + 10 - tw, 1, 2); ctx.fillRect(x + 11, y + 8 - tw, 1, 2);
+  ctx.drawImage(flash ? MOUSE_BODY_W : e.loved ? MOUSE_BODY_LOVED[f] : MOUSE_BODY[f], x - 8, y + 3);
+  drawMouseHead(x, y + 4, MOUSE_HW, flash, e.loved);
+}
 
 // ---------- sound ----------
 let AC = null, muted = store.get(MUTE_KEY) === "1";
@@ -414,6 +435,11 @@ function drawTank(e, flash) {
   R(body, 5, 4, 16, 19); R(lite, 5, 4, 16, 1);
   R(dark, 12, 18, 2, 8);
   R(lite, 7, 7, 12, 11); R(body, 8, 8, 10, 9);
+  if (mouseReady()) {
+    drawMouseHead(x + 13, y + 17, 20, flash, L);
+    if (L && !flash) { R("#fff8f0", 11, 25, 4, 3); R("#fff8f0", 12, 24, 2, 5); R("#ffd42a", 12, 26, 2, 1); }
+    return;
+  }
   if (flash) return;
   if (!L) {
     R("#14121a", 9, 10, 3, 1); R("#14121a", 14, 10, 3, 1);
@@ -453,7 +479,7 @@ function newGame(demo) {
     demo: !!demo, t: 0, score: 0, lives: 3, inv: 0, stage: 1, stageT: 0, bossOut: false,
     px: W / 2, py: H - 60, fireT: 0, power: 0, shake: 0, step: 0,
     hearts: [], ebul: [], enemies: [], cages: [], squad: [], parts: [], pops: [], pickups: [], deco: [],
-    spawnT: 1.5, cageT: 5, decoT: 0, scroll: 0, banner: null, loved: 0, rescued: 0,
+    spawnT: 1.5, cageT: 5, decoT: 0, scroll: 0, banner: null, loved: 0, mice: 0, rescued: 0,
   };
   for (let i = 0; i < 18; i++) addDeco(rnd(0, H));
   if (demo) for (let i = 0; i < 4; i++) addSquad(G.px, H + 20);
@@ -486,14 +512,14 @@ function dots(x, y, n, col) {
 function spawnEnemy() {
   const s = G.stage;
   const r = Math.random();
-  const grumpChance = Math.min(0.15 + s * 0.1, 0.55);
+  const mouseChance = Math.min(0.25 + s * 0.1, 0.6);
   if (r < 0.18 && s >= 2) {                       // a line of glooms
     const n = 3 + Math.floor(rnd(0, Math.min(s, 3)));
     const gap = 30, x0 = W / 2 - ((n - 1) * gap) / 2;
     for (let i = 0; i < n; i++) G.enemies.push(gloom(x0 + i * gap, -12 - i * 6));
-  } else if (r < 0.18 + grumpChance) {
-    G.enemies.push(grump(rnd(14, W - 14), -14));
-    if (s >= 4 && Math.random() < 0.4) G.enemies.push(grump(rnd(14, W - 14), -30));
+  } else if (r < 0.18 + mouseChance) {
+    G.enemies.push(mouse(rnd(16, W - 16), -24));
+    if (s >= 4 && Math.random() < 0.4) G.enemies.push(mouse(rnd(16, W - 16), -50));
   } else {
     G.enemies.push(gloom(rnd(14, W - 14), -10));
   }
@@ -501,9 +527,9 @@ function spawnEnemy() {
 function gloom(x, y) {
   return { type: "gloom", x, y, w: 16, h: 10, hp: 2, maxhp: 2, ph: rnd(0, 6), shootT: rnd(2, 5), flash: 0, pts: 50 };
 }
-function grump(x, y) {
+function mouse(x, y) {
   const hp = 3 + Math.floor(G.stage / 3);
-  return { type: "grump", x, y, w: 12, h: 14, hp, maxhp: hp, stopY: rnd(40, H * 0.45), wait: 0, shootT: rnd(0.6, 1.4),
+  return { type: "mouse", x, y, w: 20, h: 30, hp, maxhp: hp, stopY: rnd(40, H * 0.45), wait: 0, shootT: rnd(0.6, 1.4),
     shots: 0, flash: 0, step: 0, pts: 100 };
 }
 function tank(x) {
@@ -527,6 +553,7 @@ function hurtPlayer() {
 function loveEnemy(e) {
   e.loved = true; e.lt = 0;
   G.score += e.pts; G.loved++;
+  if (e.type === "mouse") G.mice++;
   pop(e.x, e.y - 8, "+" + e.pts);
   burst(e.x, e.y, e.type === "tank" ? 18 : 6, Math.random() < 0.5 ? SMALL_HEART : PINK_HEART, e.type === "tank" ? 90 : 55);
   if (e.type === "tank") {
@@ -534,8 +561,8 @@ function loveEnemy(e) {
     G.pickups.push({ type: "power", x: e.x, y: e.y, t: 0 });
   } else {
     SFX.love();
-    if (e.type === "grump" && Math.random() < 0.05 && G.lives < 5) G.pickups.push({ type: "life", x: e.x, y: e.y, t: 0 });
-    if (e.type === "grump") e.dir = e.x < W / 2 ? -1 : 1;
+    if (e.type === "mouse" && Math.random() < 0.05 && G.lives < 5) G.pickups.push({ type: "life", x: e.x, y: e.y, t: 0 });
+    if (e.type === "mouse") e.dir = e.x < W / 2 ? -1 : 1;
   }
 }
 
@@ -630,7 +657,7 @@ function update(dt) {
     G.bossOut = true;
     const n = G.stage >= 6 ? 3 : G.stage >= 3 ? 2 : 1;
     for (let i = 0; i < n; i++) G.enemies.push(tank(W / 2 + (i - (n - 1) / 2) * 50));
-    banner(n > 1 ? "BIG GRUMPS!" : "BIG GRUMP!", "LOVE IT TO PIECES");
+    banner(n > 1 ? "MOUSE TANKS!" : "MOUSE TANK!", "LOVE IT TO PIECES");
   }
   if (G.bossOut && !G.enemies.some((e) => e.type === "tank" && !e.loved)) {
     G.bossOut = false; G.stageT = 0; G.stage++;
@@ -645,7 +672,7 @@ function update(dt) {
     if (e.loved) {
       e.lt += dt;
       if (e.type === "gloom") { e.y -= 30 * dt; }
-      else if (e.type === "grump") { e.x += e.dir * 55 * dt; e.y += speed * dt; e.step += dt * 10; }
+      else if (e.type === "mouse") { e.x += e.dir * 55 * dt; e.y += speed * dt; e.step += dt * 10; }
       else { e.y += 45 * dt; e.tread += dt * 20; }
       continue;
     }
@@ -657,7 +684,7 @@ function update(dt) {
         e.shootT = rnd(2.5, 4.5) / Math.min(1 + G.stage * 0.15, 2);
         G.ebul.push({ type: "drop", x: e.x, y: e.y + 6, vx: 0, vy: bspeed * 0.9, w: 3, h: 4 });
       }
-    } else if (e.type === "grump") {
+    } else if (e.type === "mouse") {
       if (e.wait <= 0 && e.y < e.stopY && e.shots === 0) {
         e.y += (28 + G.stage * 3) * dt; e.step += dt * 8;
         if (e.y >= e.stopY) e.wait = 1.2;
@@ -797,20 +824,20 @@ function draw() {
     ctx.drawImage(img, Math.round(p.x - img.width / 2), Math.round(p.y - img.height / 2) + bob);
   }
 
-  // enemies, loved ones first so the grumpy ones sit on top
+  // enemies, loved ones first so the angry ones sit on top
   const order = G.enemies.slice().sort((a, b) => (a.loved ? 0 : 1) - (b.loved ? 0 : 1));
   for (const e of order) {
     const fl = e.flash > 0;
     if (e.type === "tank") { drawTank(e, fl); continue; }
-    let img;
-    if (e.type === "gloom") img = e.loved ? HAPPY_CLOUD : fl ? GLOOM_W : GLOOM;
-    else img = e.loved ? HAPPY_GRUMP[Math.floor(e.step) % 2] : fl ? GRUMP_W : GRUMP[Math.floor(e.step) % 2];
-    if (e.loved && e.type === "gloom") ctx.globalAlpha = clamp(1 - e.lt / 2.5, 0, 1);
+    if (e.type === "mouse") {
+      drawMouse(e, fl);
+      if (e.loved && Math.floor(e.lt * 4) % 2 === 0) ctx.drawImage(PINK_HEART, Math.round(e.x - 2), Math.round(e.y - 26));
+      continue;
+    }
+    const img = e.loved ? HAPPY_CLOUD : fl ? GLOOM_W : GLOOM;
+    if (e.loved) ctx.globalAlpha = clamp(1 - e.lt / 2.5, 0, 1);
     ctx.drawImage(img, Math.round(e.x - img.width / 2), Math.round(e.y - img.height / 2));
     ctx.globalAlpha = 1;
-    if (e.loved && e.type === "grump" && Math.floor(e.lt * 4) % 2 === 0) {
-      ctx.drawImage(PINK_HEART, Math.round(e.x - 2), Math.round(e.y - 14));
-    }
   }
 
   // tank health bars
@@ -894,7 +921,7 @@ function showOver() {
   const best = +(store.get(BEST_KEY) || 0);
   $("overStats").innerHTML =
     "SCORE <b>" + G.score + "</b><br>" +
-    "GRUMPS LOVED <b>" + G.loved + "</b><br>" +
+    "MICE LOVED <b>" + G.mice + "</b><br>" +
     "MOES FREED <b>" + G.rescued + "</b><br>" +
     "STAGE <b>" + G.stage + "</b> · BEST <b>" + best + "</b>";
   $("rank").textContent = "";
@@ -904,7 +931,7 @@ function showOver() {
   setTimeout(fill, 1500); setTimeout(fill, 4000);
 }
 function share() {
-  const msg = "I won over " + G.loved + " grumps with love and scored " + G.score +
+  const msg = "I won over " + G.mice + " of the Anti Moemoe mouse army with love and scored " + G.score +
     " in MOEMOE ARMY 💛\nmoemoe means ily. Enlist:";
   window.open("https://x.com/intent/post?text=" + encodeURIComponent(msg) + "&url=" + encodeURIComponent(SITE_URL),
     "_blank", "noopener");

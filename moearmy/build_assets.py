@@ -1,10 +1,10 @@
 """Builds moearmy/assets/ from the source art on the Desktop.
 
-  ~/Desktop/moearmy/soldier.jpg  ->  assets/head_photo.png
+  ~/Desktop/moearmy/soldier.jpg  ->  assets/head_photo.png   (the Moe soldiers)
+  ~/Desktop/moearmy/mouse.webp   ->  assets/mouse_head.png   (the Anti Moemoe mouse army)
 
-Cuts the soldier Moe's head (cap, face, hair) out of the tank background and saves it
-small with a see-through background. The game's "PHOTO" face mode draws it on every soldier.
-(The "PIXEL" face is hand-drawn in index.html, no file needed.)
+Cuts each head out of its tank background and saves it small with a see-through background.
+(The Moe's "PIXEL" face is hand-drawn in index.html, no file needed.)
 
 Run with:  /usr/bin/python3 moearmy/build_assets.py
 """
@@ -94,5 +94,33 @@ def main():
     print("wrote", path, head.size)
 
 
+# The mouse has clean black outlines, so a hand-traced outline (source-picture coords) is the whole cut:
+# ears, cap and face down to the chin. Whiskers and the cigarette are left out.
+MOUSE_SRC = os.path.expanduser("~/Desktop/moearmy/mouse.webp")
+MOUSE_OUTLINE = [
+    (420, 95), (480, 85), (520, 85), (600, 100), (700, 120), (800, 170), (870, 230), (885, 280),
+    (950, 265), (1020, 285), (1065, 335), (1085, 420), (1078, 500), (1055, 560), (1010, 615),
+    (950, 648), (890, 650), (880, 690), (870, 720), (830, 775), (780, 810), (720, 845), (640, 875),
+    (560, 885), (480, 870), (410, 840), (350, 805), (310, 770), (265, 720), (270, 690), (250, 645),
+    (180, 630), (110, 580), (60, 500), (42, 420), (55, 330), (100, 265), (160, 225), (220, 205),
+    (270, 205), (300, 165), (360, 115),
+]
+MOUSE_WIDTH = 150   # drawn about 30 game pixels wide (the ears make it wider than a Moe head)
+
+
+def mouse():
+    img = Image.open(MOUSE_SRC).convert("RGB")
+    mask = Image.new("L", img.size, 0)
+    ImageDraw.Draw(mask).polygon(MOUSE_OUTLINE, fill=255)
+    mask = mask.filter(ImageFilter.MinFilter(9)).filter(ImageFilter.GaussianBlur(1.5))   # pull the edge in a hair
+    img.putalpha(mask)
+    img = img.crop(mask.point(lambda v: 255 if v > 127 else 0).getbbox())
+    img = img.resize((MOUSE_WIDTH, round(img.height * MOUSE_WIDTH / img.width)), Image.LANCZOS)
+    path = os.path.join(OUT, "mouse_head.png")
+    img.save(path, optimize=True)
+    print("wrote", path, img.size)
+
+
 if __name__ == "__main__":
     main()
+    mouse()
