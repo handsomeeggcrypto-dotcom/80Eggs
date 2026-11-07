@@ -6,6 +6,8 @@
   ~/Desktop/moearmy/bradley.jpg  ->  assets/bradley_head.png (CEO Bradley, an unlockable player)
   ~/Desktop/moearmy/crayons.jpg  ->  assets/crayons_head.png (Commander Crayons, an unlockable player)
   ~/Desktop/moearmy/bluu.jpg     ->  assets/bluu_head.png    (General Bluu, an unlockable player)
+  ~/Desktop/moearmy/brute.webp   ->  assets/brute_head.png   (the big tanky mouse, stage 4 and up)
+  ~/Desktop/moearmy/brute_loved.webp -> assets/brute_loved.png (the same, heart eyes, once loved)
   ~/Desktop/moearmy/heart_official.webp -> assets/heart_face.png (the official moemoe heart, on the menus)
 
 Cuts each head out of its tank background and saves it small with a see-through background.
@@ -260,6 +262,28 @@ def bluu():
     print("wrote", path, img.size)
 
 
+# The brute: same cut as the bandana mouse, from a bigger picture. Ears, bandana knot (tails cut short), face to the chin.
+BRUTE_OUTLINE = [
+    (130, 300), (140, 170), (200, 80), (290, 40), (380, 50), (450, 90), (500, 130), (560, 50), (620, 30), (700, 40),
+    (760, 70), (800, 40), (900, 30), (990, 70), (1050, 150), (1065, 250), (1040, 340), (980, 400), (900, 420),
+    (880, 470), (850, 520), (780, 560), (700, 578), (600, 562), (520, 532), (440, 500), (380, 470), (330, 445),
+    (250, 455), (185, 515), (150, 495), (200, 425), (165, 380),
+]
+
+
+def brute(src, name):
+    img = Image.open(os.path.expanduser(src)).convert("RGB")
+    mask = Image.new("L", img.size, 0)
+    ImageDraw.Draw(mask).polygon(BRUTE_OUTLINE, fill=255)
+    mask = mask.filter(ImageFilter.MinFilter(9)).filter(ImageFilter.GaussianBlur(1.5))
+    img.putalpha(mask)
+    img = img.crop(mask.point(lambda v: 255 if v > 127 else 0).getbbox())
+    img = img.resize((MOUSE_WIDTH, round(img.height * MOUSE_WIDTH / img.width)), Image.LANCZOS)
+    path = os.path.join(OUT, name)
+    img.save(path, optimize=True)
+    print("wrote", path, img.size)
+
+
 if __name__ == "__main__":
     main()
     mouse()
@@ -268,3 +292,5 @@ if __name__ == "__main__":
     heart()
     crayons()
     bluu()
+    brute("~/Desktop/moearmy/brute.webp", "brute_head.png")
+    brute("~/Desktop/moearmy/brute_loved.webp", "brute_loved.png")
