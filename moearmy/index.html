@@ -58,7 +58,7 @@
       <div class="how">DRAG TO MOVE<br>HEARTS FIRE ON THEIR OWN<br>FREE CAGED MOES TO GROW<br>YOUR SQUAD</div>
       <div class="big blink" id="tapStart">TAP TO ENLIST</div>
       <div class="stat" id="bestTitle"></div>
-      <div class="row"><button class="alt" id="lbTitle">LEADERBOARD</button></div>
+      <div class="row"><button class="alt" id="lbTitle">LEADERBOARD</button><button class="alt" id="faceBtn">FACE: PIXEL</button></div>
     </div>
 
     <div class="screen" id="over">
@@ -97,7 +97,7 @@ const cv = document.getElementById("cv"), ctx = cv.getContext("2d");
 const stageEl = document.getElementById("stage");
 const $ = (id) => document.getElementById(id);
 const W = 180;
-let H = 320, SCALE = 2;
+let H = 320, SCALE = 2, R = 3;
 
 const rnd = (a, b) => a + Math.random() * (b - a);
 const pick = (a) => a[Math.floor(Math.random() * a.length)];
@@ -111,13 +111,14 @@ const lb = typeof Scores !== "undefined" ? Scores : null;
 function resize() {
   const vw = window.innerWidth, vh = window.innerHeight;
   H = clamp(Math.round(W * vh / vw), 290, 390);
-  cv.width = W; cv.height = H;
-  ctx.imageSmoothingEnabled = false;
   SCALE = Math.min(vw / W, vh / H);
+  R = clamp(Math.ceil(SCALE * (window.devicePixelRatio || 1)), 2, 4);
+  cv.width = W * R; cv.height = H * R;
+  ctx.imageSmoothingEnabled = false;
   stageEl.style.width = W * SCALE + "px";
   stageEl.style.height = H * SCALE + "px";
   stageEl.style.setProperty("--s", SCALE * 0.85);
-  if (G) { G.px = clamp(G.px, 8, W - 8); G.py = clamp(G.py, 30, H - 14); }
+  if (G) { G.px = clamp(G.px, 10, W - 10); G.py = clamp(G.py, 36, H - 16); }
 }
 
 // ---------- pixel art ----------
@@ -152,39 +153,94 @@ function white(c) {
   return o;
 }
 
-// soldier Moe, 16 wide. h = hair, so squad members can have their own hair colour
-const MOE = [
-  "......GGGG......",
-  "....GGggggGG....",
-  "...GggyyyyggG...",
-  "..GgggyyyygggG..",
-  "..GGGGGGGGGGGGGG",
-  "..hhwwwwwwwwhh..",
-  ".hhwwwwwwwwwwhh.",
-  ".hwkkkwwwwkkkwh.",
-  ".hwkwkwwwwkwkwh.",
-  ".hwkkkwwwwkkkwh.",
-  ".hwpwwwwwwwwpwh.",
-  ".hhwwwwkkwwwwhh.",
-  "hhh.wwwwwwww.hhh",
-  "hh..GrrGGrrG..hh",
-  "...GgggbbgggG...",
-  "..GgggggbggggG..",
-  "..GgggggbggggG..",
+// soldier Moe: a head pixelled by hand from the soldier art, 24 x 23, on a 16-wide uniform.
+// PHOTO face mode swaps the head for assets/head_photo.png (made by build_assets.py).
+const HE = (a, b) => "hhh" + "ww" + a + "www" + b + "ww" + "hhh" + ".";
+const HEAD = [
+  "........oooooo..........",
+  "......oolllgggoo........",
+  ".....olllggggggggo......",
+  "....olggggBBBBBBBgo.....",
+  "...olgggggByByByBggo....",
+  "...oggggggByyyyyBgggo...",
+  "..oggggggggggggggggGGo..",
+  "..oGgggggggggggggggGGGo.",
+  ".ohGGGGgggggggggggGGGGGo",
+  ".hhhhGGGGGGGGGGGGGGGGGGo",
+  "hhhHhwoooooooooooooooo..",
+  "hhhwwwwwwwwwwwwwwwwwhhh.",
+  HE("wkkkw", "wkkkw"),
+  HE("kkwwk", "kkwwk"),
+  HE("kkwwk", "kkwwk"),
+  HE("kkkkk", "kkkkk"),
+  HE("kkkkk", "kkkkk"),
+  HE("wkkkw", "wkkkw"),
+  "hhh" + "pp" + "wfwfw" + "www" + "wfwfw" + "pp" + "hhh" + ".",
+  "hhhh" + "wwwwwww" + "rr" + "wwwwwww" + "hhhh",
+  "hhhhh" + "wwwwwwwwwwwww" + "hhhhhh",
+  "hhhhhhh" + "swwwwwwws" + "hhhhhhhh",
+  ".hhh....wwwwwww....hhh..",
+];
+const BODY = [
+  "....GrrGGrrG....",
+  "..GGggggggggGG..",
+  ".GgGggggggggGgG.",
+  ".GgGGGGbbGGGGgG.",
+  ".GgGggggggyrGgG.",
+  ".GgGgggbbgggGgG.",
+  ".GgGggggggggGgG.",
+  ".wwGgggbbgggGww.",
+  "...GggggggggG...",
   "...GGGGGGGGGG...",
 ];
-const LEGS = ["....kk....kk....", ".....kk..kk....."];
-const HAIRS = ["#14121a", "#6b3e1f", "#e9c46a", "#ff8fc7", "#4f8cff", "#e6e6e6", "#c0392b", "#8e5cd9", "#3fbf7f"];
-const moeCache = {};
-function moe(hair) {
-  if (!moeCache[hair]) {
-    const f = LEGS.map((l) => sprite(MOE.concat([l]), { h: hair }));
-    moeCache[hair] = { f, white: white(f[0]) };
+const LEGS = [["...GggG..GggG...", "...kkkk...kkk..."], ["...GggG..GggG...", "...kkk...kkkk..."]];
+const HEAD_PX = sprite(HEAD, {
+  o: "#222a10", l: "#9aa452", g: "#75843c", G: "#55622a", B: "#2f5fd0", r: "#e0607e", f: "#c9a49a",
+  H: "#3a3a44", s: "#e6d8d2",
+});
+const HEAD_PX_W = white(HEAD_PX);
+const BODY_F = LEGS.map((l) => sprite(BODY.concat(l)));
+const BODY_W = white(BODY_F[0]);
+const HEAD_PHOTO = new Image();
+HEAD_PHOTO.src = "assets/head_photo.png";
+let faceMode = store.get("moearmy_face") === "photo" ? "photo" : "pixel";
+const photoReady = () => HEAD_PHOTO.complete && HEAD_PHOTO.naturalWidth > 0;
+
+// (x, y) is the middle of the soldier: head from y-20, uniform from y+3, boots end at y+14
+function drawMoe(x, y, frame, flash) {
+  const hx = Math.round(x - 12), hy = Math.round(y - 20);
+  ctx.drawImage(BODY_F[frame % 2], hx + 4, hy + 23);
+  drawHead(hx, hy);
+  if (flash) {
+    ctx.globalAlpha = flash;
+    ctx.drawImage(BODY_W, hx + 4, hy + 23);
+    ctx.drawImage(HEAD_PX_W, hx, hy);
+    ctx.globalAlpha = 1;
   }
-  return moeCache[hair];
+}
+function drawHead(hx, hy) {
+  if (faceMode === "photo" && photoReady()) {
+    const w = 26, h = w * HEAD_PHOTO.naturalHeight / HEAD_PHOTO.naturalWidth;
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = "high";
+    ctx.drawImage(HEAD_PHOTO, hx + 1, hy + 24 - h, w, h);
+    ctx.imageSmoothingEnabled = false;
+  } else {
+    ctx.drawImage(HEAD_PX, hx, hy);
+  }
 }
 
-const HEART = sprite([".yy.yy.", "yyyyyyy", "yykykyy", "yyyyyyy", ".oyyyo.", "..ooo..", "...o..."]);
+const HEART = sprite([
+  ".yyy.yyy.",
+  "yyyyyyyyy",
+  "yywkywkyy",
+  "yykkykkyy",
+  "yyyyyyyyy",
+  ".oyyyyyo.",
+  "..ooooo..",
+  "...ooo...",
+  "....o....",
+]);
 const SMALL_HEART = sprite([".y.y.", "yyyyy", ".yyy.", "..y.."]);
 const PINK_HEART = sprite([".P.P.", "PPPPP", ".PPP.", "..P.."]);
 const BRADLEY = sprite([
@@ -373,33 +429,34 @@ function drawTank(e, flash) {
 }
 
 function drawCage(c) {
-  const x = Math.round(c.x - 10), y = Math.round(c.y - 12);
+  const x = Math.round(c.x - 14), y = Math.round(c.y - 14);
   const sx = c.shake > 0 ? Math.round(rnd(-1, 1)) : 0;
-  ctx.drawImage(moe(c.hair).f[0], x + 2 + sx, y + 2);
-  ctx.fillStyle = "#5e3a18"; ctx.fillRect(x + sx, y, 20, 3); ctx.fillRect(x + sx, y + 21, 20, 3);
+  ctx.fillStyle = "#3d2a14"; ctx.fillRect(x + sx + 1, y + 3, 26, 23);
+  drawHead(x + 2 + sx, y + 3);
+  ctx.fillStyle = "#5e3a18"; ctx.fillRect(x + sx, y, 28, 3); ctx.fillRect(x + sx, y + 25, 28, 3);
   ctx.fillStyle = "#8a5a2b";
-  for (let i = 0; i < 4; i++) ctx.fillRect(x + sx + i * 6, y + 2, 2, 20);
-  ctx.fillRect(x + sx + 1, y + 1, 18, 1);
+  for (let i = 0; i < 5; i++) ctx.fillRect(x + sx + i * 6 + 1, y + 2, 2, 24);
+  ctx.fillRect(x + sx + 1, y + 1, 26, 1);
   if (Math.floor(c.t * 3) % 2 === 0) {
-    ctx.fillStyle = "#fff"; ctx.fillRect(x + 16, y - 8, 7, 7);
-    ctx.fillStyle = "#d93a2b"; ctx.fillRect(x + 19, y - 7, 1, 3); ctx.fillRect(x + 19, y - 3, 1, 1);
+    ctx.fillStyle = "#fff"; ctx.fillRect(x + 23, y - 8, 7, 7);
+    ctx.fillStyle = "#d93a2b"; ctx.fillRect(x + 26, y - 7, 1, 3); ctx.fillRect(x + 26, y - 3, 1, 1);
   }
 }
 
 // ---------- game state ----------
 let G = null, state = "title", paused = false;
 let overTimer = 0;
-const SLOTS = [[-14, 9], [14, 9], [-28, 18], [28, 18], [0, 22], [-42, 27], [42, 27], [-14, 32]];
+const SLOTS = [[-22, 12], [22, 12], [-44, 22], [44, 22], [0, 30], [-66, 30], [66, 30], [-22, 40]];
 
 function newGame(demo) {
   G = {
     demo: !!demo, t: 0, score: 0, lives: 3, inv: 0, stage: 1, stageT: 0, bossOut: false,
-    px: W / 2, py: H - 46, fireT: 0, power: 0, shake: 0, step: 0,
+    px: W / 2, py: H - 60, fireT: 0, power: 0, shake: 0, step: 0,
     hearts: [], ebul: [], enemies: [], cages: [], squad: [], parts: [], pops: [], pickups: [], deco: [],
     spawnT: 1.5, cageT: 5, decoT: 0, scroll: 0, banner: null, loved: 0, rescued: 0,
   };
   for (let i = 0; i < 18; i++) addDeco(rnd(0, H));
-  if (demo) for (let i = 0; i < 5; i++) addSquad(G.px, H + 10, pick(HAIRS));
+  if (demo) for (let i = 0; i < 4; i++) addSquad(G.px, H + 20);
 }
 
 function addDeco(y) {
@@ -408,8 +465,8 @@ function addDeco(y) {
   G.deco.push({ kind, x: rnd(4, W - 10), y, n: 2 + Math.floor(rnd(0, 3)),
     col: pick(["#ff7eb6", "#fff8f0", "#ffd42a", "#ff9f5a"]) });
 }
-function addSquad(x, y, hair) {
-  G.squad.push({ x, y, hair, fireT: rnd(0.1, 0.5), step: rnd(0, 1) });
+function addSquad(x, y) {
+  G.squad.push({ x, y, fireT: rnd(0.1, 0.5), step: rnd(0, 1) });
 }
 function banner(a, b, t) { G.banner = { a, b, t: t || 2.4 }; }
 function pop(x, y, text, col) { G.pops.push({ x, y, text, col: col || "#ffd42a", t: 1 }); }
@@ -504,41 +561,43 @@ function update(dt) {
   // player
   if (G.demo) {
     G.px = W / 2 + Math.sin(G.t * 0.7) * 40;
-    G.py = H * 0.8 + Math.sin(G.t * 1.3) * 6;
+    G.py = H * 0.74 + Math.sin(G.t * 1.3) * 6;
   } else {
     const kx = (keys.ArrowRight || keys.KeyD ? 1 : 0) - (keys.ArrowLeft || keys.KeyA ? 1 : 0);
     const ky = (keys.ArrowDown || keys.KeyS ? 1 : 0) - (keys.ArrowUp || keys.KeyW ? 1 : 0);
     G.px += kx * 110 * dt; G.py += ky * 110 * dt;
-    G.px = clamp(G.px, 8, W - 8); G.py = clamp(G.py, 30, H - 14);
+    G.px = clamp(G.px, 10, W - 10); G.py = clamp(G.py, 36, H - 16);
   }
   G.step += dt * 6;
 
-  // shooting
+  // shooting: hearts start slow so you can see them, and speed up every stage
+  const hv = Math.min(100 + (G.stage - 1) * 22, 240);
   G.fireT -= dt;
   if (G.fireT <= 0) {
-    G.fireT = 0.15;
-    G.hearts.push({ x: G.px, y: G.py - 12, vx: 0, vy: -210 });
+    G.fireT = Math.max(0.12, 0.26 - (G.stage - 1) * 0.025);
+    G.hearts.push({ x: G.px, y: G.py - 22, vx: 0, vy: -hv });
     if (G.power > 0) {
-      G.hearts.push({ x: G.px - 4, y: G.py - 10, vx: -55, vy: -200 });
-      G.hearts.push({ x: G.px + 4, y: G.py - 10, vx: 55, vy: -200 });
+      G.hearts.push({ x: G.px - 5, y: G.py - 20, vx: -hv * 0.27, vy: -hv * 0.95 });
+      G.hearts.push({ x: G.px + 5, y: G.py - 20, vx: hv * 0.27, vy: -hv * 0.95 });
     }
     if (!G.demo) SFX.shoot();
   }
   G.squad.forEach((m, i) => {
     const s = SLOTS[i];
-    const tx = clamp(G.px + s[0], 8, W - 8), ty = Math.min(G.py + s[1], H - 8);
+    const tx = clamp(G.px + s[0], 10, W - 10), ty = Math.min(G.py + s[1], H - 14);
     const k = 1 - Math.exp(-8 * dt);
     m.x += (tx - m.x) * k; m.y += (ty - m.y) * k;
     m.step += dt * 6;
     m.fireT -= dt;
     if (m.fireT <= 0) {
-      m.fireT = G.power > 0 ? 0.3 : 0.5;
-      G.hearts.push({ x: m.x, y: m.y - 10, vx: 0, vy: -200 });
+      const gap = Math.max(0.35, 0.7 - (G.stage - 1) * 0.06);
+      m.fireT = G.power > 0 ? gap / 2 : gap;
+      G.hearts.push({ x: m.x, y: m.y - 22, vx: 0, vy: -hv });
     }
   });
 
   for (const h of G.hearts) { h.x += h.vx * dt; h.y += h.vy * dt; }
-  G.hearts = G.hearts.filter((h) => h.y > -10 && h.x > -10 && h.x < W + 10 && !h.dead);
+  G.hearts = G.hearts.filter((h) => h.y > -12 && h.x > -10 && h.x < W + 10 && !h.dead);
 
   // scenery
   for (const d of G.deco) d.y += speed * dt;
@@ -564,7 +623,7 @@ function update(dt) {
   if (G.cageT <= 0) {
     G.cageT = rnd(9, 14);
     if (G.squad.length + G.cages.length < SLOTS.length) {
-      G.cages.push({ x: rnd(16, W - 16), y: -14, hp: 6, hair: pick(HAIRS), t: 0, shake: 0 });
+      G.cages.push({ x: rnd(18, W - 18), y: -16, hp: 6, t: 0, shake: 0 });
     }
   }
   if (!G.bossOut && G.stageT > 30) {
@@ -651,7 +710,7 @@ function update(dt) {
   for (const h of G.hearts) {
     for (const e of G.enemies) {
       if (e.loved || e.y < -4) continue;
-      if (hit(h, h.x, h.y, 5, 6, e, e.x, e.y, e.w * 0.9, e.h * 0.9)) {
+      if (hit(h, h.x, h.y, 7, 7, e, e.x, e.y, e.w * 0.9, e.h * 0.9)) {
         h.dead = true; e.hp--; e.flash = 0.06;
         dots(h.x, h.y - 2, 2, "#ffd42a");
         if (e.hp <= 0) loveEnemy(e); else if (e.type === "tank") SFX.hit();
@@ -660,16 +719,16 @@ function update(dt) {
     }
     if (h.dead) continue;
     for (const c of G.cages) {
-      if (hit(h, h.x, h.y, 5, 6, c, c.x, c.y, 20, 24)) {
+      if (hit(h, h.x, h.y, 7, 7, c, c.x, c.y, 28, 28)) {
         h.dead = true; c.hp--; c.shake = 0.12;
         dots(h.x, h.y, 2, "#8a5a2b");
         if (c.hp <= 0 && !c.dead) {
           c.dead = true;
-          dots(c.x, c.y, 16, "#8a5a2b");
+          dots(c.x, c.y, 20, "#8a5a2b");
           burst(c.x, c.y, 5, SMALL_HEART, 50);
-          addSquad(c.x, c.y, c.hair);
+          addSquad(c.x, c.y);
           G.rescued++; G.score += 250;
-          pop(c.x, c.y - 14, "+1 MOE!", "#ff9fca");
+          pop(c.x, c.y - 18, "+1 MOE!", "#ff9fca");
           SFX.free();
         }
         break;
@@ -680,16 +739,16 @@ function update(dt) {
 
   // things hit you
   for (const b of G.ebul) {
-    if (hit(b, b.x, b.y, b.w * 0.7, b.h * 0.7, null, G.px, G.py, 7, 10)) {
+    if (hit(b, b.x, b.y, b.w * 0.7, b.h * 0.7, null, G.px, G.py - 2, 10, 16)) {
       b.dead = true; hurtPlayer(); continue;
     }
     for (let i = 0; i < G.squad.length; i++) {
       const m = G.squad[i];
-      if (hit(b, b.x, b.y, b.w * 0.7, b.h * 0.7, m, m.x, m.y, 8, 10)) {
+      if (hit(b, b.x, b.y, b.w * 0.7, b.h * 0.7, m, m.x, m.y - 2, 10, 16)) {
         b.dead = true;
         G.squad.splice(i, 1);
         dots(m.x, m.y, 10, "#fff");
-        pop(m.x, m.y - 10, "AWW", "#c4cde8");
+        pop(m.x, m.y - 24, "AWW", "#c4cde8");
         SFX.lose();
         break;
       }
@@ -697,10 +756,10 @@ function update(dt) {
   }
   G.ebul = G.ebul.filter((b) => !b.dead && b.y < H + 10 && b.y > -20 && b.x > -10 && b.x < W + 10);
   for (const e of G.enemies) {
-    if (!e.loved && hit(e, e.x, e.y, e.w * 0.7, e.h * 0.7, null, G.px, G.py, 7, 10)) hurtPlayer();
+    if (!e.loved && hit(e, e.x, e.y, e.w * 0.7, e.h * 0.7, null, G.px, G.py - 2, 10, 16)) hurtPlayer();
   }
   for (const p of G.pickups) {
-    if (hit(p, p.x, p.y, 12, 12, null, G.px, G.py, 12, 14)) {
+    if (hit(p, p.x, p.y, 12, 12, null, G.px, G.py - 2, 16, 24)) {
       p.dead = true;
       if (p.type === "power") { G.power = 10; SFX.power(); banner("LOVE OVERLOAD!", "TRIPLE HEARTS", 1.8); }
       else { G.lives = Math.min(5, G.lives + 1); SFX.free(); pop(p.x, p.y - 10, "+1 LIFE", "#ff9fca"); }
@@ -717,7 +776,7 @@ function text(s, x, y, col, align) {
 }
 
 function draw() {
-  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.setTransform(R, 0, 0, R, 0, 0);
   ctx.imageSmoothingEnabled = false;
   if (!G) return;
   if (G.shake > 0) ctx.translate(Math.round(rnd(-2, 2)), Math.round(rnd(-2, 2)));
@@ -764,19 +823,12 @@ function draw() {
   }
 
   // squad, then you
-  for (const m of G.squad) {
-    const s = moe(m.hair).f[Math.floor(m.step) % 2];
-    ctx.drawImage(s, Math.round(m.x - 8), Math.round(m.y - 10));
-  }
+  for (const m of G.squad.slice().sort((a, b) => a.y - b.y)) drawMoe(m.x, m.y, Math.floor(m.step));
   if (!(G.inv > 0 && Math.floor(G.inv * 12) % 2 === 0)) {
-    const me = moe(HAIRS[0]);
-    ctx.drawImage(me.f[Math.floor(G.step) % 2], Math.round(G.px - 8), Math.round(G.py - 10));
-    if (G.power > 0 && Math.floor(G.t * 10) % 2) {
-      ctx.globalAlpha = 0.35; ctx.drawImage(me.white, Math.round(G.px - 8), Math.round(G.py - 10)); ctx.globalAlpha = 1;
-    }
+    drawMoe(G.px, G.py, Math.floor(G.step), G.power > 0 && Math.floor(G.t * 10) % 2 ? 0.35 : 0);
   }
 
-  for (const h of G.hearts) ctx.drawImage(HEART, Math.round(h.x - 3), Math.round(h.y - 3));
+  for (const h of G.hearts) ctx.drawImage(HEART, Math.round(h.x - 4), Math.round(h.y - 4));
   for (const b of G.ebul) {
     const img = b.type === "drop" ? DROP : FROWN;
     ctx.drawImage(img, Math.round(b.x - img.width / 2), Math.round(b.y - img.height / 2));
@@ -799,7 +851,7 @@ function draw() {
   if (G.demo) return;
 
   // HUD
-  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.setTransform(R, 0, 0, R, 0, 0);
   ctx.fillStyle = "#14121acc"; ctx.fillRect(0, 0, W, 13);
   text(String(G.score).padStart(6, "0"), 3, 3, "#ffd42a");
   for (let i = 0; i < G.lives; i++) ctx.drawImage(PINK_HEART, W - 8 - i * 7, 4);
@@ -880,8 +932,8 @@ stageEl.addEventListener("pointerdown", (e) => {
 stageEl.addEventListener("pointermove", (e) => {
   if (!drag || drag.id !== e.pointerId || state !== "play" || paused) return;
   const k = 1.25 / SCALE;
-  G.px = clamp(G.px + (e.clientX - drag.x) * k, 8, W - 8);
-  G.py = clamp(G.py + (e.clientY - drag.y) * k, 30, H - 14);
+  G.px = clamp(G.px + (e.clientX - drag.x) * k, 10, W - 10);
+  G.py = clamp(G.py + (e.clientY - drag.y) * k, 36, H - 16);
   drag.x = e.clientX; drag.y = e.clientY;
 });
 const endDrag = (e) => { if (drag && drag.id === e.pointerId) drag = null; };
@@ -907,6 +959,12 @@ $("lbTitle").onclick = () => lb && lb.open(BOARD);
 $("lbOver").onclick = () => lb && lb.open(BOARD);
 $("getMoe").onclick = () => SCATTER_URL && window.open(SCATTER_URL, "_blank", "noopener");
 $("mute").onclick = () => { audio(); setMute(!muted); };
+const showFace = () => { $("faceBtn").textContent = "FACE: " + faceMode.toUpperCase(); };
+$("faceBtn").onclick = () => {
+  faceMode = faceMode === "pixel" ? "photo" : "pixel";
+  store.set("moearmy_face", faceMode); showFace();
+};
+showFace();
 setMute(muted);
 
 // big Bradley on the title
