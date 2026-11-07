@@ -872,7 +872,10 @@ const LEVELS = {
   camp: { name: "BOOT CAMP", song: "march" },
   strip: { name: "SUNSET STRIP", song: "strip" },
   factory: { name: "MOE FACTORY", song: "factory" },
+  // not a level of its own: plays the levels in this order, moving on every CAMPAIGN_EVERY stages
+  campaign: { name: "CAMPAIGN", order: ["camp", "strip", "factory"] },
 };
+const CAMPAIGN_EVERY = 4;   // stages 1-4 Boot Camp, 5-8 the Strip, 9 and up the factory
 const LEVEL_KEY = "moearmy_level";
 const LOCAL = /^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname);   // the Strip is this Mac only for now
 let levelId = LOCAL && LEVELS[store.get(LEVEL_KEY)] ? store.get(LEVEL_KEY) : "camp";
@@ -1078,7 +1081,7 @@ function drawStripLights(night) {
     ctx.globalAlpha = 1;
   }
 }
-const levelNight = () => clamp((G.stage - 1) / 5, 0, 1);
+const levelNight = () => clamp((G.stage - G.levelStart) / 5, 0, 1);   // counts from when you arrived
 function drawSunset() {   // warm orange up the street fading to purple, then a dark blue that deepens each stage
   const night = levelNight();
   const g = ctx.createLinearGradient(0, 0, 0, H);
@@ -1425,7 +1428,7 @@ function newGame(demo) {
     demo: !!demo, t: 0, score: 0, lives: 3, inv: 0, stage: 1, stageT: 0, bossOut: false,
     px: W / 2, py: H - 60, fireT: 0, power: 0, shake: 0, step: 0,
     hearts: [], ebul: [], enemies: [], cages: [], squad: [], parts: [], pops: [], pickups: [], deco: [],
-    spawnT: 1.5, cageT: 5, decoT: 0, scroll: 0, level: levelId, blocks: [], belt: [], steam: [], beltOff: 0, banner: null, loved: 0, mice: 0, rescued: 0,
+    spawnT: 1.5, cageT: 5, decoT: 0, scroll: 0, level: levelId === "campaign" ? "camp" : levelId, campaign: levelId === "campaign", levelStart: 1, fade: null, blocks: [], belt: [], steam: [], beltOff: 0, banner: null, loved: 0, mice: 0, rescued: 0,
     glooms: 0, overloads: 0, wasHit: false, maxArmy: 0, extra: 0, promoted: 0,
   };
   if (LEVELS[G.level].scroll) LEVELS[G.level].scroll(0);
@@ -1433,6 +1436,14 @@ function newGame(demo) {
   if (demo) for (let i = 0; i < 4; i++) addSquad(G.px, H + 20);
 }
 
+function switchLevel(id) {
+  G.level = id; G.levelStart = G.stage;
+  G.deco = []; G.blocks = []; G.belt = []; G.steam = [];
+  if (LEVELS[id].scroll) LEVELS[id].scroll(0);
+  for (let i = 0; i < 18; i++) addDeco(rnd(0, H));
+  startMusic(LEVELS[id].song);
+  banner(LEVELS[id].banner ? LEVELS[id].banner[0] : LEVELS[id].name, "STAGE " + G.stage);
+}
 function addDeco(y) {
   if (LEVELS[G.level].deco) { LEVELS[G.level].deco(y); return; }
   const r = Math.random();
@@ -1710,6 +1721,12 @@ function update(dt) {
   G.shake = Math.max(0, G.shake - dt);
   G.power = Math.max(0, G.power - dt);
   if (G.banner && (G.banner.t -= dt) <= 0) G.banner = null;
+  if (G.fade) {   // fade out, swap the scenery and the song while it's dark, fade back in
+    const was = G.fade.t;
+    G.fade.t += dt;
+    if (was < 0.6 && G.fade.t >= 0.6) switchLevel(G.fade.to);
+    if (G.fade.t >= 1.2) G.fade = null;
+  }
 
   // player
   if (G.demo) {
@@ -1793,7 +1810,9 @@ function update(dt) {
   if (G.bossOut && !G.enemies.some((e) => e.type === "tank" && !e.loved)) {
     G.bossOut = false; G.stageT = 0; G.stage++;
     G.score += 500 * (G.stage - 1);
-    banner("STAGE " + G.stage, "+" + 500 * (G.stage - 1) + " BONUS");
+    const next = G.campaign && LEVELS.campaign.order[Math.floor((G.stage - 1) / CAMPAIGN_EVERY)];
+    if (next && next !== G.level) G.fade = { t: 0, to: next };   // march on to the next level
+    else banner("STAGE " + G.stage, "+" + 500 * (G.stage - 1) + " BONUS");
     reachStage(G.stage);
     if (G.stage >= 3 && !G.wasHit) award("socks");
     if (G.stage >= 11) award("crayon");
@@ -2042,6 +2061,10 @@ function draw() {
   }
   ctx.globalAlpha = 1;
 
+  if (G.fade) {
+    ctx.fillStyle = "rgba(10,8,16," + clamp(1 - Math.abs(G.fade.t - 0.6) / 0.6, 0, 1) + ")";
+    ctx.fillRect(0, 0, W, H);
+  }
   if (G.demo) return;
 
   // HUD
