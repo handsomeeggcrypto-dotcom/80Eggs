@@ -94,6 +94,7 @@
       </div>
       <div class="stat noStart" id="pName"></div>
       <div class="row"><button id="enlistBtn">ENLIST YOUR MOE</button></div>
+      <div class="row noStart" id="levelRow" style="display:none"><button class="alt" id="levelBtn">LEVEL</button></div>
       <div class="big blink" id="tapStart">TAP TO PLAY</div>
       <div class="stat" id="bestTitle"></div>
       <div class="row"><button class="alt" id="lbTitle">LEADERBOARD</button><button class="alt" id="troTitle">TROPHIES</button></div>
@@ -605,15 +606,53 @@ const SONGS = {
     order: "A A B A",
     intro: "roll",
   },
+  // "Neon Love on Sunset": Game Boy glam rock for the Sunset Strip, in E minor.
+  // style "rock" swaps the oom-pah for a chugging power-chord bass and adds hi-hats.
+  strip: {
+    bpm: 150,
+    style: "rock",
+    hit: "c",
+    sections: {
+      A: {   // the riff
+        lead: `E4 . E5 . D5 . B4 . A4 . G4 . A4 . B4 .   E5 . . . D5 . B4 . _ . G4 . A4 . . .
+               G4 . B4 . D5 . G5 . F#5 . D5 . B4 . D5 .  E5 . . . . . D5 . E5 . G5 . A5 . . .
+               E4 . E5 . D5 . B4 . A4 . G4 . A4 . B4 .   E5 . . . D5 . B4 . _ . G4 . A4 . . .
+               C5 . E5 . G5 . E5 . D5 . . . B4 . . .     D5 . . . A4 . B4 . D5 . E5 . _ . _ .`,
+        roots: "E E G A E E C D",
+        drums: "rock rock rock rock rock rock rock fill",
+      },
+      B: {   // the big chorus
+        lead: `G5 . . . G5 . A5 . G5 . E5 . . . _ .    F#5 . . . E5 . D5 . . . A4 . . . _ .
+               E5 . . . G5 . . . B5 . . . A5 . G5 .    E5 . . . . . . . _ . _ . _ . _ .
+               G5 . . . G5 . A5 . G5 . E5 . . . _ .    F#5 . . . A5 . . . B5 . A5 . F#5 . . .
+               B5 . . . A5 . F#5 . D#5 . . . B4 . . .  B4 . . . . . . . F#4 . A4 . B4 . D#5 .`,
+        roots: "C D E E C D B B",
+        drums: "drive drive drive drive drive drive drive fill",
+      },
+      C: {   // guitar solo
+        lead: `E5 G5 A5 G5 E5 G5 A5 G5 E5 G5 A5 B5 A5 G5 E5 D5          E5 . . . _ . B4 D5 E5 . . . G5 . E5 .
+               D5 F#5 A5 F#5 D5 F#5 A5 F#5 D5 F#5 A5 B5 A5 F#5 D5 A4  D5 . . . _ . A4 B4 D5 . . . F#5 . D5 .
+               C5 E5 G5 E5 C5 E5 G5 E5 C5 E5 G5 A5 G5 E5 C5 G4          C5 . . . _ . G4 A4 C5 . . . E5 . G5 .
+               B4 D#5 F#5 D#5 B4 D#5 F#5 A5 F#5 D#5 B4 D#5 F#5 . A5 .   B5 . . . . . . . _ . _ . _ . _ .`,
+        roots: "E E D D C C B B",
+        drums: "drive drive drive drive drive drive drive fill",
+      },
+    },
+    order: "A A B C A B",
+    intro: "fill",
+  },
 };
 const DRUM_BARS = {
   march: "k . . . s . . . k . . . s . . .",
   stomp: "k . . . s . . . k . k . s . _ .",
   roll: "k . . . s . s . s s s s s s s s",
+  rock: "k . h . s . h . k . k . s . h .",
+  drive: "k . h . s . h k . k h . s . h .",
+  fill: "k . s . s . s s . s s . s s s s",
 };
 const NOTE_I = { C: 0, D: 2, E: 4, F: 5, G: 7, A: 9, B: 11 };
 const noteHz = (n) => 440 * Math.pow(2, (NOTE_I[n[0]] + (n[1] === "#" ? 1 : 0) + (+n[n.length - 1] + 1) * 12 - 69) / 12);
-const FIFTH = { C: "G", D: "A", E: "B", G: "D", A: "E", B: "F#" };
+const FIFTH = { C: "G", D: "A", E: "B", F: "C", G: "D", A: "E", B: "F#" };
 
 // turn a song into one list of steps per channel
 function buildSong(song) {
@@ -622,6 +661,11 @@ function buildSong(song) {
     lead.push(...sec.lead.trim().split(/\s+/));
     sec.roots.split(" ").forEach((root) => {
       for (let i = 0; i < 16; i++) {
+        if (song.style === "rock") {   // eighth-note chug: root and fifth together make a power chord, with an octave pop
+          bass.push(i % 2 ? "." : i % 8 === 6 ? root + "3" : root + "2");
+          harm.push(i % 2 ? "." : i % 8 === 6 ? "_" : FIFTH[root] + "3");
+          continue;
+        }
         // oom-pah bass: root on the beat, its fifth on the half beat; the second pulse plays soft off-beat stabs
         bass.push(i % 4 === 0 ? root + "2" : i % 4 === 2 ? FIFTH[root] + "2" : ".");
         harm.push(i % 4 === 2 ? FIFTH[root] + "4" : i % 4 === 3 ? "_" : ".");
@@ -630,7 +674,7 @@ function buildSong(song) {
     sec.drums.split(" ").forEach((b) => drum.push(...DRUM_BARS[b].split(" ")));
   };
   const intro = DRUM_BARS[song.intro].split(" ");
-  intro[0] = "g";
+  intro[0] = song.hit || "g";
   for (let i = 0; i < 16; i++) { lead.push("_"); harm.push("_"); bass.push("_"); }
   drum.push(...intro);
   const loopAt = lead.length;
@@ -675,9 +719,10 @@ function drum(kind, t) {
   }
   const src = AC.createBufferSource(), f = AC.createBiquadFilter(), g = AC.createGain();
   src.buffer = MUSIC.noise;
-  const gong = kind === "g", dur = gong ? 1.6 : 0.07;
-  f.type = gong ? "lowpass" : "highpass"; f.frequency.value = gong ? 900 : 1800;
-  g.gain.setValueAtTime(gong ? 0.12 : 0.09, t); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  const gong = kind === "g", hat = kind === "h", crash = kind === "c";
+  const dur = gong ? 1.6 : crash ? 0.9 : hat ? 0.03 : 0.07;
+  f.type = gong ? "lowpass" : "highpass"; f.frequency.value = gong ? 900 : hat ? 7000 : crash ? 4000 : 1800;
+  g.gain.setValueAtTime(gong ? 0.12 : hat ? 0.05 : crash ? 0.08 : 0.09, t); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
   src.connect(f); f.connect(g); g.connect(MUSIC.gain);
   src.start(t, Math.random() * 0.5); src.stop(t + dur + 0.02);
   if (gong) { voice(98, t, 1.8, "triangle", 0.12); voice(147, t, 1.4, "sine", 0.05); }
@@ -769,6 +814,230 @@ function drawDeco(d) {
   }
 }
 
+// ---------- level 2: the Sunset Strip ----------
+// A 90s rock-club street seen from above: buildings on both edges with neon blade signs over the sidewalks,
+// a four-lane road down the middle, palm trees, streetlights and parked cars. It starts at sunset and gets
+// darker every stage until the neon is doing all the work.
+const LEVELS = {
+  camp: { name: "BOOT CAMP", song: "march" },
+  strip: { name: "SUNSET STRIP", song: "strip" },
+};
+const LEVEL_KEY = "moearmy_level";
+const LOCAL = /^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname);   // the Strip is this Mac only for now
+let levelId = LOCAL && LEVELS[store.get(LEVEL_KEY)] ? store.get(LEVEL_KEY) : "camp";
+
+// street layout, in game pixels across the 180-wide screen
+const ST = { bld: 16, walk: 36, road: 38, road2: 142, walk2: 144, bld2: 164 };
+const STRIP_TILE = (() => {
+  const c = document.createElement("canvas"); c.width = W; c.height = 64;
+  const x = c.getContext("2d");
+  let seed = 11;
+  const r = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+  const R = (col, a, b, w, h) => { x.fillStyle = col; x.fillRect(a, b, w, h); };
+  R("#2a2030", 0, 0, W, 64);                                   // behind the buildings
+  R("#a8908f", ST.bld, 0, ST.walk - ST.bld, 64);               // sidewalks
+  R("#a8908f", ST.walk2, 0, ST.bld2 - ST.walk2, 64);
+  for (let y = 0; y < 64; y += 16) { R("#927a7c", ST.bld, y, 20, 1); R("#927a7c", ST.walk2, y, 20, 1); }
+  for (let i = 0; i < 30; i++) {                               // gum and cracks
+    const side = r() < 0.5 ? ST.bld + 1 : ST.walk2 + 1;
+    R(r() < 0.5 ? "#9a8283" : "#b8a09e", side + Math.floor(r() * 18), Math.floor(r() * 64), 1, 1);
+  }
+  R("#d8c3b4", ST.walk, 0, 2, 64); R("#d8c3b4", ST.road2, 0, 2, 64);   // curbs
+  R("#5e5266", ST.road, 0, ST.road2 - ST.road, 64);            // asphalt
+  R("#4e4358", ST.road, 0, 2, 64); R("#4e4358", ST.road2 - 2, 0, 2, 64);   // gutters
+  for (let i = 0; i < 140; i++) {
+    R(r() < 0.5 ? "#554a5e" : "#685c70", ST.road + 2 + Math.floor(r() * 100), Math.floor(r() * 64), 1, 1);
+  }
+  R("#f2c440", 88, 0, 1, 64); R("#f2c440", 91, 0, 1, 64);      // double yellow
+  for (let y = 0; y < 64; y += 16) { R("#e9e2dc", 64, y, 1, 8); R("#e9e2dc", 116, y, 1, 8); }   // lane dashes
+  return c;
+})();
+
+// a tiny 3x5 pixel font for the neon signs
+const MINI = {
+  A: "010101111101101", B: "110101110101110", C: "011100100100011", D: "110101101101110", E: "111100110100111",
+  G: "011100101101011", H: "101101111101101", I: "111010010010111", K: "101101110101101", L: "100100100100111",
+  M: "101111111101101", N: "110101101101101", O: "010101101101010", P: "110101110100100", R: "110101110101101",
+  S: "011100010001110", T: "111010010010010", U: "101101101101111", V: "101101101101010", Y: "101101010010010",
+  X: "101101010101101",
+};
+// a vertical neon blade sign: letters stacked top to bottom on a dark panel, drawn once and kept
+const SIGNS = {};
+function neonSign(word, col) {
+  const k = word + col;
+  if (SIGNS[k]) return SIGNS[k];
+  const c = document.createElement("canvas"); c.width = 11; c.height = word.length * 7 + 5;
+  const x = c.getContext("2d");
+  x.fillStyle = "#14121a"; x.fillRect(2, 0, 7, c.height);
+  x.fillStyle = "#3a2f44"; x.fillRect(2, 0, 7, 1); x.fillRect(2, c.height - 1, 7, 1);
+  for (let pass = 0; pass < 2; pass++) {
+    [...word].forEach((ch, i) => {
+      const g = MINI[ch]; if (!g) return;
+      for (let p = 0; p < 15; p++) if (g[p] === "1") {
+        const px = 4 + (p % 3), py = 3 + i * 7 + Math.floor(p / 3);
+        if (pass === 0) { x.fillStyle = col + "55"; x.fillRect(px - 1, py - 1, 3, 3); }
+        else { x.fillStyle = col; x.fillRect(px, py, 1, 1); }
+      }
+    });
+  }
+  return (SIGNS[k] = c);
+}
+
+// the buildings, one row going up each edge of the screen
+const BUILDINGS = [
+  { kind: "club", col: "#17121c", trim: "#2c2333", sign: "MOEROOM", neon: "#7dff8a", w: 3 },
+  { kind: "gogo", col: "#a3342c", trim: "#7a221d", sign: "GOGO", neon: "#ffd42a", w: 2 },
+  { kind: "records", col: "#e3ad24", trim: "#c0392b", sign: "EGGS", neon: "#ff5a4a", w: 2 },
+  { kind: "motel", col: "#3f8f8a", trim: "#2c6b67", sign: "MOTEL", neon: "#ff7eb6", w: 2 },
+  { kind: "bar", col: "#5a3a2a", trim: "#3e271b", sign: "BAR", neon: "#5ee8ff", w: 2 },
+  { kind: "live", col: "#2b2a4a", trim: "#1d1c33", sign: "LIVE", neon: "#ff7eb6", w: 2 },
+  { kind: "plain", col: "#7a6670", trim: "#5c4b55", w: 4 },
+  { kind: "plain", col: "#8c7a5e", trim: "#6b5c45", w: 3 },
+  { kind: "plain", col: "#55606e", trim: "#3f4853", w: 3 },
+];
+function addBuilding(side, bottom) {
+  const pool = [];
+  BUILDINGS.forEach((b) => { for (let i = 0; i < b.w; i++) pool.push(b); });
+  const b = pick(pool), h = Math.round(b.kind === "plain" ? rnd(24, 44) : rnd(48, 70));
+  G.blocks.push({ ...b, side, y: bottom - h, h, flick: 0, ac: Math.floor(rnd(0, 3)) });
+}
+function topBlock(side) {
+  let top = Infinity;
+  for (const b of G.blocks) if (b.side === side) top = Math.min(top, b.y);
+  return top;
+}
+function stripScroll(dy) {
+  for (const b of G.blocks) b.y += dy;
+  G.blocks = G.blocks.filter((b) => b.y < H + 4);
+  for (const side of [0, 1]) while (topBlock(side) > -10) addBuilding(side, topBlock(side) === Infinity ? H : topBlock(side));
+  for (const b of G.blocks) if (b.sign && (b.flick -= 1 / 60) < -rnd(2, 40)) b.flick = rnd(0.1, 0.5);   // a neon tube buzzing
+}
+
+function addStripDeco(y) {
+  const r = Math.random(), left = Math.random() < 0.5;
+  const walk = left ? rnd(ST.bld + 4, ST.walk - 4) : rnd(ST.walk2 + 4, ST.bld2 - 4);
+  const d = { y, left };
+  if (r < 0.2) Object.assign(d, { kind: "palm", x: left ? ST.walk - 5 : ST.walk2 + 5 });
+  else if (r < 0.34) Object.assign(d, { kind: "lamp", x: left ? ST.walk - 2 : ST.walk2 + 1 });
+  else if (r < 0.52) Object.assign(d, { kind: "car", x: left ? 51 : 129, col: pick(CAR_COLS) });
+  else if (r < 0.6) Object.assign(d, { kind: pick(["hydrant", "newsbox", "trash"]), x: walk });
+  else if (r < 0.68) Object.assign(d, { kind: "flyer", x: walk, col: pick(["#ff7eb6", "#ffd42a", "#5ee8ff", "#fff8f0"]) });
+  else if (r < 0.78) Object.assign(d, { kind: "manhole", x: rnd(ST.road + 30, ST.road2 - 30) });
+  else if (r < 0.88) Object.assign(d, { kind: "puddle", x: rnd(ST.road + 10, ST.road2 - 10), col: pick(["#ff7eb6", "#5ee8ff", "#ffd42a"]) });
+  else if (r < 0.93) Object.assign(d, { kind: "crosswalk", x: ST.road });
+  else Object.assign(d, { kind: "rope", x: left ? ST.bld + 3 : ST.walk2 + 3 });
+  G.deco.push(d);
+}
+const CAR_COLS = ["#ff7eb6", "#14121a", "#e9e2dc", "#5ee8ff", "#c0392b", "#f2c440"];
+
+function drawStripDeco(d) {
+  const x = Math.round(d.x), y = Math.round(d.y);
+  const R = (c, a, b, w, h) => { ctx.fillStyle = c; ctx.fillRect(x + a, y + b, w, h); };
+  switch (d.kind) {
+    case "crosswalk":
+      for (let i = 0; i < 13; i++) R("#e9e2dc", 3 + i * 8, 0, 5, 12);
+      break;
+    case "manhole":
+      R("#3e3546", -4, -3, 8, 6); R("#3e3546", -3, -4, 6, 8);
+      R("#4e4358", -2, -2, 4, 4); R("#3e3546", -1, -1, 2, 2); break;
+    case "puddle":
+      R("#4a3f5a", -6, -1, 12, 3); R("#4a3f5a", -4, -2, 8, 5);
+      R(d.col + "88", -3, -1, 3, 1); R(d.col + "55", 1, 0, 3, 1); break;
+    case "car": {   // parked, seen from above, nose pointing down the street
+      const c = d.col, dark = "#14121a";
+      R("#00000055", -5, -9, 12, 21);
+      R(c, -6, -10, 12, 21);
+      R(dark, -7, -7, 1, 4); R(dark, 6, -7, 1, 4); R(dark, -7, 4, 1, 4); R(dark, 6, 4, 1, 4);   // wheels
+      R("#9fd8ff", -4, 2, 8, 3); R("#7ab8e0", -4, -5, 8, 2);      // windshields
+      R(c === dark ? "#2c2333" : "#00000033", -4, -3, 8, 5);      // roof
+      R("#fff8c0", -5, 9, 2, 1); R("#fff8c0", 3, 9, 2, 1);        // headlights
+      R("#ff3a3a", -5, -10, 2, 1); R("#ff3a3a", 3, -10, 2, 1);    // tail lights
+      break;
+    }
+    case "palm": {   // seen from above: a star of long fronds, each with leaflets down both sides
+      ctx.fillStyle = "#00000040"; ctx.beginPath(); ctx.ellipse(x + 3, y + 4, 13, 9, 0, 0, 7); ctx.fill();
+      for (let a = 0; a < 7; a++) {
+        const ang = a * 0.898 + 0.4, cx = Math.cos(ang), cy = Math.sin(ang);
+        for (let s = 2; s < 14; s++) {
+          const fx = x + Math.round(cx * s), fy = y + Math.round(cy * s);
+          ctx.fillStyle = s > 10 ? "#2f5e2c" : "#3f7a3a"; ctx.fillRect(fx, fy, 2, 2);
+          if (s > 3 && s % 2 === 0) {   // leaflets
+            ctx.fillStyle = "#56963f";
+            ctx.fillRect(fx + Math.round(-cy * 2), fy + Math.round(cx * 2), 1, 1);
+            ctx.fillRect(fx + Math.round(cy * 2), fy + Math.round(-cx * 2), 1, 1);
+          }
+        }
+      }
+      R("#6fb04f", -2, -2, 5, 5); R("#8a6a3a", -1, -1, 3, 3); break;
+    }
+    case "lamp": {   // a pole at the curb with its arm hanging over the road
+      const dir = d.left ? 1 : -1;
+      R("#00000040", 1, 1, 3, 3); R("#3e3546", 0, -1, 3, 3);
+      for (let i = 2; i < 9; i++) R("#2c2333", dir * i + (d.left ? 1 : 1), 0, 1, 1);
+      R("#ffe6a8", dir * 9 + (d.left ? 0 : 0), -1, 2, 3); break;
+    }
+    case "hydrant":
+      R("#c0392b", -2, -2, 4, 4); R("#e05a4a", -1, -1, 2, 2); R("#c0392b", -3, -1, 6, 2); break;
+    case "newsbox":
+      R("#2f6fb0", -3, -3, 6, 6); R("#9fd8ff", -2, -2, 4, 2); break;
+    case "trash":
+      R("#3a4a3a", -3, -3, 6, 6); R("#526552", -2, -2, 4, 4); R("#e9e2dc", -1, -1, 1, 1); break;
+    case "flyer":
+      R("#5e4a3a", -1, -1, 3, 3); R(d.col, 2, -4, 4, 5); R("#14121a", 3, -3, 2, 1); break;
+    case "rope":   // velvet rope outside a club
+      R("#d4af37", 0, 0, 2, 2); R("#d4af37", 0, 12, 2, 2); R("#d4af37", 0, 24, 2, 2);
+      R("#b0203a", 0, 2, 1, 10); R("#b0203a", 1, 14, 1, 10); break;
+  }
+}
+
+function drawBuilding(b) {
+  const x = b.side ? ST.bld2 : 0, y = Math.round(b.y), w = ST.bld;
+  ctx.fillStyle = b.col; ctx.fillRect(x, y, w, b.h);
+  ctx.fillStyle = b.trim;
+  ctx.fillRect(x, y, w, 1); ctx.fillRect(x, y + b.h - 1, w, 1);
+  ctx.fillRect(b.side ? x : x + w - 2, y, 2, b.h);                 // roof edge on the street side
+  for (let i = 0; i < b.ac; i++) {                                  // air conditioners on the roof
+    ctx.fillStyle = "#9a9aa6"; ctx.fillRect(x + 4 + (b.side ? 2 : 0), y + 5 + i * 9, 5, 5);
+    ctx.fillStyle = "#6d6d78"; ctx.fillRect(x + 5 + (b.side ? 2 : 0), y + 6 + i * 9, 3, 3);
+  }
+  if (b.kind === "records") { ctx.fillStyle = "#c0392b"; for (let i = 0; i < b.h; i += 6) ctx.fillRect(x + 1, y + i, w - 3, 2); }
+  if (b.kind === "motel") { ctx.fillStyle = "#5ee8ff"; ctx.fillRect(x + 3 + (b.side ? 2 : 0), y + b.h - 14, 7, 9); }   // the pool
+}
+
+// neon and streetlights are drawn after the sunset tint, so they stay bright as night falls
+function drawStripLights(night) {
+  for (const d of G.deco) if (d.kind === "lamp") {
+    const lx = d.x + (d.left ? 10 : -8), g = ctx.createRadialGradient(lx, d.y, 0, lx, d.y, 20);
+    g.addColorStop(0, "rgba(255,190,110," + (0.18 + night * 0.22) + ")"); g.addColorStop(1, "rgba(255,190,110,0)");
+    ctx.fillStyle = g; ctx.fillRect(lx - 20, d.y - 20, 40, 40);
+  }
+  for (const b of G.blocks) {
+    if (!b.sign) continue;
+    const img = neonSign(b.sign, b.neon), x = b.side ? ST.bld2 - 9 : ST.bld - 2, y = Math.round(b.y + (b.h - img.height) / 2);
+    ctx.globalAlpha = b.flick > 0 ? 0.3 : 1;
+    const g = ctx.createRadialGradient(x + 5, y + img.height / 2, 0, x + 5, y + img.height / 2, img.height * 0.7);
+    g.addColorStop(0, b.neon + (night > 0.5 ? "66" : "33")); g.addColorStop(1, b.neon + "00");
+    ctx.fillStyle = g; ctx.fillRect(x - 20, y - 10, 51, img.height + 20);
+    ctx.drawImage(img, x, y);
+    if (b.kind === "gogo" && b.flick <= 0) {   // marquee bulbs chasing round
+      ctx.fillStyle = "#fff3a0";
+      const bx = b.side ? ST.bld2 - 1 : ST.bld, on = Math.floor(G.t * 6) % 3;
+      for (let i = on; i < b.h; i += 3) ctx.fillRect(bx, Math.round(b.y) + i, 1, 1);
+    }
+    ctx.globalAlpha = 1;
+  }
+}
+const stripNight = () => clamp((G.stage - 1) / 5, 0, 1);
+function drawSunset() {   // warm orange up the street fading to purple, then a dark blue that deepens each stage
+  const night = stripNight();
+  const g = ctx.createLinearGradient(0, 0, 0, H);
+  g.addColorStop(0, "rgba(255,130,60," + (0.22 - night * 0.12) + ")");
+  g.addColorStop(1, "rgba(130,60,200," + (0.16 + night * 0.06) + ")");
+  ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+  if (night > 0) { ctx.fillStyle = "rgba(14,8,34," + night * 0.34 + ")"; ctx.fillRect(0, 0, W, H); }
+  drawStripLights(night);
+}
+
 // tank, drawn from rectangles. 26 x 28, (x, y) is the top-left
 function drawTank(e, flash) {
   const x = Math.round(e.x - 13), y = Math.round(e.y - 14);
@@ -855,14 +1124,16 @@ function newGame(demo) {
     demo: !!demo, t: 0, score: 0, lives: 3, inv: 0, stage: 1, stageT: 0, bossOut: false,
     px: W / 2, py: H - 60, fireT: 0, power: 0, shake: 0, step: 0,
     hearts: [], ebul: [], enemies: [], cages: [], squad: [], parts: [], pops: [], pickups: [], deco: [],
-    spawnT: 1.5, cageT: 5, decoT: 0, scroll: 0, banner: null, loved: 0, mice: 0, rescued: 0,
+    spawnT: 1.5, cageT: 5, decoT: 0, scroll: 0, level: levelId, blocks: [], banner: null, loved: 0, mice: 0, rescued: 0,
     glooms: 0, overloads: 0, wasHit: false, maxArmy: 0, extra: 0, promoted: 0,
   };
+  if (G.level === "strip") stripScroll(0);
   for (let i = 0; i < 18; i++) addDeco(rnd(0, H));
   if (demo) for (let i = 0; i < 4; i++) addSquad(G.px, H + 20);
 }
 
 function addDeco(y) {
+  if (G.level === "strip") { addStripDeco(y); return; }
   const r = Math.random();
   const kind = r < 0.45 ? "flower" : r < 0.62 ? "bush" : r < 0.75 ? "crater" : r < 0.86 ? "bags" : r < 0.93 ? "track" : "sign";
   G.deco.push({ kind, x: rnd(4, W - 10), y, n: 2 + Math.floor(rnd(0, 3)),
@@ -1184,7 +1455,8 @@ function update(dt) {
 
   // scenery
   for (const d of G.deco) d.y += speed * dt;
-  G.deco = G.deco.filter((d) => d.y < H + 20);
+  G.deco = G.deco.filter((d) => d.y < H + 30);
+  if (G.level === "strip") stripScroll(speed * dt);
   G.decoT -= dt;
   if (G.decoT <= 0) { G.decoT = rnd(0.25, 0.7); addDeco(-12); }
 
@@ -1382,9 +1654,17 @@ function draw() {
   if (G.shake > 0) ctx.translate(Math.round(rnd(-2, 2)), Math.round(rnd(-2, 2)));
 
   // ground
-  const off = Math.floor(G.scroll) % 32;
-  for (let y = -32 + off; y < H; y += 32) for (let x = 0; x < W; x += 32) ctx.drawImage(TILE, x, y);
-  G.deco.forEach(drawDeco);
+  if (G.level === "strip") {
+    const off = Math.floor(G.scroll) % 64;
+    for (let y = -64 + off; y < H; y += 64) ctx.drawImage(STRIP_TILE, 0, y);
+    G.deco.forEach(drawStripDeco);
+    G.blocks.forEach(drawBuilding);
+    drawSunset();
+  } else {
+    const off = Math.floor(G.scroll) % 32;
+    for (let y = -32 + off; y < H; y += 32) for (let x = 0; x < W; x += 32) ctx.drawImage(TILE, x, y);
+    G.deco.forEach(drawDeco);
+  }
 
   G.cages.forEach(drawCage);
   for (const p of G.pickups) {
@@ -1504,10 +1784,11 @@ function startGame() {
   G.guard = !!player().guard;
   G.crayon = !!player().crayon;
   G.blue = !!player().blue;
-  startMusic("march");
+  startMusic(LEVELS[G.level].song);
   state = "play"; paused = false;
   show(null);
-  banner("STAGE 1", "LOVE THEM ALL");
+  if (G.level === "strip") banner("SUNSET STRIP", "STAGE 1");
+  else banner("STAGE 1", "LOVE THEM ALL");
 }
 function toTitle() {
   stopMusic();
@@ -1740,6 +2021,16 @@ $("edNext").onclick = () => {
   if (!kept) $("pName").textContent = "YOUR MOE (THIS VISIT ONLY)";
 };
 $("pPrev").onclick = () => cyclePlayer(-1);
+// level picker: only shows on this Mac until the Strip is ready
+function showLevel() { $("levelBtn").textContent = "LEVEL: " + LEVELS[levelId].name; }
+if (LOCAL) { $("levelRow").style.display = ""; showLevel(); }
+$("levelBtn").onclick = () => {
+  const ids = Object.keys(LEVELS);
+  levelId = ids[(ids.indexOf(levelId) + 1) % ids.length];
+  store.set(LEVEL_KEY, levelId);
+  showLevel();
+  newGame(true);
+};
 $("pNext").onclick = () => cyclePlayer(1);
 function showOver() {
   const best = +(store.get(BEST_KEY) || 0);
