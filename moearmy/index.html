@@ -717,6 +717,8 @@ function spawnEnemy() {
   } else if (r < 0.18 + mouseChance) {
     G.enemies.push(mouse(rnd(16, W - 16), -24));
     if (s >= 4 && Math.random() < 0.4) G.enemies.push(mouse(rnd(16, W - 16), -50));
+    if (Math.random() < G.squad.length / 80) G.enemies.push(mouse(rnd(16, W - 16), -76));
+    if (G.squad.length > 50 && Math.random() < 0.5) G.enemies.push(mouse(rnd(16, W - 16), -102));
   } else {
     G.enemies.push(gloom(rnd(14, W - 14), -10));
   }
@@ -1010,8 +1012,10 @@ function update(dt) {
   G.stageT += dt;
   G.spawnT -= dt * (G.bossOut ? 0.45 : 1);
   if (G.spawnT <= 0) {
-    G.spawnT = Math.max(0.38, 1.5 - G.stage * 0.14) * rnd(0.7, 1.3);
-    if (G.enemies.length < 30) spawnEnemy();
+    // a bigger army brings out more of the mouse army, so there's always plenty to love
+    const army = G.squad.length;
+    G.spawnT = Math.max(0.38, 1.5 - G.stage * 0.14) * rnd(0.7, 1.3) / (1 + army / 25);
+    if (G.enemies.length < 30 + army / 2) spawnEnemy();
   }
   G.cageT -= dt;
   if (G.cageT <= 0) {
