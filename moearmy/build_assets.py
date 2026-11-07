@@ -9,6 +9,8 @@
   ~/Desktop/moearmy/brute.webp   ->  assets/brute_head.png   (the big tanky mouse, stage 4 and up)
   ~/Desktop/moearmy/brute_loved.webp -> assets/brute_loved.png (the same, heart eyes, once loved)
   ~/Desktop/moearmy/heart_official.webp -> assets/heart_face.png (the official moemoe heart, on the menus)
+  ~/Desktop/moearmy/meower_wild.jpg  -> assets/meower_wild.png  (the wild Meower in the hat, saved in Boot Camp)
+  ~/Desktop/moearmy/meower_smoke.jpg -> assets/meower_smoke.png (the smoking Meower: Strip citizen, factory worker)
 
 Cuts each head out of its tank background and saves it small with a see-through background.
 (The Moe's "PIXEL" face is hand-drawn in index.html, no file needed.)
@@ -284,6 +286,35 @@ def brute(src, name):
     print("wrote", path, img.size)
 
 
+# Meowers: cats the mice have tied up. Hand-traced outlines (source-picture coords), hat/ears down to the chin.
+MEOWERS = {
+    "meower_wild": [
+        (105, 420), (110, 300), (160, 170), (260, 60), (400, 0), (620, 0), (760, 50), (830, 150), (850, 260),
+        (880, 280), (950, 290), (945, 370), (900, 420), (865, 450), (860, 560), (800, 610), (700, 680),
+        (560, 720), (420, 720), (300, 690), (200, 620), (140, 520),
+    ],
+    "meower_smoke": [
+        (110, 180), (210, 170), (300, 110), (420, 60), (560, 50), (700, 80), (820, 150), (900, 230), (1060, 270),
+        (1040, 370), (980, 450), (940, 560), (880, 650), (780, 720), (680, 790), (600, 790), (500, 770),
+        (380, 740), (260, 680), (180, 600), (150, 500), (140, 380), (120, 280),
+    ],
+}
+MEOWER_WIDTH = 140
+
+
+def meower(name):
+    img = Image.open(os.path.expanduser("~/Desktop/moearmy/" + name + ".jpg")).convert("RGB")
+    mask = Image.new("L", img.size, 0)
+    ImageDraw.Draw(mask).polygon(MEOWERS[name], fill=255)
+    mask = mask.filter(ImageFilter.MinFilter(9)).filter(ImageFilter.GaussianBlur(2))
+    img.putalpha(mask)
+    img = img.crop(mask.point(lambda v: 255 if v > 127 else 0).getbbox())
+    img = img.resize((MEOWER_WIDTH, round(img.height * MEOWER_WIDTH / img.width)), Image.LANCZOS)
+    path = os.path.join(OUT, name + ".png")
+    img.save(path, optimize=True)
+    print("wrote", path, img.size)
+
+
 if __name__ == "__main__":
     main()
     mouse()
@@ -294,3 +325,5 @@ if __name__ == "__main__":
     bluu()
     brute("~/Desktop/moearmy/brute.webp", "brute_head.png")
     brute("~/Desktop/moearmy/brute_loved.webp", "brute_loved.png")
+    meower("meower_wild")
+    meower("meower_smoke")
