@@ -5,6 +5,7 @@
   ~/Desktop/moearmy/mouse_loved.webp -> assets/mouse_loved.png (the same mouse, heart eyes, once loved)
   ~/Desktop/moearmy/bradley.jpg  ->  assets/bradley_head.png (CEO Bradley, an unlockable player)
   ~/Desktop/moearmy/crayons.jpg  ->  assets/crayons_head.png (Commander Crayons, an unlockable player)
+  ~/Desktop/moearmy/bluu.jpg     ->  assets/bluu_head.png    (General Bluu, an unlockable player)
   ~/Desktop/moearmy/heart_official.webp -> assets/heart_face.png (the official moemoe heart, on the menus)
 
 Cuts each head out of its tank background and saves it small with a see-through background.
@@ -225,6 +226,40 @@ def crayons():
     print("wrote", path, img.size)
 
 
+# General Bluu: white face on a white background, so a hand-traced outline is the whole cut. The picture cuts
+# off the top of the hair, so the round top of the head is drawn back on in the hair's black.
+BLUU_SRC = os.path.expanduser("~/Desktop/moearmy/bluu.jpg")
+BLUU_PAD = 45   # room added above the picture for the rest of the hair
+BLUU_OUTLINE = [   # source-picture coords, from the hair's widest point down to the chin (the round top is an ellipse)
+    (0, 95), (347, 95), (346, 160), (332, 178), (316, 205), (310, 232), (296, 240), (286, 268), (276, 296),
+    (240, 293), (200, 291), (150, 289), (100, 283), (70, 262), (40, 225), (16, 185), (2, 140),
+]
+BLUU_WIDTH = 150
+
+
+def bluu():
+    src = Image.open(BLUU_SRC).convert("RGB")
+    w, h = src.size
+    img = Image.new("RGB", (w, h + BLUU_PAD), (16, 16, 18))
+    img.paste(src, (0, BLUU_PAD))
+    mask = Image.new("L", img.size, 0)
+    d = ImageDraw.Draw(mask)
+    d.polygon([(x, y + BLUU_PAD) for x, y in BLUU_OUTLINE], fill=255)
+    d.ellipse((0, 0, 350, 260), fill=255)   # the round top of the head
+    px, mp = img.load(), mask.load()
+    for y in range(BLUU_PAD + 140):           # up in the hair, anything light is background: make it hair
+        for x in range(w):
+            if mp[x, y] and sum(px[x, y]) > 200:
+                px[x, y] = (16, 16, 18)
+    mask = mask.filter(ImageFilter.MinFilter(3)).filter(ImageFilter.GaussianBlur(0.8))
+    img.putalpha(mask)
+    img = img.crop(mask.point(lambda v: 255 if v > 127 else 0).getbbox())
+    img = img.resize((BLUU_WIDTH, round(img.height * BLUU_WIDTH / img.width)), Image.LANCZOS)
+    path = os.path.join(OUT, "bluu_head.png")
+    img.save(path, optimize=True)
+    print("wrote", path, img.size)
+
+
 if __name__ == "__main__":
     main()
     mouse()
@@ -232,3 +267,4 @@ if __name__ == "__main__":
     bradley()
     heart()
     crayons()
+    bluu()

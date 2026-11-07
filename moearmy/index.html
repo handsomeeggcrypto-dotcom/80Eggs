@@ -283,7 +283,18 @@ const CRAYONS_HEAD = new Image();
 CRAYONS_HEAD.src = "assets/crayons_head.png";
 let CRAYONS_HEAD_W = null;
 CRAYONS_HEAD.onload = () => { CRAYONS_HEAD_W = tinted(CRAYONS_HEAD, "#fff"); renderPicker(); };
-const BODIES = { bradley: () => BODY_RED, crayons: () => BODY_CRAYON };
+// General Bluu: navy uniform, gold collar, buttons and shoulder boards
+const BLUU_ROWS = BODY.map((r, i) => {
+  const a = r.split("").map((c) => (c === "b" || c === "r" ? "y" : c === "y" ? "g" : c));
+  if (i === 2) { a[1] = "y"; a[2] = "y"; a[13] = "y"; a[14] = "y"; }
+  return a.join("");
+});
+const BODY_BLUU = LEGS.map((l) => sprite(BLUU_ROWS.concat(l), { g: "#2b3f8f", G: "#18245a", y: "#ffd42a" }));
+const BLUU_HEAD = new Image();
+BLUU_HEAD.src = "assets/bluu_head.png";
+let BLUU_HEAD_W = null;
+BLUU_HEAD.onload = () => { BLUU_HEAD_W = tinted(BLUU_HEAD, "#fff"); renderPicker(); };
+const BODIES = { bradley: () => BODY_RED, crayons: () => BODY_CRAYON, bluu: () => BODY_BLUU };
 const BRADLEY_HEAD = new Image();
 BRADLEY_HEAD.src = "assets/bradley_head.png";
 let BRADLEY_HEAD_W = null;
@@ -308,7 +319,7 @@ function loadCustom(url) {
 // Who you can play as. Unlockable players slot in here later, e.g.
 // { id: "general", name: "GENERAL MOE", head: "photo", unlock: { stage: 5, text: "REACH STAGE 5" } }
 // unlock can ask for { mice: n } (mice loved, added up over every game) or { stage: n } (best stage reached)
-const STAGE_KEY = "moearmy_best_stage", MICE_KEY = "moearmy_mice_total";
+const STAGE_KEY = "moearmy_best_stage", MICE_KEY = "moearmy_mice_total", FREED_KEY = "moearmy_freed_total";
 const PLAYERS = [
   { id: "soldier", name: "SOLDIER MOE", head: "photo" },
   { id: "pixel", name: "PIXEL MOE", head: "pixel" },
@@ -316,13 +327,16 @@ const PLAYERS = [
     perk: "NO MOE LEFT BEHIND", guard: true },   // guard: mouse shots bounce off your squad
   { id: "crayons", name: "COMMANDER CRAYONS", head: "crayons", unlock: { stage: 4, text: "REACH STAGE 4" },
     perk: "HEARTS PIERCE 3 MICE", crayon: true },   // crayon: rainbow hearts that keep going
+  { id: "bluu", name: "GENERAL BLUU", head: "bluu", unlock: { freed: 300, text: "FREE 300 MOES" },
+    perk: "BIG BLUE HEARTS x2", blue: true },   // blue: your own hearts are big and count double
   { id: "custom", name: "YOUR MOE", head: "custom" },
 ];
 let playerId = store.get(PLAYER_KEY) || (store.get("moearmy_face") === "pixel" ? "pixel" : "soldier");
 const bestStage = () => +(store.get(STAGE_KEY) || 0);
 const miceTotal = () => +(store.get(MICE_KEY) || 0);
+const freedTotal = () => +(store.get(FREED_KEY) || 0);
 const unlocked = (p) => !p.unlock ||
-  (p.unlock.mice ? miceTotal() >= p.unlock.mice : bestStage() >= p.unlock.stage);
+  (p.unlock.mice ? miceTotal() >= p.unlock.mice : p.unlock.freed ? freedTotal() >= p.unlock.freed : bestStage() >= p.unlock.stage);
 const available = () => PLAYERS.filter((p) => p.id !== "custom" || CUSTOM);   // shown in the picker, locked or not
 const player = () => available().find((p) => p.id === playerId && unlocked(p)) || PLAYERS[0];
 let viewId = playerId;   // who the title picker is showing (can be a locked player)
@@ -347,6 +361,9 @@ function drawHead(hx, hy, kind, flash) {
   } else if (kind === "crayons" && CRAYONS_HEAD.complete && CRAYONS_HEAD.naturalWidth) {
     img = CRAYONS_HEAD; wimg = CRAYONS_HEAD_W;
     w = 28; h = w * CRAYONS_HEAD.naturalHeight / CRAYONS_HEAD.naturalWidth; x = hx - 1; y = hy + 25 - h;
+  } else if (kind === "bluu" && BLUU_HEAD.complete && BLUU_HEAD.naturalWidth) {   // a big head
+    img = BLUU_HEAD; wimg = BLUU_HEAD_W;
+    w = 38; h = w * BLUU_HEAD.naturalHeight / BLUU_HEAD.naturalWidth; x = hx - 7; y = hy + 26 - h;
   } else if (kind === "custom" && CUSTOM) {
     img = CUSTOM; wimg = CUSTOM_W; x = hx - 1; y = hy - 1; w = 26; h = 25;
   } else if (kind !== "pixel" && photoReady()) {
@@ -380,9 +397,14 @@ const CRAYON_COLS = [["#ff5a5a", "#b02a2a"], ["#ff9b2e", "#b55e10"], ["#3fc25a",
 const CRAYON_HEARTS = CRAYON_COLS.map(([y, o]) => sprite([
   ".yyy.yyy.", "yyyyyyyyy", "yywkywkyy", "yykkykkyy", "yyyyyyyyy", ".oyyyyyo.", "..ooooo..", "...ooo...", "....o....",
 ], { y, o }));
+const BIG_BLUE_HEART = sprite([
+  ".bbb...bbb.", "bbbbb.bbbbb", "bbbbbbbbbbb", "bbwkbbbwkbb", "bbkkbbbkkbb", "bbbbbbbbbbb", ".dbbbbbbbd.", "..dbbbbbd..",
+  "...dbbbd...", "....ddd....", ".....d.....",
+], { b: "#3d7bff", d: "#1f45b8" });
 let crayonN = 0;
 function addHeart(h) {   // every heart goes through here, so Commander Crayons can colour them in
   if (G.crayon) { h.c = crayonN++ % CRAYON_COLS.length; h.pierce = 3; h.hits = []; }
+  if (G.blue && h.own) { h.blue = true; h.dmg = 2; }
   G.hearts.push(h);
 }
 const SMALL_HEART = sprite([".y.y.", "yyyyy", ".yyy.", "..y.."]);
@@ -749,6 +771,11 @@ function reachStage(n) {
   store.set(STAGE_KEY, n);
   celebrate(was);
 }
+function freeMoesTotal(n) {
+  const was = lockedNow();
+  store.set(FREED_KEY, freedTotal() + n);
+  celebrate(was);
+}
 function loveMouseTotal() {
   const was = lockedNow();
   store.set(MICE_KEY, miceTotal() + 1);
@@ -921,10 +948,10 @@ function update(dt) {
   G.fireT -= dt;
   if (G.fireT <= 0) {
     G.fireT = Math.max(0.12, 0.26 - (G.stage - 1) * 0.025);
-    addHeart({ x: G.px, y: G.py - 22, vx: 0, vy: -hv });
+    addHeart({ x: G.px, y: G.py - 22, vx: 0, vy: -hv, own: true });
     if (G.power > 0) {
-      addHeart({ x: G.px - 5, y: G.py - 20, vx: -hv * 0.27, vy: -hv * 0.95 });
-      addHeart({ x: G.px + 5, y: G.py - 20, vx: hv * 0.27, vy: -hv * 0.95 });
+      addHeart({ x: G.px - 5, y: G.py - 20, vx: -hv * 0.27, vy: -hv * 0.95, own: true });
+      addHeart({ x: G.px + 5, y: G.py - 20, vx: hv * 0.27, vy: -hv * 0.95, own: true });
     }
     if (!G.demo) SFX.shoot();
   }
@@ -1066,10 +1093,11 @@ function update(dt) {
   for (const h of G.hearts) {
     for (const e of G.enemies) {
       if (e.loved || e.y < -4 || (h.hits && h.hits.includes(e))) continue;
-      if (hit(h, h.x, h.y, 7, 7, e, e.x, e.y, e.w * 0.9, e.h * 0.9)) {
+      const hs = h.blue ? 10 : 7;
+      if (hit(h, h.x, h.y, hs, hs, e, e.x, e.y, e.w * 0.9, e.h * 0.9)) {
         if (h.pierce && --h.pierce > 0) h.hits.push(e); else h.dead = true;
         if (h.hits && e.type === "mouse" && (h.mHits = (h.mHits || 0) + 1) >= 3) award("rainbow");
-        e.hp--; e.flash = 0.06;
+        e.hp -= h.dmg || 1; e.flash = 0.06;
         dots(h.x, h.y - 2, 2, "#ffd42a");
         if (e.hp <= 0) loveEnemy(e); else if (e.type === "tank") SFX.hit();
         break;
@@ -1078,7 +1106,7 @@ function update(dt) {
     if (h.dead) continue;
     for (const c of G.cages) {
       if (hit(h, h.x, h.y, 7, 7, c, c.x, c.y, 28, 28)) {
-        h.dead = true; c.hp--; c.shake = 0.12;
+        h.dead = true; c.hp -= h.dmg || 1; c.shake = 0.12;
         dots(h.x, h.y, 2, "#8a5a2b");
         if (c.hp <= 0 && !c.dead) {
           c.dead = true;
@@ -1088,7 +1116,7 @@ function update(dt) {
           award("key");
           if (G.squad.length >= SLOTS.length) award("whistle");
           if (G.squad.length >= 100) award("flag");
-          G.rescued += c.n; G.score += 250 * c.n;
+          G.rescued += c.n; G.score += 250 * c.n; freeMoesTotal(c.n);
           pop(c.x, c.y - 18, "+" + c.n + (c.n > 1 ? " MOES!" : " MOE!"), "#ff9fca");
           SFX.free();
         }
@@ -1194,6 +1222,7 @@ function draw() {
   }
 
   for (const h of G.hearts) {
+    if (h.blue) { ctx.drawImage(BIG_BLUE_HEART, Math.round(h.x - 5), Math.round(h.y - 5)); continue; }
     if (h.c == null) { ctx.drawImage(HEART, Math.round(h.x - 4), Math.round(h.y - 4)); continue; }
     ctx.fillStyle = CRAYON_COLS[h.c][0];   // a wiggly crayon scribble behind the heart
     for (let k = 1; k <= 4; k++) {
@@ -1265,6 +1294,7 @@ function startGame() {
   newGame(false);
   G.guard = !!player().guard;
   G.crayon = !!player().crayon;
+  G.blue = !!player().blue;
   state = "play"; paused = false;
   show(null);
   banner("STAGE 1", "LOVE THEM ALL");
@@ -1284,6 +1314,7 @@ function renderPicker() {
   const p = list.find((q) => q.id === viewId) || player();
   const locked = !unlocked(p);
   const prog = !locked ? "" : p.unlock.mice ? " (" + Math.min(miceTotal(), p.unlock.mice) + "/" + p.unlock.mice + ")"
+    : p.unlock.freed ? " (" + Math.min(freedTotal(), p.unlock.freed) + "/" + p.unlock.freed + ")"
     : bestStage() ? " (BEST " + bestStage() + ")" : "";
   $("pName").innerHTML = p.name + (locked ? "<br><b>LOCKED: " + p.unlock.text + prog + "</b>" : "") +
     (p.perk ? "<br>PERK: " + p.perk : "");
@@ -1291,12 +1322,14 @@ function renderPicker() {
   const c = $("pCv").getContext("2d");
   c.setTransform(1, 0, 0, 1, 0, 0);
   c.clearRect(0, 0, 144, 176);
-  c.setTransform(4, 0, 0, 4, 0, 0);
+  const big = p.head === "bluu";   // big heads get drawn a bit smaller so they fit
+  c.setTransform(big ? 3 : 4, 0, 0, big ? 3 : 4, 0, 0);
   c.imageSmoothingEnabled = false;
   const main = ctx;
   ctx = c;
-  if (!locked) drawGlow(18, 23, 0);
-  drawMoe(18, 23, 0, 0, p.head);
+  const px = big ? 24 : 18, py = big ? 36 : 23;
+  if (!locked) drawGlow(px, py, 0);
+  drawMoe(px, py, 0, 0, p.head);
   ctx = main;
   if (locked) {   // a dark shape, like a character select you haven't earned yet
     c.setTransform(1, 0, 0, 1, 0, 0);
