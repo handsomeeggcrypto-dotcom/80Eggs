@@ -94,7 +94,7 @@
       </div>
       <div class="stat noStart" id="pName"></div>
       <div class="row"><button id="enlistBtn">ENLIST YOUR MOE</button></div>
-      <div class="row noStart" id="levelRow" style="display:none"><button class="alt" id="levelBtn">LEVEL</button></div>
+      <div class="row noStart" id="levelRow"><button class="alt" id="levelBtn">LEVEL</button></div>
       <div class="big blink" id="tapStart">TAP TO PLAY</div>
       <div class="stat" id="bestTitle"></div>
       <div class="row"><button class="alt" id="lbTitle">LEADERBOARD</button><button class="alt" id="troTitle">TROPHIES</button></div>
@@ -949,8 +949,7 @@ const LEVELS = {
 };
 const CAMPAIGN_EVERY = 4;   // stages 1-4 Boot Camp, 5-8 the Strip, 9 and up the factory
 const LEVEL_KEY = "moearmy_level";
-const LOCAL = /^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname);   // the Strip is this Mac only for now
-let levelId = LOCAL && LEVELS[store.get(LEVEL_KEY)] ? store.get(LEVEL_KEY) : "camp";
+let levelId = LEVELS[store.get(LEVEL_KEY)] ? store.get(LEVEL_KEY) : "camp";
 
 // street layout, in game pixels across the 180-wide screen
 const ST = { bld: 16, walk: 36, road: 38, road2: 142, walk2: 144, bld2: 164 };
@@ -2420,9 +2419,9 @@ $("edNext").onclick = () => {
   toTitle();
 };
 $("pPrev").onclick = () => cyclePlayer(-1);
-// level picker: only shows on this Mac until the Strip is ready
+// level picker: Boot Camp, the Sunset Strip, the factory, or all three in a row
 function showLevel() { $("levelBtn").textContent = "LEVEL: " + LEVELS[levelId].name; }
-if (LOCAL) { $("levelRow").style.display = ""; showLevel(); }
+showLevel();
 $("levelBtn").onclick = () => {
   const ids = Object.keys(LEVELS);
   levelId = ids[(ids.indexOf(levelId) + 1) % ids.length];
