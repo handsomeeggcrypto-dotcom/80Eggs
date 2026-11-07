@@ -403,8 +403,8 @@ const BIG_BLUE_HEART = sprite([
 ], { b: "#3d7bff", d: "#1f45b8" });
 let crayonN = 0;
 function addHeart(h) {   // every heart goes through here, so Commander Crayons can colour them in
-  if (G.crayon) { h.c = crayonN++ % CRAYON_COLS.length; h.pierce = 3; h.hits = []; }
-  if (G.blue && h.own) { h.blue = true; h.dmg = 2; }
+  if (G.crayon || h.kind === "crayons") { h.c = crayonN++ % CRAYON_COLS.length; h.pierce = 3; h.hits = []; }
+  if ((G.blue && h.own) || h.kind === "bluu") { h.blue = true; h.dmg = 2; }
   G.hearts.push(h);
 }
 const SMALL_HEART = sprite([".y.y.", "yyyyy", ".yyy.", "..y.."]);
@@ -646,7 +646,23 @@ let overTimer = 0;
 const SLOTS = [[-22, 12], [22, 12], [-44, 22], [44, 22], [0, 30], [-66, 30], [66, 30], [-22, 40]];
 // The first 8 Moes march in a V around you. Everyone after that joins the army ranks along the bottom of the
 // screen, filling it from the bottom up, and the ranks lean a little toward you as you move.
-const MAX_ARMY = 120, RANK = 10;
+const RANK = 10;
+// the ranks stay in the bottom third of the screen, so taller phones fit a few more rows
+const armyMax = () => SLOTS.length + RANK * (Math.max(1, Math.floor((H / 3 - 20) / 16)) + 1);
+// once the army is full, Moes you free promote someone instead: the first extra one, then every 5th
+const PROMOTE = ["crayons", "bluu", "bradley"];
+function freeMoe(x, y) {
+  if (G.squad.length < armyMax()) { addSquad(x, y); return; }
+  G.extra++;
+  if (G.extra !== 1 && G.extra % 5) return;
+  const plain = G.squad.filter((m) => !m.kind);
+  if (!plain.length) return;
+  const m = plain[Math.floor(rnd(0, plain.length))];
+  m.kind = PROMOTE[G.promoted++ % PROMOTE.length];
+  burst(m.x, m.y - 10, 6, SMALL_HEART, 40);
+  pop(m.x, m.y - 26, "PROMOTED!", "#ffd42a");
+  award("promote");
+}
 function slotPos(i) {
   if (i < SLOTS.length) return [clamp(G.px + SLOTS[i][0], 10, W - 10), Math.min(G.py + SLOTS[i][1], H - 14)];
   const j = i - SLOTS.length, rank = Math.floor(j / RANK), col = j % RANK;
@@ -660,7 +676,7 @@ function newGame(demo) {
     px: W / 2, py: H - 60, fireT: 0, power: 0, shake: 0, step: 0,
     hearts: [], ebul: [], enemies: [], cages: [], squad: [], parts: [], pops: [], pickups: [], deco: [],
     spawnT: 1.5, cageT: 5, decoT: 0, scroll: 0, banner: null, loved: 0, mice: 0, rescued: 0,
-    glooms: 0, overloads: 0, wasHit: false, maxArmy: 0,
+    glooms: 0, overloads: 0, wasHit: false, maxArmy: 0, extra: 0, promoted: 0,
   };
   for (let i = 0; i < 18; i++) addDeco(rnd(0, H));
   if (demo) for (let i = 0; i < 4; i++) addSquad(G.px, H + 20);
@@ -793,9 +809,12 @@ const TROPHIES = [
   { id: "whistle", name: "SQUAD WHISTLE", how: "HAVE 8 MOES IN YOUR ARMY", lore: "Tweet tweet, everybody in line.", icon: sprite([
     "....rr......", "...r..r.....", "..r....kkkkk", ".r....kmmmmk", ".r..kkmmkkmk", "..rkmmmmmmmk", "...kmmmmmmk.", "...kmmmmmk..",
     "....kkkkk..."]) },
-  { id: "flag", name: "GRAND ARMY FLAG", how: "HAVE 100 MOES IN YOUR ARMY", lore: "Visible from space.", icon: sprite([
+  { id: "flag", name: "GRAND ARMY FLAG", how: "FILL YOUR WHOLE ARMY", lore: "Visible from space.", icon: sprite([
     "kkkkkkkkkk..", "kyyyyyyyyyk.", "kyyPPyPPyyk.", "kyyPPPPPyyk.", "kyyyPPPyyyk.", "kyyyyPyyyyk.", "kkkkkkkkkk..", "kb..........",
     "kb..........", "kb..........", "kb..........", "kk.........."]) },
+  { id: "promote", name: "SHINY NEW STRIPES", how: "GET A MOE PROMOTED", lore: "Earned, not given.", icon: sprite([
+    "y........y", "yo......oy", ".yo....oy.", "..yo..oy..", "...yooy...", "....yy....", "y........y", "yo......oy",
+    ".yo....oy.", "..yo..oy..", "...yooy...", "....yy...."]) },
   { id: "tread", name: "TANK TREAD BRACELET", how: "LOVE A MOUSE TANK", lore: "Fashion from the front lines.", icon: sprite([
     "...kkkkkk...", "..kcCcCcCk..", ".kCkkkkkkck.", ".kck....kCk.", ".kCk.PP.kck.", ".kck....kCk.", ".kCkkkkkkck.",
     "..kcCcCcCk..", "...kkkkkk..."]) },
@@ -967,7 +986,7 @@ function update(dt) {
     if (m.fireT <= 0) {
       const gap = Math.max(0.35, 0.7 - (G.stage - 1) * 0.06);
       m.fireT = (G.power > 0 ? gap / 2 : gap) * (i < SLOTS.length ? 1 : slow * rnd(0.8, 1.2));
-      addHeart({ x: m.x, y: m.y - 22, vx: 0, vy: -hv });
+      addHeart({ x: m.x, y: m.y - 22, vx: 0, vy: -hv, kind: m.kind });
     }
   });
 
@@ -996,14 +1015,10 @@ function update(dt) {
   }
   G.cageT -= dt;
   if (G.cageT <= 0) {
-    G.cageT = rnd(5, 8);
-    const waiting = G.cages.reduce((a, c) => a + c.n, 0);
-    if (G.squad.length + waiting < MAX_ARMY) {
-      // later cages hold more Moes, and sometimes a big one turns up with a crowd inside
-      const big = G.stage >= 2 && Math.random() < 0.25;
-      const n = Math.min(MAX_ARMY - G.squad.length - waiting, big ? 8 + G.stage * 3 : 1 + G.stage);
-      G.cages.push({ x: rnd(18, W - 18), y: -16, hp: 6 + Math.min(n, 12), t: 0, shake: 0, n });
-    }
+    G.cageT = rnd(3.5, 5.5);
+    // most cages hold one Moe; now and then a bigger one turns up with a few inside
+    const n = G.stage >= 2 && Math.random() < 0.15 ? 2 + Math.floor(rnd(0, Math.min(G.stage, 4))) : 1;
+    G.cages.push({ x: rnd(18, W - 18), y: -16, hp: 6 + n, t: 0, shake: 0, n });
   }
   if (!G.bossOut && G.stageT > 30) {
     G.bossOut = true;
@@ -1112,10 +1127,10 @@ function update(dt) {
           c.dead = true;
           dots(c.x, c.y, 20, "#8a5a2b");
           burst(c.x, c.y, 5, SMALL_HEART, 50);
-          for (let k = 0; k < c.n; k++) addSquad(c.x + rnd(-8, 8), c.y + rnd(-6, 6));
+          for (let k = 0; k < c.n; k++) freeMoe(c.x + rnd(-8, 8), c.y + rnd(-6, 6));
           award("key");
           if (G.squad.length >= SLOTS.length) award("whistle");
-          if (G.squad.length >= 100) award("flag");
+          if (G.squad.length >= armyMax()) award("flag");
           G.rescued += c.n; G.score += 250 * c.n; freeMoesTotal(c.n);
           pop(c.x, c.y - 18, "+" + c.n + (c.n > 1 ? " MOES!" : " MOE!"), "#ff9fca");
           SFX.free();
@@ -1136,8 +1151,8 @@ function update(dt) {
       if (hit(b, b.x, b.y, b.w * 0.7, b.h * 0.7, m, m.x, m.y - 2, 10, 16)) {
         b.dead = true;
         if (G.guard) { dots(m.x, m.y - 8, 6, "#ffd23f"); pop(m.x, m.y - 24, "SAFE", "#ffd23f"); break; }
-        // the back ranks stand shoulder to shoulder: most shots just bounce off the crowd
-        if (i >= SLOTS.length && Math.random() < 0.88) { dots(m.x, m.y - 8, 3, "#fff"); break; }
+        // half the shots bounce off your V, and the back ranks stand shoulder to shoulder so most bounce off them
+        if (Math.random() < (i >= SLOTS.length ? 0.88 : 0.5)) { dots(m.x, m.y - 8, 3, "#fff"); break; }
         G.squad.splice(i, 1);
         dots(m.x, m.y, 10, "#fff");
         pop(m.x, m.y - 24, "AWW", "#c4cde8");
@@ -1215,7 +1230,7 @@ function draw() {
   }
 
   // squad, then you
-  for (const m of G.squad.slice().sort((a, b) => a.y - b.y)) drawMoe(m.x, m.y, Math.floor(m.step));
+  for (const m of G.squad.slice().sort((a, b) => a.y - b.y)) drawMoe(m.x, m.y, Math.floor(m.step), 0, m.kind);
   if (!(G.inv > 0 && Math.floor(G.inv * 12) % 2 === 0)) {
     drawGlow(G.px, G.py, G.t);
     drawMoe(G.px, G.py, Math.floor(G.step), G.power > 0 && Math.floor(G.t * 10) % 2 ? 0.35 : 0, player().head);
