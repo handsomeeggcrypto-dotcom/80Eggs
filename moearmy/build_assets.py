@@ -2,6 +2,8 @@
 
   ~/Desktop/moearmy/soldier.jpg  ->  assets/head_photo.png   (the Moe soldiers)
   ~/Desktop/moearmy/mouse.webp   ->  assets/mouse_head.png   (the Anti Moemoe mouse army)
+  ~/Desktop/moearmy/mouse_loved.webp -> assets/mouse_loved.png (the same mouse, heart eyes, once loved)
+  ~/Desktop/moearmy/bradley.jpg  ->  assets/bradley_head.png (CEO Bradley, an unlockable player)
 
 Cuts each head out of its tank background and saves it small with a see-through background.
 (The Moe's "PIXEL" face is hand-drawn in index.html, no file needed.)
@@ -107,15 +109,71 @@ MOUSE_OUTLINE = [   # the bandana mouse: ears, bandana and knot (tails cut short
 MOUSE_WIDTH = 150   # drawn about 30 game pixels wide (the ears make it wider than a Moe head)
 
 
-def mouse():
-    img = Image.open(MOUSE_SRC).convert("RGB")
+def mouse(src=MOUSE_SRC, name="mouse_head.png"):
+    img = Image.open(src).convert("RGB")
     mask = Image.new("L", img.size, 0)
     ImageDraw.Draw(mask).polygon(MOUSE_OUTLINE, fill=255)
     mask = mask.filter(ImageFilter.MinFilter(9)).filter(ImageFilter.GaussianBlur(1.5))   # pull the edge in a hair
     img.putalpha(mask)
     img = img.crop(mask.point(lambda v: 255 if v > 127 else 0).getbbox())
     img = img.resize((MOUSE_WIDTH, round(img.height * MOUSE_WIDTH / img.width)), Image.LANCZOS)
-    path = os.path.join(OUT, "mouse_head.png")
+    path = os.path.join(OUT, name)
+    img.save(path, optimize=True)
+    print("wrote", path, img.size)
+
+
+# CEO Bradley: a yellow heart head on a black background, so anything not near-black (inside the head box)
+# is Bradley. The biggest bright blob is kept and its holes (the black eyes) filled in.
+BRADLEY_SRC = os.path.expanduser("~/Desktop/moearmy/bradley.jpg")
+BRADLEY_BOX = (100, 30, 840, 600)   # the heart, above the neck
+BRADLEY_WIDTH = 130
+
+
+def bradley():
+    img = Image.open(BRADLEY_SRC).convert("RGB").crop(BRADLEY_BOX)
+    w, h = img.size
+    px = img.load()
+    m = Image.new("L", img.size, 0)
+    mp = m.load()
+    for y in range(h):
+        for x in range(w):
+            r, g, b = px[x, y]
+            if max(r, g, b) > 70:
+                mp[x, y] = 255
+    m = m.filter(ImageFilter.MedianFilter(7))
+    small = m.resize((w // 2, h // 2), Image.NEAREST)
+    sp = small.load()
+    sw, sh = small.size
+    seen, best = set(), []
+    for sx in range(sw):
+        for sy in range(sh):
+            if sp[sx, sy] and (sx, sy) not in seen:
+                stack, comp = [(sx, sy)], []
+                seen.add((sx, sy))
+                while stack:
+                    x, y = stack.pop()
+                    comp.append((x, y))
+                    for nx, ny in ((x + 1, y), (x - 1, y), (x, y + 1), (x, y - 1)):
+                        if 0 <= nx < sw and 0 <= ny < sh and sp[nx, ny] and (nx, ny) not in seen:
+                            seen.add((nx, ny))
+                            stack.append((nx, ny))
+                if len(comp) > len(best):
+                    best = comp
+    keep = Image.new("L", small.size, 0)
+    kp = keep.load()
+    for x, y in best:
+        kp[x, y] = 255
+    outside = keep.copy()
+    ImageDraw.floodfill(outside, (0, 0), 100)
+    op = outside.load()
+    for x in range(sw):
+        for y in range(sh):
+            kp[x, y] = 0 if op[x, y] == 100 else 255
+    mask = keep.resize((w, h), Image.NEAREST).filter(ImageFilter.GaussianBlur(1.5))
+    img.putalpha(mask)
+    img = img.crop(mask.point(lambda v: 255 if v > 127 else 0).getbbox())
+    img = img.resize((BRADLEY_WIDTH, round(img.height * BRADLEY_WIDTH / img.width)), Image.LANCZOS)
+    path = os.path.join(OUT, "bradley_head.png")
     img.save(path, optimize=True)
     print("wrote", path, img.size)
 
@@ -123,3 +181,5 @@ def mouse():
 if __name__ == "__main__":
     main()
     mouse()
+    mouse(os.path.expanduser("~/Desktop/moearmy/mouse_loved.webp"), "mouse_loved.png")
+    bradley()

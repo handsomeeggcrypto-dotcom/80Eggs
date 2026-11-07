@@ -231,6 +231,17 @@ const HEAD_PX = sprite(HEAD, {
 const HEAD_PX_W = white(HEAD_PX);
 const BODY_F = LEGS.map((l) => sprite(BODY.concat(l)));
 const BODY_W = white(BODY_F[0]);
+const RED_ROWS = BODY.map((r, i) => {
+  const a = r.split("").map((c) => (c === "b" ? "k" : c === "y" || c === "r" && i === 4 ? "g" : c));
+  if (i >= 1 && i <= 8) { if (a[4] !== ".") a[4] = "k"; if (a[11] !== ".") a[11] = "k"; }   // harness straps
+  if (i === 4) { a[4] = "s"; a[11] = "s"; }                                                // silver buckles
+  return a.join("");
+});
+const BODY_RED = LEGS.map((l) => sprite(RED_ROWS.concat(l), { g: "#d8352a", G: "#8e1d17", r: "#14121a", s: "#d8d8d8" }));
+const BRADLEY_HEAD = new Image();
+BRADLEY_HEAD.src = "assets/bradley_head.png";
+let BRADLEY_HEAD_W = null;
+BRADLEY_HEAD.onload = () => { BRADLEY_HEAD_W = tinted(BRADLEY_HEAD, "#fff"); renderPicker(); };
 const HEAD_PHOTO = new Image();
 HEAD_PHOTO.src = "assets/head_photo.png";
 const photoReady = () => HEAD_PHOTO.complete && HEAD_PHOTO.naturalWidth > 0;
@@ -250,20 +261,25 @@ function loadCustom(url) {
 
 // Who you can play as. Unlockable players slot in here later, e.g.
 // { id: "general", name: "GENERAL MOE", head: "photo", unlock: (stats) => stats.bestStage >= 5 }
+const STAGE_KEY = "moearmy_best_stage";
 const PLAYERS = [
   { id: "soldier", name: "SOLDIER MOE", head: "photo" },
   { id: "pixel", name: "PIXEL MOE", head: "pixel" },
+  { id: "bradley", name: "CEO BRADLEY", head: "bradley", unlock: { stage: 3, text: "REACH STAGE 3" } },
   { id: "custom", name: "YOUR MOE", head: "custom" },
 ];
 let playerId = store.get(PLAYER_KEY) || (store.get("moearmy_face") === "pixel" ? "pixel" : "soldier");
-const available = () => PLAYERS.filter((p) => p.id !== "custom" || CUSTOM);
-const player = () => available().find((p) => p.id === playerId) || PLAYERS[0];
+const bestStage = () => +(store.get(STAGE_KEY) || 0);
+const unlocked = (p) => !p.unlock || bestStage() >= p.unlock.stage;
+const available = () => PLAYERS.filter((p) => p.id !== "custom" || CUSTOM);   // shown in the picker, locked or not
+const player = () => available().find((p) => p.id === playerId && unlocked(p)) || PLAYERS[0];
+let viewId = playerId;   // who the title picker is showing (can be a locked player)
 
 // (x, y) is the middle of the soldier: head from y-20, uniform from y+3, boots end at y+14.
 // kind: "photo" (the standard soldier face), "pixel" or "custom"
 function drawMoe(x, y, frame, flash, kind) {
   const hx = Math.round(x - 12), hy = Math.round(y - 20);
-  ctx.drawImage(BODY_F[frame % 2], hx + 4, hy + 23);
+  ctx.drawImage((kind === "bradley" ? BODY_RED : BODY_F)[frame % 2], hx + 4, hy + 23);
   drawHead(hx, hy, kind || "photo", flash);
   if (flash) {
     ctx.globalAlpha = flash;
@@ -273,7 +289,10 @@ function drawMoe(x, y, frame, flash, kind) {
 }
 function drawHead(hx, hy, kind, flash) {
   let img = null, wimg = null, x, y, w, h;
-  if (kind === "custom" && CUSTOM) {
+  if (kind === "bradley" && BRADLEY_HEAD.complete && BRADLEY_HEAD.naturalWidth) {
+    img = BRADLEY_HEAD; wimg = BRADLEY_HEAD_W;
+    w = 25; h = w * BRADLEY_HEAD.naturalHeight / BRADLEY_HEAD.naturalWidth; x = hx; y = hy + 25 - h;
+  } else if (kind === "custom" && CUSTOM) {
     img = CUSTOM; wimg = CUSTOM_W; x = hx - 1; y = hy - 1; w = 26; h = 25;
   } else if (kind !== "pixel" && photoReady()) {
     img = HEAD_PHOTO; wimg = HEAD_PHOTO_W;
@@ -373,7 +392,9 @@ const MOUSE_BODY_ROWS = BODY.map((r, i) => {
 });
 const MOUSE_FUR = { f: "#cfc6cc", t: "#d9c08a", s: "#b89a62", c: "#efe3c4" };
 const MOUSE_BODY = LEGS.map((l) => sprite(MOUSE_BODY_ROWS.concat(l), Object.assign({ g: "#4a4d5a", G: "#2d2f38" }, MOUSE_FUR)));
-const MOUSE_BODY_LOVED = LEGS.map((l) => sprite(MOUSE_BODY_ROWS.concat(l), Object.assign({}, MOUSE_FUR, { c: "#ff7eb6" })));
+const MOUSE_LOVED = new Image();   // heart eyes and a big smile, once a mouse has been loved
+MOUSE_LOVED.src = "assets/mouse_loved.png";
+const lovedReady = () => MOUSE_LOVED.complete && MOUSE_LOVED.naturalWidth > 0;
 const MOUSE_BODY_W = white(MOUSE_BODY[0]);
 const MOUSE_HW = 32;   // head drawn 32 game pixels wide
 
@@ -383,9 +404,10 @@ function drawMouseHead(cx, bottom, w, flash, loved) {
   const x = cx - w / 2, y = bottom - h;
   ctx.imageSmoothingEnabled = true;
   ctx.imageSmoothingQuality = "high";
-  ctx.drawImage(MOUSE_HEAD, x, y, w, h);
+  if (loved && lovedReady()) ctx.drawImage(MOUSE_LOVED, x, y, w, h);
+  else ctx.drawImage(MOUSE_HEAD, x, y, w, h);
   if (flash && MOUSE_W) ctx.drawImage(MOUSE_W, x, y, w, h);
-  if (loved && MOUSE_PINK) { ctx.globalAlpha = 0.3; ctx.drawImage(MOUSE_PINK, x, y, w, h); ctx.globalAlpha = 1; }
+  if (loved && !lovedReady() && MOUSE_PINK) { ctx.globalAlpha = 0.3; ctx.drawImage(MOUSE_PINK, x, y, w, h); ctx.globalAlpha = 1; }
   ctx.imageSmoothingEnabled = false;
 }
 // (x, y) is the middle of the mouse, like drawMoe
@@ -396,7 +418,7 @@ function drawMouse(e, flash) {
   ctx.fillStyle = e.loved ? "#ff9fca" : "#e8a0a8";
   const tw = Math.floor(e.step * 0.5) % 2;
   ctx.fillRect(x + 7, y + 11, 3, 1); ctx.fillRect(x + 10, y + 10 - tw, 1, 2); ctx.fillRect(x + 11, y + 8 - tw, 1, 2);
-  ctx.drawImage(flash ? MOUSE_BODY_W : e.loved ? MOUSE_BODY_LOVED[f] : MOUSE_BODY[f], x - 8, y + 3);
+  ctx.drawImage(flash ? MOUSE_BODY_W : MOUSE_BODY[f], x - 8, y + 3);
   drawMouseHead(x, y + 4, MOUSE_HW, flash, e.loved);
 }
 
@@ -628,6 +650,20 @@ function loveEnemy(e) {
   }
 }
 
+function reachStage(n) {
+  const before = bestStage();
+  if (n <= before) return;
+  store.set(STAGE_KEY, n);
+  const fresh = PLAYERS.find((p) => p.unlock && before < p.unlock.stage && n >= p.unlock.stage);
+  if (fresh) {
+    setTimeout(() => {
+      if (state !== "play") return;
+      banner(fresh.name, "UNLOCKED!", 3);
+      SFX.power();
+    }, 2600);
+  }
+}
+
 function endGame() {
   state = "over"; overTimer = 1.1;
   SFX.over();
@@ -725,6 +761,7 @@ function update(dt) {
     G.bossOut = false; G.stageT = 0; G.stage++;
     G.score += 500 * (G.stage - 1);
     banner("STAGE " + G.stage, "+" + 500 * (G.stage - 1) + " BONUS");
+    reachStage(G.stage);
   }
 
   // enemies
@@ -988,13 +1025,16 @@ function toTitle() {
   state = "title";
   const best = +(store.get(BEST_KEY) || 0);
   $("bestTitle").innerHTML = best ? "BEST <b>" + best + "</b>" : "";
+  viewId = player().id;
   renderPicker();
   show("title");
 }
 
 function renderPicker() {
-  const p = player();
-  $("pName").textContent = p.name;
+  const list = available();
+  const p = list.find((q) => q.id === viewId) || player();
+  const locked = !unlocked(p);
+  $("pName").innerHTML = p.name + (locked ? "<br><b>LOCKED: " + p.unlock.text + "</b>" : "");
   $("enlistBtn").textContent = CUSTOM ? "NEW PICTURE" : "ENLIST YOUR MOE";
   const c = $("pCv").getContext("2d");
   c.setTransform(1, 0, 0, 1, 0, 0);
@@ -1003,15 +1043,23 @@ function renderPicker() {
   c.imageSmoothingEnabled = false;
   const main = ctx;
   ctx = c;
-  drawGlow(18, 23, 0);
+  if (!locked) drawGlow(18, 23, 0);
   drawMoe(18, 23, 0, 0, p.head);
   ctx = main;
+  if (locked) {   // a dark shape, like a character select you haven't earned yet
+    c.setTransform(1, 0, 0, 1, 0, 0);
+    c.globalCompositeOperation = "source-atop";
+    c.fillStyle = "rgba(20, 18, 26, 0.93)";
+    c.fillRect(0, 0, 144, 176);
+    c.globalCompositeOperation = "source-over";
+  }
 }
 function cyclePlayer(d) {
   const list = available();
-  const i = Math.max(0, list.findIndex((p) => p.id === player().id));
-  playerId = list[(i + d + list.length) % list.length].id;
-  store.set(PLAYER_KEY, playerId);
+  const i = Math.max(0, list.findIndex((p) => p.id === viewId));
+  const next = list[(i + d + list.length) % list.length];
+  viewId = next.id;
+  if (unlocked(next)) { playerId = next.id; store.set(PLAYER_KEY, playerId); }
   renderPicker();
 }
 
