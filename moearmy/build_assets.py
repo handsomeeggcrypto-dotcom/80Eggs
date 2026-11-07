@@ -11,12 +11,22 @@ Run with:  /usr/bin/python3 moearmy/build_assets.py
 import colorsys
 import os
 
-from PIL import Image, ImageDraw, ImageFilter
+from PIL import Image, ImageChops, ImageDraw, ImageFilter
 
 SRC = os.path.expanduser("~/Desktop/moearmy/soldier.jpg")
 OUT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets")
 HEAD_BOX = (230, 95, 1290, 1110)   # cap top to chin, in the source picture
 OUT_WIDTH = 120                    # drawn about 24 game pixels wide, so 5x for sharp phones
+
+# Hand-traced outline (source-picture coords) of everything below the cap brim: the hair, face and
+# neck, cut off at the collar. The colour test alone keeps bits of the tank behind the hair, because
+# the tank is nearly as dark as the hair. Above the brim the colour test is clean, so the outline is loose there.
+OUTLINE = [
+    (150, 0), (1460, 0), (1460, 560), (1290, 640), (1150, 645), (1110, 625), (1105, 680), (1095, 730),
+    (1075, 780), (1065, 870), (1080, 920), (1135, 985), (1140, 1015), (1110, 1060), (1020, 1088),
+    (850, 1095), (630, 1095), (530, 1075), (400, 1050), (280, 1042), (245, 1035), (250, 1010),
+    (262, 900), (268, 750), (270, 590), (260, 550), (255, 450), (150, 450),
+]
 
 
 def subject_mask(img):
@@ -71,7 +81,10 @@ def subject_mask(img):
 def main():
     os.makedirs(OUT, exist_ok=True)
     head = Image.open(SRC).convert("RGB").crop(HEAD_BOX)
-    mask = subject_mask(head)
+    outline = Image.new("L", head.size, 0)
+    ImageDraw.Draw(outline).polygon([(x - HEAD_BOX[0], y - HEAD_BOX[1]) for x, y in OUTLINE], fill=255)
+    outline = outline.filter(ImageFilter.GaussianBlur(1.5))
+    mask = ImageChops.multiply(subject_mask(head), outline)
     head.putalpha(mask)
     head = head.crop(mask.point(lambda v: 255 if v > 127 else 0).getbbox())
     h = round(head.height * OUT_WIDTH / head.width)

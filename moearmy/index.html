@@ -203,7 +203,7 @@ const BODY_F = LEGS.map((l) => sprite(BODY.concat(l)));
 const BODY_W = white(BODY_F[0]);
 const HEAD_PHOTO = new Image();
 HEAD_PHOTO.src = "assets/head_photo.png";
-let faceMode = store.get("moearmy_face") === "photo" ? "photo" : "pixel";
+let faceMode = store.get("moearmy_face") === "pixel" ? "pixel" : "photo";
 const photoReady = () => HEAD_PHOTO.complete && HEAD_PHOTO.naturalWidth > 0;
 
 // (x, y) is the middle of the soldier: head from y-20, uniform from y+3, boots end at y+14
