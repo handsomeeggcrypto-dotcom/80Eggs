@@ -4,6 +4,7 @@
   ~/Desktop/moearmy/mouse.webp   ->  assets/mouse_head.png   (the Anti Moemoe mouse army)
   ~/Desktop/moearmy/mouse_loved.webp -> assets/mouse_loved.png (the same mouse, heart eyes, once loved)
   ~/Desktop/moearmy/bradley.jpg  ->  assets/bradley_head.png (CEO Bradley, an unlockable player)
+  ~/Desktop/moearmy/heart_official.webp -> assets/heart_face.png (the official moemoe heart, on the menus)
 
 Cuts each head out of its tank background and saves it small with a see-through background.
 (The Moe's "PIXEL" face is hand-drawn in index.html, no file needed.)
@@ -178,8 +179,30 @@ def bradley():
     print("wrote", path, img.size)
 
 
+# The official moemoe heart already has a see-through background, but its edge has a faint blue fringe.
+HEART_SRC = os.path.expanduser("~/Desktop/moearmy/heart_official.webp")
+HEART_WIDTH = 160
+
+
+def heart():
+    img = Image.open(HEART_SRC).convert("RGBA")
+    px = img.load()
+    w, h = img.size
+    for y in range(h):
+        for x in range(w):
+            r, g, b, a = px[x, y]
+            if a < 140 or (b > r and b > g):   # the blue fringe and half-see-through edge
+                px[x, y] = (0, 0, 0, 0)
+    img = img.crop(img.getbbox())
+    img = img.resize((HEART_WIDTH, round(img.height * HEART_WIDTH / img.width)), Image.LANCZOS)
+    path = os.path.join(OUT, "heart_face.png")
+    img.save(path, optimize=True)
+    print("wrote", path, img.size)
+
+
 if __name__ == "__main__":
     main()
     mouse()
     mouse(os.path.expanduser("~/Desktop/moearmy/mouse_loved.webp"), "mouse_loved.png")
     bradley()
+    heart()

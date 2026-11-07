@@ -44,7 +44,7 @@
   .stat { font-size: calc(var(--s) * 6px); line-height: 2; color: #e9f2d0; }
   .stat b { color: #ffd42a; font-weight: normal; }
   #rank { color: #8fd3ff; }
-  #bradley { width: calc(var(--s) * 22px); height: calc(var(--s) * 22px); image-rendering: pixelated; }
+  .moeHeart { width: calc(var(--s) * 34px); height: auto; }
   #title { gap: calc(var(--s) * 4px); }
   .picker { display: flex; align-items: center; gap: calc(var(--s) * 4px); }
   #pCv { width: calc(var(--s) * 50px); height: calc(var(--s) * 61px); image-rendering: auto; }
@@ -63,7 +63,7 @@
     <canvas id="cv"></canvas>
 
     <div class="screen on" id="title">
-      <canvas id="bradley" width="11" height="11"></canvas>
+      <img class="moeHeart" src="assets/heart_face.png" alt="">
       <div class="logo">MOEMOE<br>ARMY<small>OPERATION I.L.Y.</small></div>
       <div class="ily">moemoe means ily</div>
       <div class="how">DRAG TO MOVE, HEARTS FIRE ON THEIR OWN<br>FREE CAGED MOES TO GROW YOUR SQUAD<br>LOVE THE ANTI MOEMOE MICE</div>
@@ -80,6 +80,7 @@
     </div>
 
     <div class="screen" id="over">
+      <img class="moeHeart" src="assets/heart_face.png" alt="">
       <div class="logo" style="font-size:calc(var(--s)*12px)">MISSION<br>OVER</div>
       <div class="stat" id="overStats"></div>
       <div class="stat" id="rank"></div>
@@ -104,6 +105,7 @@
     </div>
 
     <div class="screen" id="pause">
+      <img class="moeHeart" src="assets/heart_face.png" alt="">
       <div class="logo" style="font-size:calc(var(--s)*12px)">PAUSED</div>
       <div class="big blink">TAP TO GO ON</div>
       <div class="row"><button class="alt" id="menuPause">MAIN MENU</button></div>
@@ -1338,8 +1340,6 @@ $("mute").onclick = () => { audio(); setMute(!muted); };
 loadCustom(store.get(CUSTOM_KEY));
 setMute(muted);
 
-// big Bradley on the title
-(() => { const b = $("bradley").getContext("2d"); b.drawImage(BRADLEY, 0, 0); })();
 
 // ---------- loop ----------
 let last = performance.now();
