@@ -639,6 +639,22 @@ class Handler(BaseHTTPRequestHandler):
         path = self.path.split("?")[0]
         if not self.gate(path):
             return
+        if path == "/api/phonelink":         # texts the phone app's link (static/phone.html); this Mac only
+            if self.client_address[0] not in ("127.0.0.1", "::1"):
+                return self.send(403, {"error": "only on the mac"})
+            import daily
+            import nudge
+            who = daily.config().get("text_to")
+            if not who:
+                return self.send(400, {"error": "no text_to in data/daily.json"})
+            host = subprocess.run(["scutil", "--get", "LocalHostName"], capture_output=True, text=True).stdout.strip()
+            link = f"http://{host}.local:{PORT}/p/{station_config()['watch_key']}/"
+            try:
+                nudge.send(who, "🥚 me, in your pocket. open this in safari, tap share, then add to home screen. "
+                                "home wi-fi only.\n\n" + link)
+            except Exception as e:
+                return self.send(500, {"error": str(e)})
+            return self.send(200, {"sent": True})
         if path == "/api/nudge/test":         # nudge.py --test: one text now, sent from here so macOS asks about YOLK
             if self.client_address[0] not in ("127.0.0.1", "::1"):
                 return self.send(403, {"error": "only on the mac"})
