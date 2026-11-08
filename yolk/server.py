@@ -45,12 +45,20 @@ def station_config():
     """Pairing code and device token, made on first run."""
     DATA.mkdir(parents=True, exist_ok=True)
     cfg = json.loads(STATION.read_text()) if STATION.exists() else {}
+    changed = False
     if "code" not in cfg:
         cfg["code"] = f"{secrets.randbelow(1000000):06d}"
         cfg["token"] = secrets.token_hex(16)
+        changed = True
     if "watch_key" not in cfg:          # the Apple Watch Shortcut sends this instead of a cookie
         cfg["watch_key"] = secrets.token_hex(16)
-    STATION.write_text(json.dumps(cfg, indent=2))
+        changed = True
+    if changed:
+        # only when something's new, and all at once: every tablet request reads this file,
+        # and rewriting it each time let a request catch it half-written (and fail)
+        tmp = STATION.with_suffix(".tmp")
+        tmp.write_text(json.dumps(cfg, indent=2))
+        tmp.replace(STATION)
     return cfg
 
 

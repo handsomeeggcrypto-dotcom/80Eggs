@@ -189,7 +189,11 @@ def deliver(shell):
     music = shell / "Music" / "YOLK Radio"
     music.mkdir(parents=True, exist_ok=True)
     for old in music.glob("*YOLK.m4a"):
-        old.unlink()
+        if old.name.startswith("._"):       # the Mac's hidden twin files; they go with their song
+            continue
+        old.unlink(missing_ok=True)
+    for twin in music.glob("._*"):
+        twin.unlink(missing_ok=True)
     for clip in sorted(OUT.glob("*.m4a")):
         (music / clip.name).write_bytes(clip.read_bytes())
     marker.parent.mkdir(exist_ok=True)

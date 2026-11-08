@@ -41,6 +41,7 @@ QUIET_DAYS = 4
 JUST_TALKED = 2 * 3600                  # no text if you talked to her in the last 2 hours
 SONG_PLAYS = 5
 THINKING_CHANCE = 0.3                   # on an otherwise-eligible day
+NOT_HERS = ("reminder", "letter", "test")      # texts that don't count toward her one a day
 LATE_OK = 3 * 3600                      # a timed reminder still goes out this late (Mac asleep at the time)
 
 
@@ -99,7 +100,7 @@ def reasons(now=None):
     if med["streak"] >= 2 and not med["today"] and hour >= EVENING:
         out.append(("streak", now.date().isoformat(),
                     f"their meditation streak is {med['streak']} days and they haven't meditated today. "
-                    "it breaks at midnight", False))
+                    "it breaks at midnight", True))
     talked = last_talk()
     if talked and time.time() - talked > QUIET_DAYS * 86400:
         days = int((time.time() - talked) // 86400)
@@ -142,8 +143,11 @@ def pick(now=None, ignore_limits=False):
     if not ignore_limits:
         if not (FIRST_HOUR <= hour < LAST_HOUR):
             return None
-        if any(time.strftime("%Y-%m-%d", time.localtime(s["t"])) == today for s in history):
-            return None                               # one a day at most
+        # one of her own a day at most; reminders you asked for, the Sunday letter and tests
+        # don't use it up (a noon reminder once kept her from warning about a streak that evening)
+        if any(time.strftime("%Y-%m-%d", time.localtime(s["t"])) == today and s["why"] not in NOT_HERS
+               for s in history):
+            return None
         if time.time() - last_talk() < JUST_TALKED:
             return None
         # each day has its own random hour for ordinary texts, so they don't come like clockwork
@@ -151,7 +155,8 @@ def pick(now=None, ignore_limits=False):
         if hour < FIRST_HOUR + rng.random() * (EVENING + 1 - FIRST_HOUR):
             return None
     done = {(s["why"], s["key"]) for s in history}
-    since_last = (time.time() - history[-1]["t"]) / 86400 if history else 99
+    hers = [s for s in history if s["why"] not in NOT_HERS]
+    since_last = (time.time() - hers[-1]["t"]) / 86400 if hers else 99
     for why, key, what, urgent in reasons(now):
         if (why, key) in done:
             continue
