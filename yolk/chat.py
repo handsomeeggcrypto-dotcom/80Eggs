@@ -61,6 +61,9 @@ PLACES = {
              "short sentences.",
     "text": "Right now you're texting your owner out of nowhere, by iMessage, from the Mac. They didn't "
             "message you first, and they'll see it on their phone wherever they are.",
+    "phone": "Right now you're on your owner's iPhone, in a little chat app on their home screen (home "
+             "Wi-Fi only). They're typing to you, often answering a text you sent them first, so keep it "
+             "short, like texting: one or two sentences.",
     "desk": "Right now you're on the desktop terminal on the Mac. Your owner is typing to you, and your "
             "words appear as text on the terminal screen.",
 }
@@ -143,6 +146,13 @@ def details(where="station"):
         heard = music.for_chat()
         if heard:
             facts.append(heard)
+    except Exception:
+        pass
+    try:
+        import wedding
+        w = wedding.for_chat()
+        if w:
+            facts.append(w)
     except Exception:
         pass
     try:

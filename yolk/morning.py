@@ -79,6 +79,13 @@ def compose(day=None):
     mem = server.read_mem(server.MEMORY)
     name = "" if mem.get("name") in (None, "", "nobody") else f", {mem['name']}"
     lines = [f"🥚 YOLK · {day.strftime('%A, %b')} {day.day}", f"good morning{name}."]
+    try:
+        import wedding
+        wd = wedding.for_morning()
+        if wd:
+            lines.append(wd)
+    except Exception:
+        pass
 
     w = weather(cfg, day)
     if w:

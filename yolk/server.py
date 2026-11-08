@@ -422,7 +422,12 @@ def ambient():
             "daily": (daily.OUT / "daily.txt").read_text(encoding="utf-8") if (daily.OUT / "daily.txt").exists() else "",
         }
         _ambient["at"] = time.time()
-    return {**_ambient["data"], "meditation": meditation_stats(), "reminders": holding()}
+    try:
+        import wedding
+        countdown = wedding.short()
+    except Exception:
+        countdown = None
+    return {**_ambient["data"], "meditation": meditation_stats(), "reminders": holding(), "wedding": countdown}
 
 
 def holding(limit=4):
@@ -520,9 +525,16 @@ class Handler(BaseHTTPRequestHandler):
         key = self.headers.get("X-YOLK-Key") or path.rsplit("/", 1)[-1]
         return secrets.compare_digest(key.strip(), station_config()["watch_key"])
 
+    def phone_ok(self, path):
+        """The phone page lives at /p/<watch key>/..., so a home-screen app needs no cookie."""
+        parts = path.split("/")
+        return len(parts) > 2 and secrets.compare_digest(parts[2], station_config()["watch_key"])
+
     def gate(self, path):
         """True if the request may continue; otherwise answers it with the pairing page."""
         if self.trusted() or path in self.PUBLIC:
+            return True
+        if path.startswith("/p/") and self.phone_ok(path):
             return True
         if (path == "/api/watch" or path.startswith(("/api/watch/", "/w/"))) and self.watch_ok(path):
             return True
@@ -540,6 +552,18 @@ class Handler(BaseHTTPRequestHandler):
             return
         if path.startswith("/w/"):           # the Apple Watch chat page
             return self.send(200, watch_page(), TYPES[".html"])
+        if path.startswith("/p/"):           # the phone page (static/phone.html), /p/<watch key>/...
+            rest = path.split("/", 3)[3] if path.count("/") >= 3 else ""
+            if rest == "icon.png":
+                return self.send(200, (STATIC / "faces" / "big" / "good.png").read_bytes(), "image/png")
+            if rest.startswith("face/") and re.match(r"^[a-z]+$", rest[5:-4] or "-") and rest.endswith(".png"):
+                f = STATIC / "faces" / rest[5:]
+                return self.send(200, f.read_bytes(), "image/png") if f.is_file() else self.send(404, {})
+            if rest == "recent":             # her texts from the last two days, so the page reads like a thread
+                import nudge
+                return self.send(200, {"texts": [{"t": s["t"], "text": s["text"]} for s in nudge.sent()
+                                                 if time.time() - s["t"] < 2 * 86400 and s["why"] != "test"]})
+            return self.send(200, (STATIC / "phone.html").read_bytes(), TYPES[".html"])
         if path == "/pair":
             path = "/pair.html"
         if path == "/station":
@@ -623,6 +647,17 @@ class Handler(BaseHTTPRequestHandler):
                 return self.send(200, {"sent": nudge.test()})
             except Exception as e:
                 return self.send(500, {"error": str(e)})
+        if path.startswith("/p/") and path.endswith("/chat"):   # the phone page talking
+            import chat
+            data = self.body()
+            text = str(data.get("text", "")).strip()[:1000]
+            if not text:
+                return self.send(400, {"error": "empty"})
+            try:
+                return self.send(200, {"reply": chat.reply(text, new=bool(data.get("new")), where="phone")})
+            except Exception as e:
+                print("YOLK phone chat failed:", e)
+                return self.send(200, {"reply": "my brain glitched. try again in a second."})
         if path.startswith("/w/"):           # the Apple Watch chat page's form
             import chat
             from urllib.parse import parse_qs

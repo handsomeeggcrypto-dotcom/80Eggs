@@ -30,6 +30,7 @@
   #weather { font-size: 34px; color: #f2eadb; margin-top: 22px; }
   #weather .dim, .dim { color: #8a6410; }
   #streak { font-size: 30px; color: #ffc21a; margin-top: 14px; min-height: 1.2em; }
+  #wedding { font-size: 26px; color: #ff9ec4; margin-top: 8px; }
   /* reminders she's holding (journal notes with a day, from /api/ambient) */
   #holding { margin-top: 24px; font-size: 27px; }
   #holding .head { font-size: 22px; color: #8a6410; letter-spacing: .12em; margin-bottom: 4px; }
@@ -140,6 +141,7 @@
     <div id="date"></div>
     <div id="weather"></div>
     <div id="streak"></div>
+    <div id="wedding"></div>
     <div id="holding" class="hidden"></div>
     <div class="moe" id="moe"></div>
   </div>
@@ -268,6 +270,7 @@ function drawAmbient() {
   if (amb.meditation && amb.meditation.streak) parts.push("meditation: " + amb.meditation.streak + " day" + (amb.meditation.streak > 1 ? "s" : "") + (amb.meditation.today ? " (done today)" : ""));
   if (amb.streak) parts.push(amb.streak.habit + ": " + amb.streak.days + " days");
   $("streak").textContent = parts.join("  .  ");
+  $("wedding").textContent = amb.wedding || "";
   drawHolding(amb.reminders || []);
   var m = amb.moe;
   if (m) {
