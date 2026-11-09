@@ -202,7 +202,8 @@ def deliver(shell):
     keep = {n["id"] for n in notes[-FOR_SHELL:]} | {n["id"] for n in notes if n["on"] and n["on"] >= today}
     text = "".join(f"{n['id']}|{PLACES.get(n['where'], n['where'])}|{n['note']}|"
                    f"{day_number(n['on']) if n['on'] else 0}\n" for n in notes if n["id"] in keep)
-    (shell / "remember.txt").write_text(text, encoding="latin-1", errors="replace")
+    import shellio
+    shellio.text(shell / "remember.txt", text)
 
 
 if __name__ == "__main__":

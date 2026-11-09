@@ -37,6 +37,7 @@ sys.path.insert(0, str(HERE))
 import server  # noqa: E402  (memory + Moe lookups)
 import ai  # noqa: E402  (real-AI YOLK; does nothing without an API key)
 import radio  # noqa: E402  (YOLK Radio; same)
+import shellio  # noqa: E402  (unplug-safe writes to SHELL)
 
 DEFAULTS = {"city": "", "voice": "Junior", "rate": 175}
 
@@ -312,7 +313,7 @@ def deliver_meditation():
         for track in sorted(src.glob("*.m4a")):
             target = dest / track.name
             if not target.exists() or target.stat().st_size != track.stat().st_size:
-                shutil.copyfile(track, target)
+                shellio.copy(track, target)
                 copied += 1
     return copied
 
@@ -324,15 +325,15 @@ def deliver():
         return False
     music = SHELL / "Music" / "YOLK Daily"
     music.mkdir(parents=True, exist_ok=True)
-    (music / "YOLK Daily.m4a").write_bytes((OUT / "YOLK Daily.m4a").read_bytes())
+    shellio.copy(OUT / "YOLK Daily.m4a", music / "YOLK Daily.m4a")
     # also as text, so Talk to YOLK can read it out on screen
     text = (OUT / "daily.txt").read_text(encoding="utf-8")
-    (SHELL / "YOLK" / "daily.txt").write_text(text.encode("latin-1", "replace").decode("latin-1"), encoding="latin-1")
+    shellio.text(SHELL / "YOLK" / "daily.txt", text)
     deliver_ai()
     radio.deliver(SHELL)
     review = ai.weekly(target_day())
     if review:
-        (SHELL / "YOLK" / "review.txt").write_text(review.encode("latin-1", "replace").decode("latin-1"), encoding="latin-1")
+        shellio.text(SHELL / "YOLK" / "review.txt", review)
     return True
 
 
@@ -344,10 +345,8 @@ def deliver_ai():
     if not day or not written.exists() or (marker.exists() and marker.read_text().strip() == day):
         return False
     mind = json.loads(written.read_text())
-    with open(SHELL / "YOLK" / "dreams.txt", "a", encoding="latin-1", errors="replace") as f:
-        for kind in ("dream", "secret", "oracle"):
-            if mind.get(kind):
-                f.write(f"{kind}: {mind[kind]}\n")
+    shellio.append(SHELL / "YOLK" / "dreams.txt",
+                   "".join(f"{kind}: {mind[kind]}\n" for kind in ("dream", "secret", "oracle") if mind.get(kind)))
     marker.write_text(day)
     return True
 

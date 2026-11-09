@@ -67,7 +67,8 @@ def collect(shell):
             seen.add((int(t), text))
             next_id += 1
             new += 1
-    box.write_text("", encoding="latin-1")
+    import shellio
+    shellio.text(box, "")
     return new
 
 
@@ -121,7 +122,8 @@ def deliver(shell):
     replies = [l for l in read() if l["from"] == "yolk"][-KEEP_ON_SHELL:]
     (shell / "letters").mkdir(parents=True, exist_ok=True)
     text = "".join(f"{r['id']}|{p}\n" for r in replies for p in split(r["text"]))
-    (shell / "letters" / "in.txt").write_text(text, encoding="latin-1", errors="replace")
+    import shellio
+    shellio.text(shell / "letters" / "in.txt", text)
 
 
 def on_sync(shell):

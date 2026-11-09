@@ -91,7 +91,8 @@ def write_mem(path, mem):
     path.parent.mkdir(parents=True, exist_ok=True)
     # latin-1 because SHELL's font (and Lua) only handle single-byte text
     text = "".join(f"{k}={v}\n" for k, v in sorted(mem.items()))
-    path.write_text(text.encode("latin-1", "replace").decode("latin-1"), encoding="latin-1")
+    import shellio
+    shellio.text(path, text)
 
 
 def stamp(mem):
@@ -159,8 +160,9 @@ def read_log(path):
 
 def write_log(path, entries):
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text("".join(f"{e['day']}|{e['time']}|{e['mood']}|{','.join(sorted(e['habits']))}\n"
-                            for _, e in sorted(entries.items())), encoding="latin-1")
+    import shellio
+    shellio.text(path, "".join(f"{e['day']}|{e['time']}|{e['mood']}|{','.join(sorted(e['habits']))}\n"
+                               for _, e in sorted(entries.items())))
 
 
 def habits():
@@ -242,11 +244,56 @@ def shell_connected():
     return SHELL.is_dir()
 
 
+_shell_lock = threading.RLock()           # one writer to SHELL at a time
+_mount = {"id": None, "announced": False}
+
+
+def mount_id():
+    """Changes every time SHELL is plugged in (the volume's folder is made fresh at each mount)."""
+    try:
+        st = os.stat(SHELL.parent)
+        return (st.st_dev, getattr(st, "st_birthtime", st.st_ctime))
+    except OSError:
+        return None
+
+
+def shell_done():
+    """After the first full sync of a plug-in: tidy up, eject SHELL, and say it's safe to unplug.
+    "shell_eject": false in data/daily.json keeps SHELL mounted (to copy music yourself);
+    then the message just says the sync is done. Never ejects a test SHELL (YOLK_SHELL)."""
+    mid = mount_id()
+    if not mid or (_mount["id"] == mid and _mount["announced"]):
+        return
+    _mount["id"], _mount["announced"] = mid, True
+    import daily
+    import shellio
+    shellio.cleanup(SHELL.parent / "YOLK")
+    real = not os.environ.get("YOLK_SHELL")
+    eject = real and daily.config().get("shell_eject", True) is not False
+    if eject:
+        r = subprocess.run(["diskutil", "eject", str(SHELL.parent)], capture_output=True, text=True, timeout=60)
+        msg = ("all synced. i ejected SHELL, so you can unplug it." if r.returncode == 0 else
+               "all synced, but SHELL wouldn't eject (something has it open). eject it in finder before unplugging.")
+        print("SHELL:", msg, r.stderr.strip())
+    else:
+        msg = "all synced. eject SHELL in finder before unplugging."
+    if real:
+        subprocess.run(["osascript", "-e", 'on run argv\n display notification (item 1 of argv) with title "YOLK" '
+                        'subtitle "SHELL" sound name "Glass"\nend run', msg], capture_output=True, timeout=30)
+
+
 def sync():
     """Merge memories and hand queued dreams to SHELL. Safe to call often."""
+    with _shell_lock:
+        return _sync()
+
+
+def _sync():
     desk = read_mem(MEMORY)
     if not shell_connected():
         return desk, False
+    if _mount["id"] != mount_id():                 # just plugged in: not announced yet
+        _mount["id"], _mount["announced"] = mount_id(), False
     shell = read_mem(SHELL / "memory.txt")
     mem = merge(desk, shell, read_mem(MERGED) if MERGED.exists() else None)
     write_mem(MEMORY, mem)
@@ -280,12 +327,12 @@ def sync():
     import finance
     finance.deliver(DATA, SHELL)
     if HABITS.exists():
-        (SHELL / "habits.txt").write_text(HABITS.read_text(encoding="utf-8"), encoding="latin-1", errors="replace")
+        import shellio
+        shellio.text(SHELL / "habits.txt", HABITS.read_text(encoding="utf-8"))
     if QUEUE.exists() and QUEUE.read_text().strip():
         dreams = [l for l in QUEUE.read_text(encoding="utf-8").splitlines() if l.strip()]
-        with open(SHELL / "dreams.txt", "a", encoding="latin-1", errors="replace") as f:
-            for d in dreams:
-                f.write("dream: " + d + "\n")
+        import shellio
+        shellio.append(SHELL / "dreams.txt", "".join("dream: " + d + "\n" for d in dreams))
         with open(SENT, "a", encoding="utf-8") as f:
             for d in dreams:
                 f.write(f"{int(time.time())}\t{d}\n")
@@ -304,11 +351,16 @@ def deliver_daily():
             return
         try:
             import daily
+            built = False
             if daily.needs_build():
-                daily.build()
-                daily.deliver()
-            elif not (SHELL.parent / "Music" / "YOLK Daily" / "YOLK Daily.m4a").exists():
-                daily.deliver()
+                daily.build()                       # can take a minute; SHELL isn't touched yet
+                built = True
+            with _shell_lock:
+                if not shell_connected():
+                    return
+                if built or not (SHELL.parent / "Music" / "YOLK Daily" / "YOLK Daily.m4a").exists():
+                    daily.deliver()
+                shell_done()                        # everything's on SHELL: eject and say so
         except Exception as e:
             print("YOLK Daily failed:", e)
         finally:

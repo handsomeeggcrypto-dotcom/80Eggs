@@ -164,7 +164,8 @@ def for_radio():
 
 def deliver(shell):
     """Writes her remarks to SHELL as /YOLK/music.txt, one per line (latin-1 for its font)."""
-    (shell / "music.txt").write_text("".join(r + "\n" for r in remarks()), encoding="latin-1", errors="replace")
+    import shellio
+    shellio.text(shell / "music.txt", "".join(r + "\n" for r in remarks()))
 
 
 def on_sync(shell):

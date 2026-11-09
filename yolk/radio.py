@@ -8,6 +8,7 @@ song and a sign-off, and macOS speaks them. daily.deliver() puts the clips in
 Music/YOLK Radio/ with a playlist, and SHELL's radio.lua hands it to the music player.
 No API key or any error: there's just no new show.
 """
+import shellio  # unplug-safe writes to SHELL
 import json
 import os
 import random
@@ -195,11 +196,11 @@ def deliver(shell):
     for twin in music.glob("._*"):
         twin.unlink(missing_ok=True)
     for clip in sorted(OUT.glob("*.m4a")):
-        (music / clip.name).write_bytes(clip.read_bytes())
+        shellio.copy(clip, music / clip.name)
     marker.parent.mkdir(exist_ok=True)
     lines = playlist_for(shell, (OUT / "today.m3u8").read_text(encoding="utf-8").splitlines())
-    (shell / "YOLK" / "radio" / "today.m3u8").write_text("\n".join(lines) + "\n", encoding="utf-8")
-    marker.write_text(day)
+    shellio.write(shell / "YOLK" / "radio" / "today.m3u8", "\n".join(lines) + "\n")
+    shellio.write(marker, day)
     return True
 
 

@@ -105,5 +105,6 @@ def deliver(data_dir, shell_yolk):
     if out.exists() and out.read_text(encoding="latin-1") == text:
         return False
     out.parent.mkdir(exist_ok=True)
-    out.write_text(text, encoding="latin-1")
+    import shellio
+    shellio.text(out, text)
     return True
