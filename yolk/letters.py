@@ -127,11 +127,12 @@ def deliver(shell):
 
 
 def on_sync(shell):
-    """Called by server.sync() whenever SHELL is plugged in."""
-    collect(shell)
+    """Called by server.sync() whenever SHELL is plugged in. Returns how many letters came in.
+    Her replies are written by the server's background step (answer_pending, then deliver),
+    before it ejects SHELL, so they make the same trip."""
+    new = collect(shell)
     deliver(shell)
-    if unanswered():
-        threading.Thread(target=answer_pending, args=(shell,), daemon=True).start()
+    return new
 
 
 if __name__ == "__main__":

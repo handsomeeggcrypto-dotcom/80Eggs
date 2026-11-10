@@ -134,6 +134,19 @@ local function load_heard()
 end
 
 ---------------------------------------------------------------- helpers
+-- what the last sync took and left, written by the Mac just before it ejects SHELL
+-- (shell_done in yolk/server.py): an id line (unix time), then a sentence or two
+local BROUGHT = { id = 0, lines = {} }
+local function load_brought()
+    local f = io.open(DIR .. "brought.txt", "r")
+    if not f then return end
+    for line in f:lines() do
+        if BROUGHT.id == 0 then BROUGHT.id = tonumber(line) or 0
+        elseif line:match("%S") then BROUGHT.lines[#BROUGHT.lines + 1] = line end
+    end
+    f:close()
+end
+
 -- Rockbox Lua has no os.date formatting; the RTC holds local time
 local function clock()
     local t = os.time and os.time()
@@ -502,6 +515,14 @@ local function on_the_day()
     return false
 end
 
+-- once per sync, right after hello
+local function brought()
+    if BROUGHT.id == 0 or BROUGHT.id <= num("brought_seen") or #BROUGHT.lines == 0 then return end
+    say(pick({ "while you were plugged in:", "i was busy while you charged.", "the mac and i had a talk." }), "dream")
+    for i = 1, math.min(#BROUGHT.lines, 3) do say(BROUGHT.lines[i], "good") end
+    mem.brought_seen = BROUGHT.id
+end
+
 local function greet()
     local visits = num("visits")
     local last = num("last_seen")
@@ -520,6 +541,7 @@ local function greet()
                          "hi {name}. the hard drive's warm. sit down." }
         say(pick(hellos), mood_face())
     end
+    brought()
     -- one new dream per visit, if the Mac left any
     local seen = num("dreams_seen")
     if #DREAMS > seen then
@@ -827,6 +849,7 @@ load_mem()
 load_dreams()
 load_notes()
 load_heard()
+load_brought()
 YOLK_ON_USB = function()  -- keep what YOLK learned if you plug in mid-chat
     mem.last_seen = os.time and os.time() or 0
     save_mem()

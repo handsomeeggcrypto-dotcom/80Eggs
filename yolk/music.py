@@ -169,8 +169,10 @@ def deliver(shell):
 
 
 def on_sync(shell):
-    collect(shell)
+    """Returns how many plays came in."""
+    new = collect(shell)
     deliver(shell)
+    return new
 
 
 if __name__ == "__main__":

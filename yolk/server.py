@@ -248,6 +248,91 @@ _shell_lock = threading.RLock()           # one writer to SHELL at a time
 _mount = {"id": None, "announced": False}
 
 
+_trip = {}                                # what this plug-in took from SHELL and left on it
+
+
+def trip(way, what, n):
+    if n:
+        _trip.setdefault(way, {})
+        _trip[way][what] = _trip[way].get(what, 0) + n
+
+
+def read_quiet(path):
+    try:
+        return Path(path).read_text().strip()
+    except OSError:
+        return ""
+
+
+def note_ids():
+    return {l.split("|", 1)[0] for l in read_quiet(SHELL / "remember.txt").splitlines() if l.strip()}
+
+
+APPS = HERE.parent / "shell" / "root" / "YOLK"     # SHELL's Lua apps, as committed here
+
+
+def update_apps():
+    """Copies any of SHELL's apps (shell/root/YOLK/*.lua) that changed here onto SHELL,
+    so fixes reach the iPod on the next plug-in. Only the .lua files at the top level;
+    art and data are left to tools/restore_shell.py. Never for a test SHELL."""
+    if os.environ.get("YOLK_SHELL") or not APPS.is_dir():
+        return 0
+    import shellio
+    n = 0
+    for src in sorted(APPS.glob("*.lua")):
+        dst = SHELL / src.name
+        data = src.read_bytes()
+        try:
+            if dst.exists() and dst.read_bytes() == data:
+                continue
+        except OSError:
+            continue
+        shellio.write(dst, data)
+        print("SHELL: updated", src.name)
+        n += 1
+    return n
+
+
+def brought_lines():
+    """A sentence or two for SHELL about this trip, in her voice: what she took, what she left."""
+    def some(n, one, many):
+        return one if n == 1 else f"{n} {many}"
+
+    def listed(items):
+        return items[0] if len(items) == 1 else ", ".join(items[:-1]) + " and " + items[-1]
+    took, left = _trip.get("took", {}), _trip.get("left", {})
+    t = []
+    if took.get("checkins"):
+        t.append(some(took["checkins"], "a check-in", "check-ins"))
+    if took.get("meditations"):
+        t.append(some(took["meditations"], "a meditation", "meditations"))
+    if took.get("letters"):
+        t.append(some(took["letters"], "your letter", "letters"))
+    if took.get("plays"):
+        t.append(some(took["plays"], "a song you played", "songs you played"))
+    l = []
+    if left.get("daily"):
+        l.append("today's daily")
+    if left.get("radio"):
+        l.append("a radio show")
+    if left.get("replies"):
+        l.append(some(left["replies"], "a letter back", "letters back"))
+    if left.get("notes"):
+        l.append(some(left["notes"], "a new note", "new notes"))
+    if left.get("her_dream") or left.get("mac_dreams"):
+        l.append("a dream")
+    if left.get("money"):
+        l.append("your money numbers")
+    if left.get("apps"):
+        l.append("an update for " + ("one of my apps" if left["apps"] == 1 else f"{left['apps']} of my apps"))
+    out = []
+    if t:
+        out.append("i took " + listed(t) + ".")
+    if l:
+        out.append("i left you " + listed(l) + ".")
+    return out
+
+
 def mount_id():
     """Changes every time SHELL is plugged in (the volume's folder is made fresh at each mount)."""
     try:
@@ -268,6 +353,9 @@ def shell_done():
     import daily
     import shellio
     shellio.cleanup(SHELL.parent / "YOLK")
+    said = brought_lines()
+    if said:                                # Talk to YOLK reads it once, after you unplug
+        shellio.text(SHELL / "brought.txt", f"{int(time.time())}\n" + "".join(l + "\n" for l in said))
     real = not os.environ.get("YOLK_SHELL")
     eject = real and daily.config().get("shell_eject", True) is not False
     if eject:
@@ -294,24 +382,30 @@ def _sync():
         return desk, False
     if _mount["id"] != mount_id():                 # just plugged in: not announced yet
         _mount["id"], _mount["announced"] = mount_id(), False
+        _trip.clear()
     shell = read_mem(SHELL / "memory.txt")
     mem = merge(desk, shell, read_mem(MERGED) if MERGED.exists() else None)
     write_mem(MEMORY, mem)
     write_mem(SHELL / "memory.txt", mem)
     write_mem(MERGED, mem)
+    trip("left", "apps", update_apps())
     import journal                      # her notes from the Mac and the Station
+    had = note_ids()
     journal.deliver(SHELL)
+    trip("left", "notes", len(note_ids() - had))
     import letters                      # letters written on SHELL, and her replies
-    letters.on_sync(SHELL)
+    trip("took", "letters", letters.on_sync(SHELL))
     try:
         import music                    # what you've played on SHELL
-        music.on_sync(SHELL)
+        trip("took", "plays", music.on_sync(SHELL))
     except Exception as e:
         print("YOLK couldn't read SHELL's play log:", e)
     # check-ins: union of both sides (newest wins per day), kept on both, so the
     # Mac also holds a backup for after SHELL's storage swap
     log = read_log(LOG)
     for d, e in read_log(SHELL / "log.txt").items():
+        if d not in log:
+            trip("took", "checkins", 1)
         if d not in log or e["time"] >= log[d]["time"]:
             log[d] = e
     if log:
@@ -321,11 +415,13 @@ def _sync():
     if med.exists():
         known = set(SHELL_MEDITATIONS.read_text().splitlines()) if SHELL_MEDITATIONS.exists() else set()
         new = [l for l in med.read_text().splitlines() if l.strip() and l not in known]
+        trip("took", "meditations", len(new))
         if new:
             with open(SHELL_MEDITATIONS, "a") as f:
                 f.write("".join(l + "\n" for l in new))
     import finance
-    finance.deliver(DATA, SHELL)
+    if finance.deliver(DATA, SHELL):
+        trip("left", "money", 1)
     if HABITS.exists():
         import shellio
         shellio.text(SHELL / "habits.txt", HABITS.read_text(encoding="utf-8"))
@@ -333,6 +429,7 @@ def _sync():
         dreams = [l for l in QUEUE.read_text(encoding="utf-8").splitlines() if l.strip()]
         import shellio
         shellio.append(SHELL / "dreams.txt", "".join("dream: " + d + "\n" for d in dreams))
+        trip("left", "mac_dreams", len(dreams))
         with open(SENT, "a", encoding="utf-8") as f:
             for d in dreams:
                 f.write(f"{int(time.time())}\t{d}\n")
@@ -355,12 +452,25 @@ def deliver_daily():
             if daily.needs_build():
                 daily.build()                       # can take a minute; SHELL isn't touched yet
                 built = True
+            import letters
+            replies = lambda: sum(1 for l in letters.read() if l["from"] == "yolk")
+            before = replies()
+            letters.answer_pending()                # Claude writes back (Mac side only, no SHELL yet)
             with _shell_lock:
                 if not shell_connected():
                     return
+                letters.deliver(SHELL)
+                trip("left", "replies", replies() - before)
                 if built or not (SHELL.parent / "Music" / "YOLK Daily" / "YOLK Daily.m4a").exists():
-                    daily.deliver()
-                shell_done()                        # everything's on SHELL: eject and say so
+                    radio_day = read_quiet(SHELL / "radio" / "day.txt")
+                    ai_day = read_quiet(daily.ai.OUT / "delivered.txt")
+                    if daily.deliver():
+                        trip("left", "daily", 1)
+                    if read_quiet(SHELL / "radio" / "day.txt") != radio_day:
+                        trip("left", "radio", 1)
+                    if read_quiet(daily.ai.OUT / "delivered.txt") != ai_day:
+                        trip("left", "her_dream", 1)
+                shell_done()                        # everything's on SHELL: say what, eject, notify
         except Exception as e:
             print("YOLK Daily failed:", e)
         finally:
