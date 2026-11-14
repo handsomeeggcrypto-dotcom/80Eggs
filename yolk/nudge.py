@@ -6,9 +6,12 @@
   python3 yolk/nudge.py --log      the texts she's sent
   python3 yolk/nudge.py --test     send one now, through the running server
 
-The server checks every 10 minutes (check()). She sends at most one a day, between
-NOON-ish and 9:30pm, never right after you've talked to her, and for the ordinary
-reasons only every few days, so it stays rare. Reasons, most important first:
+The server checks every 10 minutes (check()). Each day rolls its own dice (plan()): 0, 1, 2
+or 3 texts of her own, each at a random time between 11am and 9:30pm, so some days are
+silent and none are like clockwork. Never more than 3 a day (the morning text, timed
+reminders, the Sunday letter and tests don't count), never within 90 minutes of her last
+one or 2 hours of a chat. Urgent reasons (tomorrow, streak, wedding, payday) don't wait for
+a planned time, but still count toward the 3. Reasons, most important first:
   reminder  a reminder you asked for at a set time (journal note with "at"): sent at that time,
             whatever the other limits say, up to LATE_OK late if the Mac was asleep
   tomorrow  a journal note is about tomorrow (evening before)
@@ -19,7 +22,7 @@ reasons only every few days, so it stays rare. Reasons, most important first:
   payday    the day after a good paycheck, if the next one looks tight or short (finance.py,
             from the Finance page's Payday Planner): how much of this one to leave alone
   nestegg   Safe Scout (Nest Egg's practice bot) moved 10% in a day or hit a new high (eggwatch.py)
-  thinking  nothing in particular; sometimes she just brings up something she remembers
+  thinking  nothing in particular; a planned time came and she brings up something she remembers
 Claude writes the words in her voice (chat.text_message). The server sends it, so the
 first one makes macOS ask "YOLK wants to control Messages". Turn them off with
 "nudges": false in data/daily.json. Log: data/nudges.txt  (unix|reason|key|text)
@@ -39,12 +42,13 @@ import server  # noqa: E402
 LOG = server.DATA / "nudges.txt"
 FIRST_HOUR, LAST_HOUR = 11, 21.5        # never before 11am or after 9:30pm
 EVENING = 19                            # "tomorrow" and "streak" wait until 7pm
-GAP_DAYS = 2                            # ordinary reasons wait this long after the last text
 QUIET_DAYS = 4
 JUST_TALKED = 2 * 3600                  # no text if you talked to her in the last 2 hours
 SONG_PLAYS = 5
-THINKING_CHANCE = 0.3                   # on an otherwise-eligible day
-NOT_HERS = ("reminder", "letter", "test")      # texts that don't count toward her one a day
+MAX_A_DAY = 3                           # her own texts a day, at most
+SPACING = 1.5 * 3600                    # at least this long between two of her own texts
+URGENT = ("tomorrow", "streak", "wedding", "payday")   # go whenever, not at a planned time
+NOT_HERS = ("reminder", "letter", "test")      # texts that don't count toward her 3 a day
 LATE_OK = 3 * 3600                      # a timed reminder still goes out this late (Mac asleep at the time)
 
 
@@ -89,8 +93,28 @@ def last_talk():
     return last
 
 
-def reasons(now=None):
-    """Every reason she has to text right now, most important first: (why, key, what, urgent)."""
+def plan(day):
+    """Today's dice: the hours (like 14.5 = 2:30pm) she'll text on her own, 0 to 3 of them.
+    Same answer all day, so the server's checks agree with each other."""
+    rng = random.Random("yolk-plan" + day.isoformat())
+    count = rng.randint(0, MAX_A_DAY)                 # 0, 1, 2 or 3, equally likely
+    for _ in range(200):                              # spread them out at least SPACING apart
+        hours = sorted(round(rng.uniform(FIRST_HOUR, LAST_HOUR - 0.25), 2) for _ in range(count))
+        if all(b - a >= SPACING / 3600 for a, b in zip(hours, hours[1:])):
+            return hours
+    return hours[:1]
+
+
+def hers_on(day, history=None):
+    """Her own texts on that day (not reminders, letters or tests)."""
+    d = day.isoformat()
+    return [s for s in (history if history is not None else sent())
+            if s["why"] not in NOT_HERS and time.strftime("%Y-%m-%d", time.localtime(s["t"])) == d]
+
+
+def reasons(now=None, n_today=0):
+    """Every reason she has to text right now, most important first: (why, key, what, urgent).
+    n_today = her ordinary texts so far today, so each "thinking" text is about a different note."""
     now = now or dt.datetime.now()
     hour = now.hour + now.minute / 60
     out = []
@@ -141,8 +165,8 @@ def reasons(now=None):
         pass
     notes = journal.read()
     if notes:
-        n = random.Random(now.date().isoformat()).choice(notes[-30:])
-        out.append(("thinking", now.date().isoformat(),
+        n = random.Random(f"{now.date().isoformat()}#{n_today}").choice(notes[-30:])
+        out.append(("thinking", f"{now.date().isoformat()}#{n_today}",
                     f"no reason. you were thinking about something you remember: {n['note']}", False))
     return out
 
@@ -152,40 +176,34 @@ def pick(now=None, ignore_limits=False):
     now = now or dt.datetime.now()
     hour = now.hour + now.minute / 60
     history = sent()
-    today = now.date().isoformat()
     done = {(s["why"], s["key"]) for s in history}
     for why, key, what in due(now):                   # a reminder they asked for beats every rule below
         if (why, key) not in done:
             return why, key, what
+    mine = hers_on(now.date(), history)
+    ordinary = [x for x in mine if x["why"] not in URGENT]
     if not ignore_limits:
         if not (FIRST_HOUR <= hour < LAST_HOUR):
             return None
-        # one of her own a day at most; reminders you asked for, the Sunday letter and tests
-        # don't use it up (a noon reminder once kept her from warning about a streak that evening)
-        if any(time.strftime("%Y-%m-%d", time.localtime(s["t"])) == today and s["why"] not in NOT_HERS
-               for s in history):
+        if len(mine) >= MAX_A_DAY:
             return None
         if time.time() - last_talk() < JUST_TALKED:
             return None
-        # each day has its own random hour for ordinary texts, so they don't come like clockwork
-        rng = random.Random("yolk" + today)
-        if hour < FIRST_HOUR + rng.random() * (EVENING + 1 - FIRST_HOUR):
+        if mine and time.time() - mine[-1]["t"] < SPACING:
             return None
-    done = {(s["why"], s["key"]) for s in history}
-    hers = [s for s in history if s["why"] not in NOT_HERS]
-    since_last = (time.time() - hers[-1]["t"]) / 86400 if hers else 99
-    for why, key, what, urgent in reasons(now):
+    # a planned time has come and hasn't been used yet (if one was missed, e.g. the Mac
+    # slept or they were chatting, it goes at the next check that's allowed)
+    slot_open = len(ordinary) < sum(1 for h in plan(now.date()) if h <= hour)
+    for why, key, what, urgent in reasons(now, len(ordinary)):
         if (why, key) in done:
             continue
         if ignore_limits:
             return why, key, what
-        if not urgent and since_last < GAP_DAYS:
-            continue
-        if not urgent and now.weekday() == 6:          # Sunday belongs to the letter (sunday.py)
+        if urgent:
+            return why, key, what
+        if not slot_open or now.weekday() == 6:       # Sunday belongs to the letter (sunday.py)
             continue
         if why == "song" and any(s["why"] == "song" and time.time() - s["t"] < 14 * 86400 for s in history):
-            continue
-        if why == "thinking" and random.Random("think" + today).random() > THINKING_CHANCE:
             continue
         return why, key, what
     return None
@@ -267,6 +285,11 @@ if __name__ == "__main__":
         print("reasons she has right now:" if found else "no reasons right now.")
         for why, key, what, urgent in found:
             print(f"  {why:9s} {what}")
+        today = dt.date.today()
+        hours = plan(today)
+        print(f"\ntoday's dice: {len(hours)} text(s) of her own" + (" at " + ", ".join(
+            dt.datetime.combine(today, dt.time()).replace(hour=int(h), minute=int(h % 1 * 60)).strftime("%-I:%M%p").lower()
+            for h in hours) if hours else "") + f"; sent so far: {len(hers_on(today))}")
         p = pick()
         print("\nwould she text now?", f"yes, about {p[0]}" if p else "no (limits or quiet hours)")
         if "--write" in sys.argv:
