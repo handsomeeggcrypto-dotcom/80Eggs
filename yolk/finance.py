@@ -94,6 +94,91 @@ def summary(state, code):
     return "\n".join(lines) + "\n"
 
 
+# ---------- Payday Planner (same rules as renderPlanner in static/finance.html) ----------
+TIGHT = 0.25        # a check with less than a quarter left after bills is "tight"
+
+
+def _bills(state):
+    out = []
+    for d in state.get("debts", []):
+        if num(d.get("min")) > 0 and num(d.get("balance")) > 0:
+            out.append((d.get("name") or "Debt", num(d.get("min")), int(num(d.get("due")))))
+    for b in state.get("bills", []):
+        if num(b.get("amount")) > 0:
+            out.append((b.get("name") or "Bill", num(b.get("amount")), int(num(b.get("day")))))
+    return [b for b in out if 1 <= b[2] <= 31]
+
+
+def _due(year, month, day):
+    import calendar
+    return dt.date(year, month, min(day, calendar.monthrange(year, month)[1]))
+
+
+def _between(bills, start, end):
+    """(name, amount, due date) for every bill due from start to end, both included."""
+    out, y, m = [], start.year, start.month
+    while dt.date(y, m, 1) <= end:
+        for name, amt, day in bills:
+            d = _due(y, m, day)
+            if start <= d <= end:
+                out.append((name, amt, d))
+        y, m = (y + 1, 1) if m == 12 else (y, m + 1)
+    return sorted(out, key=lambda b: b[2])
+
+
+def checks(state, today=None, count=3):
+    """The paycheck you're on now and the next ones: dicts with date, bills, total, left, pay."""
+    pay = state.get("pay") or {}
+    try:
+        anchor = dt.datetime.strptime(pay.get("date") or "", "%Y-%m-%d").date()
+    except ValueError:
+        return []
+    amount = num(pay.get("amount")) or sum(num(a.get("amount")) for a in state.get("income", [])) * 12 / 26
+    c = pay.get("cushion")
+    cushion = 2 if c in (None, "") else max(0, int(num(c)))
+    today = today or dt.date.today()
+    p = anchor + dt.timedelta(days=((today - anchor).days // 14) * 14)
+    bills = _bills(state)
+    out = []
+    for k in range(count):
+        start = p + dt.timedelta(days=14 * k)
+        due = _between(bills, start + dt.timedelta(days=cushion), start + dt.timedelta(days=13 + cushion))
+        total = sum(b[1] for b in due)
+        out.append({"date": start, "bills": due, "total": total, "left": amount - total, "pay": amount})
+    return out
+
+
+def payday_warning(today=None, state=None):
+    """The day after a payday (or the day after that, if the Mac slept), if this check is fine
+    and the next one looks rough: (key, what to tell them). Otherwise None."""
+    today = today or dt.date.today()
+    if state is None:
+        f = HERE / "data" / "finance.json"
+        if not f.exists():
+            return None
+        state = json.loads(f.read_text())
+    cs = checks(state, today, 2)
+    if len(cs) < 2 or cs[0]["pay"] <= 0:
+        return None
+    now, nxt = cs
+    if (today - now["date"]).days not in (1, 2):
+        return None
+    rough = nxt["left"] < nxt["pay"] * TIGHT
+    if not rough or now["left"] < 0 or now["left"] <= nxt["left"]:
+        return None
+    hold = max(0.0, nxt["pay"] * TIGHT - nxt["left"])
+    biggest = sorted(nxt["bills"], key=lambda b: -b[1])[:3]
+    when = nxt["date"].strftime("%A %B %d").replace(" 0", " ")
+    what = (f"money heads-up. they got paid {(today - now['date']).days} day(s) ago and this check is fine "
+            f"(${round(now['left'])} left after its bills). but the next check, {when}, has to cover "
+            f"${round(nxt['total'])} of bills ({', '.join(f'{n} ${round(a)}' for n, a, _ in biggest)}), "
+            + (f"which is ${round(-nxt['left'])} MORE than the check. " if nxt["left"] < 0
+               else f"leaving only ${round(nxt['left'])}. ")
+            + f"tell them to leave about ${int(-(-hold // 10) * 10)} of this check alone so the next one isn't rough. "
+            "plain numbers, no lecture, no financial advice beyond that")
+    return now["date"].isoformat(), what
+
+
 def deliver(data_dir, shell_yolk):
     """Writes SHELL's summary if it changed. Returns True if it wrote."""
     src, code_file = data_dir / "finance.json", data_dir / "finance_code.txt"

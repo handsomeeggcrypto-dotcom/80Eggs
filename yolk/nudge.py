@@ -16,6 +16,8 @@ reasons only every few days, so it stays rare. Reasons, most important first:
   quiet     you haven't talked to her in QUIET_DAYS days
   song      one song played over and over on SHELL this week
   wedding   a milestone day before the wedding (wedding.py; 200 days, 100, 30, 7...)
+  payday    the day after a good paycheck, if the next one looks tight or short (finance.py,
+            from the Finance page's Payday Planner): how much of this one to leave alone
   nestegg   Safe Scout (Nest Egg's practice bot) moved 10% in a day or hit a new high (eggwatch.py)
   thinking  nothing in particular; sometimes she just brings up something she remembers
 Claude writes the words in her voice (chat.text_message). The server sends it, so the
@@ -121,6 +123,13 @@ def reasons(now=None):
         wd = wedding.nudge_reason()
         if wd and hour >= 12:
             out.append(("wedding", wd[0], wd[1], True))
+    except Exception:
+        pass
+    try:
+        import finance
+        pw = finance.payday_warning(now.date())
+        if pw and hour >= 12:
+            out.append(("payday", pw[0], pw[1], True))
     except Exception:
         pass
     try:
