@@ -250,6 +250,34 @@ tr.glow-row td{background:rgba(255,255,255,.05);}
 }
 .edu b{color:var(--text-on); opacity:1;}
 
+/* ===================== PAYDAY PLANNER ===================== */
+.pay-controls{display:flex;gap:10px;flex-wrap:wrap;padding:14px 20px;border-bottom:1px solid var(--key-edge);}
+.pay-controls .extra-input{width:96px;}
+.pay-controls input[type=date]{width:140px;color-scheme:dark;}
+.planner-sub{font-family:var(--title-font);font-size:12px;letter-spacing:2px;text-transform:uppercase;
+  color:var(--hud2);opacity:.8;margin:0;padding:14px 20px 4px;}
+.setaside{margin:0;padding:16px 20px;border-top:1px solid var(--border);font-size:14px;line-height:1.6;
+  background:rgba(255,255,255,.02);color:var(--text-on);}
+.setaside b{color:var(--text-glow);text-shadow:0 0 8px var(--text-glow);}
+.setaside .big{font-family:var(--title-font);font-size:26px;display:block;margin:2px 0 6px;}
+.checks{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:12px;padding:14px 20px 20px;}
+.check{border:1px solid var(--key-edge);border-radius:10px;padding:12px 14px;background:rgba(255,255,255,.02);}
+.check.now{border-color:var(--accent);box-shadow:0 0 12px -4px var(--accent);}
+.check-top{display:flex;justify-content:space-between;align-items:baseline;gap:8px;}
+.check-date{font-family:var(--title-font);font-size:15px;color:var(--text-on);}
+.check-tag{font-size:10px;letter-spacing:1px;text-transform:uppercase;padding:2px 6px;border-radius:4px;
+  border:1px solid currentColor;white-space:nowrap;}
+.check-tag.ok{color:var(--hud2);} .check-tag.tight{color:var(--hud);} .check-tag.short{color:var(--error);}
+.check-tag.bonus{color:var(--text-glow);}
+.check ul{list-style:none;margin:10px 0;padding:0;font-size:13px;}
+.check li{display:flex;justify-content:space-between;gap:8px;padding:3px 0;color:var(--hud2);}
+.check li span:first-child{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.check li.none{opacity:.6;}
+.check-sum{border-top:1px dashed var(--key-edge);padding-top:8px;font-size:13px;display:flex;justify-content:space-between;}
+.check-left{font-family:var(--title-font);font-size:16px;color:var(--text-on);}
+.check-left.neg{color:var(--error);}
+.planner-note{padding:0 20px 16px;font-size:12px;color:var(--hud2);opacity:.75;margin:0;}
+
 @media (max-width:640px){
   thead th:nth-child(3), tbody td:nth-child(3){display:none;}
   .panel-head{flex-direction:column;align-items:flex-start;}
@@ -317,6 +345,7 @@ tr.glow-row td{background:rgba(255,255,255,.05);}
             <th style="text-align:right">Balance</th>
             <th style="text-align:right">Min. payment / mo</th>
             <th style="text-align:right">Interest %</th>
+            <th style="text-align:right" title="The day of the month it's due (1-31)">Due day</th>
             <th style="text-align:right">Payoff</th>
             <th></th>
           </tr>
@@ -327,7 +356,7 @@ tr.glow-row td{background:rgba(255,255,255,.05);}
             <td>Total</td>
             <td class="num" id="debtsTotal">$0</td>
             <td class="num" id="debtsMinTotal">$0</td>
-            <td></td><td></td><td></td>
+            <td></td><td></td><td></td><td></td>
           </tr>
         </tfoot>
       </table>
@@ -349,6 +378,40 @@ tr.glow-row td{background:rgba(255,255,255,.05);}
         <tfoot><tr><td>Total</td><td class="num" id="incomeTotal">$0</td><td></td></tr></tfoot>
       </table>
       <div class="add-row" data-add="income"><span class="plus">+</span> Add income</div>
+    </div>
+
+    <!-- PAYDAY PLANNER -->
+    <div class="panel" id="plannerPanel">
+      <div class="panel-head">
+        <div>
+          <h2 class="panel-title">Payday Planner</h2>
+          <p class="panel-hint">Paid every 2 weeks, bills due on set days. This shows which check pays which bill.</p>
+        </div>
+      </div>
+      <div class="pay-controls">
+        <div class="extra-field">
+          <span class="extra-label">A payday</span>
+          <input type="date" id="payDate" class="extra-input">
+        </div>
+        <div class="extra-field">
+          <span class="extra-label">Each check $</span>
+          <input type="number" id="payAmount" class="extra-input" placeholder="0" min="0">
+        </div>
+        <div class="extra-field">
+          <span class="extra-label">Pay this many days early</span>
+          <input type="number" id="payCushion" class="extra-input" placeholder="2" min="0" style="width:50px">
+        </div>
+      </div>
+      <p class="planner-sub">Other bills (not debts)</p>
+      <table>
+        <thead><tr><th>Bill</th><th style="text-align:right">Amount / mo</th><th style="text-align:right">Due day</th><th></th></tr></thead>
+        <tbody id="billsBody"></tbody>
+      </table>
+      <div class="add-row" data-add="bills"><span class="plus">+</span> Add a bill</div>
+      <p class="setaside" id="setAside"></p>
+      <p class="planner-sub">Your next paychecks</p>
+      <div class="checks" id="checks"></div>
+      <p class="planner-note" id="plannerNote"></p>
     </div>
 
     <!-- ASSETS -->
@@ -384,6 +447,8 @@ tr.glow-row td{background:rgba(255,255,255,.05);}
     debts: [{name:"",balance:"",min:"",apr:""}],
     income: [{name:"",amount:""}],
     assets: [{name:"",amount:""}],
+    bills: [{name:"",amount:"",day:""}],
+    pay: {date:"", amount:"", cushion:""},
     theme: "theme-vice",
     strategy: "avalanche",
     extra: ""
@@ -407,6 +472,8 @@ tr.glow-row td{background:rgba(255,255,255,.05);}
     if(!state.debts.length) state.debts.push({name:"",balance:"",min:"",apr:""});
     if(!state.income.length) state.income.push({name:"",amount:""});
     if(!state.assets.length) state.assets.push({name:"",amount:""});
+    if(!Array.isArray(state.bills) || !state.bills.length) state.bills = [{name:"",amount:"",day:""}];
+    if(!state.pay || typeof state.pay !== 'object') state.pay = {date:"", amount:"", cushion:""};
   }
 
   async function saveState(){
@@ -483,7 +550,13 @@ tr.glow-row td{background:rgba(255,255,255,.05);}
     {key:'name', placeholder:'e.g. Visa card'},
     {key:'balance', placeholder:'0', type:'number', num:true},
     {key:'min', placeholder:'0', type:'number', num:true},
-    {key:'apr', placeholder:'0', type:'number', num:true, step:'0.01'}
+    {key:'apr', placeholder:'0', type:'number', num:true, step:'0.01'},
+    {key:'due', placeholder:'day', type:'number', num:true, step:'1'}
+  ];
+  const billCols = [
+    {key:'name', placeholder:'e.g. Phone'},
+    {key:'amount', placeholder:'0', type:'number', num:true},
+    {key:'day', placeholder:'day', type:'number', num:true, step:'1'}
   ];
   const incomeCols = [
     {key:'name', placeholder:'e.g. Paycheck'},
@@ -552,6 +625,135 @@ tr.glow-row td{background:rgba(255,255,255,.05);}
     document.getElementById('netWorthSub').textContent =
       netWorth >= 0 ? "ASSETS MINUS DEBTS // THIS IS THE NUMBER TO GROW" :
       "ASSETS MINUS DEBTS // NEGATIVE RIGHT NOW, AND FIXABLE";
+    renderPlanner();
+  }
+
+  // ---------- Payday Planner ----------
+  // Paid every 14 days, bills due on a day of the month. A bill is paid from the
+  // latest check that lands at least `cushion` days before it's due.
+  function parseDay(s){
+    const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s||'');
+    return m ? new Date(+m[1], +m[2]-1, +m[3]) : null;
+  }
+  function addDays(d, n){ const x = new Date(d); x.setDate(x.getDate()+n); return x; }
+  function shortDate(d){ return d.toLocaleDateString('en-US', {weekday:'short', month:'short', day:'numeric'}); }
+
+  function allBills(){
+    const out = [];
+    state.debts.forEach(d=>{
+      const amt = parseFloat(d.min)||0, day = parseInt(d.due,10);
+      if(amt > 0 && (parseFloat(d.balance)||0) > 0) out.push({name: d.name || 'Debt', amount: amt, day});
+    });
+    state.bills.forEach(b=>{
+      const amt = parseFloat(b.amount)||0, day = parseInt(b.day,10);
+      if(amt > 0) out.push({name: b.name || 'Bill', amount: amt, day});
+    });
+    return out;
+  }
+
+  function dueDate(year, month, day){        // day 31 in a short month = its last day
+    const last = new Date(year, month+1, 0).getDate();
+    return new Date(year, month, Math.min(Math.max(day,1), last));
+  }
+
+  // every bill due between `from` and `to`, as {name, amount, due}
+  function billsBetween(bills, from, to){
+    const out = [];
+    let y = from.getFullYear(), m = from.getMonth();
+    while(new Date(y, m, 1) <= to){
+      bills.forEach(b=>{
+        const due = dueDate(y, m, b.day);
+        if(due >= from && due <= to) out.push({name:b.name, amount:b.amount, due});
+      });
+      m++; if(m > 11){ m = 0; y++; }
+    }
+    return out.sort((a,b)=> a.due - b.due);
+  }
+
+  function checkAmount(){
+    const a = parseFloat(state.pay.amount);
+    if(a > 0) return {amount:a, guessed:false};
+    const monthly = sum(state.income,'amount');
+    return {amount: monthly*12/26, guessed: monthly > 0};
+  }
+
+  function renderPlanner(){
+    const box = document.getElementById('checks');
+    const aside = document.getElementById('setAside');
+    const note = document.getElementById('plannerNote');
+    if(!box) return;
+    const bills = allBills();
+    const dated = bills.filter(b=> b.day >= 1 && b.day <= 31);
+    const undated = bills.filter(b=> !(b.day >= 1 && b.day <= 31));
+    const monthly = bills.reduce((s,b)=> s + b.amount, 0);
+    const perCheck = monthly*12/26;
+    const pay = checkAmount();
+    const cushion = state.pay.cushion === '' || state.pay.cushion == null ? 2 : Math.max(0, parseInt(state.pay.cushion,10)||0);
+    const anchor = parseDay(state.pay.date);
+
+    note.textContent = undated.length
+      ? `Still needs a due day: ${undated.map(b=>b.name).join(', ')}. Bills without one aren't on the checks yet.`
+      : '';
+
+    if(!anchor){
+      aside.innerHTML = `Your bills come to <b>${fmt(monthly)}</b> a month. Put in the date of any payday above and the planner fills in.`;
+      box.innerHTML = '';
+      return;
+    }
+
+    // the check you're living on now = the latest payday on or before today
+    const today = new Date(); today.setHours(0,0,0,0);
+    let p = new Date(anchor);
+    const steps = Math.floor((today - p) / 864e5 / 14);
+    p = addDays(p, steps*14);
+    if(p > today) p = addDays(p, -14);
+
+    // the bills pile: put the same amount in from every check for a year and see
+    // how low it would ever get, so we know what to start it with
+    const yearBills = billsBetween(dated, addDays(p, cushion), addDays(p, 364 + cushion));
+    let bal = 0, low = 0, bi = 0;
+    for(let k = 0; k < 26; k++){
+      bal += perCheck;
+      const next = addDays(p, (k+1)*14);
+      while(bi < yearBills.length && addDays(yearBills[bi].due, -cushion) < next){
+        bal -= yearBills[bi].amount; bi++;
+        low = Math.min(low, bal);
+      }
+    }
+    const startWith = Math.ceil(-low/10)*10;
+    let asideHtml = `Set aside from every check:<span class="big">${fmt(Math.ceil(perCheck))}</span>`+
+      `Your bills are <b>${fmt(monthly)}</b> a month. Move <b>${fmt(Math.ceil(perCheck))}</b> into a separate "bills" account every payday `+
+      `and pay every bill from there. Then it doesn't matter which check a bill lands on, since every check carries the same load.`;
+    if(startWith > 0) asideHtml += ` Start that account with about <b>${fmt(startWith)}</b> so it never runs short in the first months.`;
+    if(pay.amount > 0) asideHtml += ` That leaves about <b>${fmt(pay.amount - perCheck)}</b> from each check for everything else.`;
+    aside.innerHTML = asideHtml;
+
+    // the next 8 checks, paying each bill from the check before it's due
+    let html = '';
+    for(let k = 0; k < 8; k++){
+      const start = addDays(p, k*14), next = addDays(start, 14);
+      const due = billsBetween(dated, addDays(start, cushion), addDays(next, cushion - 1));
+      const total = due.reduce((s,b)=> s + b.amount, 0);
+      const left = pay.amount - total;
+      const sameMonth = [-28,-14,14,28].map(o=> addDays(start,o)).filter(d=> d.getMonth() === start.getMonth()).length;
+      let tag = '';
+      if(pay.amount > 0 && left < 0) tag = '<span class="check-tag short">Short</span>';
+      else if(pay.amount > 0 && left < pay.amount*0.25) tag = '<span class="check-tag tight">Tight</span>';
+      else if(sameMonth >= 2) tag = '<span class="check-tag bonus">3rd check</span>';
+      else tag = '<span class="check-tag ok">OK</span>';
+      const items = due.length
+        ? due.map(b=> `<li><span>${escapeHtml(b.name)} <small>(${b.due.getMonth()+1}/${b.due.getDate()})</small></span><span>${fmt(b.amount)}</span></li>`).join('')
+        : '<li class="none"><span>No bills due off this one</span></li>';
+      html += `<div class="check${k===0?' now':''}">
+        <div class="check-top"><span class="check-date">${k===0?'Now: ':''}${shortDate(start)}</span>${tag}</div>
+        <ul>${items}</ul>
+        <div class="check-sum"><span>Bills ${fmt(total)}</span>`+
+        (pay.amount > 0 ? `<span>Left <span class="check-left${left<0?' neg':''}">${fmt(left)}</span></span>` : '')+
+        `</div></div>`;
+    }
+    box.innerHTML = html;
+    if(pay.guessed) note.textContent = (note.textContent ? note.textContent + ' ' : '') +
+      `Check amount is a guess from your monthly income. Type in your real take-home pay above.`;
   }
 
   function monthlyRate(apr){ return (parseFloat(apr)||0)/100/12; }
@@ -715,6 +917,14 @@ tr.glow-row td{background:rgba(255,255,255,.05);}
 
   document.getElementById('fixBtn').addEventListener('click', runFix);
 
+  [['payDate','date'],['payAmount','amount'],['payCushion','cushion']].forEach(([id,key])=>{
+    document.getElementById(id).addEventListener('input', (e)=>{
+      state.pay[key] = e.target.value;
+      renderPlanner();
+      saveState();
+    });
+  });
+
   document.querySelectorAll('.strat-btn').forEach(btn=>{
     btn.addEventListener('click', ()=>{
       state.strategy = btn.dataset.strategy;
@@ -736,6 +946,7 @@ tr.glow-row td{background:rgba(255,255,255,.05);}
       if(which==='debts') state.debts.push({name:"",balance:"",min:"",apr:""});
       if(which==='income') state.income.push({name:"",amount:""});
       if(which==='assets') state.assets.push({name:"",amount:""});
+      if(which==='bills') state.bills.push({name:"",amount:"",day:""});
       renderAll();
       saveState();
     });
@@ -748,6 +959,10 @@ tr.glow-row td{background:rgba(255,255,255,.05);}
     });
     renderTable('incomeBody', state.income, incomeCols);
     renderTable('assetsBody', state.assets, assetCols);
+    renderTable('billsBody', state.bills, billCols);
+    document.getElementById('payDate').value = state.pay.date || '';
+    document.getElementById('payAmount').value = state.pay.amount || '';
+    document.getElementById('payCushion').value = state.pay.cushion ?? '';
     renderTotals();
     clearFix();
     document.querySelectorAll('.strat-btn').forEach(b=> b.classList.toggle('on', b.dataset.strategy === state.strategy));
@@ -767,6 +982,8 @@ tr.glow-row td{background:rgba(255,255,255,.05);}
       debts: state.debts,
       income: state.income,
       assets: state.assets,
+      bills: state.bills,
+      pay: state.pay,
       theme: state.theme,
       strategy: state.strategy,
       extra: state.extra,
@@ -794,6 +1011,8 @@ tr.glow-row td{background:rgba(255,255,255,.05);}
         state.debts = Array.isArray(parsed.debts) && parsed.debts.length ? parsed.debts : [{name:"",balance:"",min:"",apr:""}];
         state.income = Array.isArray(parsed.income) && parsed.income.length ? parsed.income : [{name:"",amount:""}];
         state.assets = Array.isArray(parsed.assets) && parsed.assets.length ? parsed.assets : [{name:"",amount:""}];
+        state.bills = Array.isArray(parsed.bills) && parsed.bills.length ? parsed.bills : [{name:"",amount:"",day:""}];
+        if(parsed.pay && typeof parsed.pay === 'object') state.pay = parsed.pay;
         if(parsed.strategy === 'snowball' || parsed.strategy === 'avalanche') state.strategy = parsed.strategy;
         if(typeof parsed.extra !== 'undefined') state.extra = parsed.extra;
         renderAll();
