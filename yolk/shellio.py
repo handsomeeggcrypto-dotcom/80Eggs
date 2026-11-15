@@ -54,3 +54,29 @@ def cleanup(root):
         except OSError:
             pass
     return n
+
+
+# SHELL's own apps save the same way, as "<name>.new" then a swap (YOLK_SAVE in
+# shell/root/YOLK/usb.lua). These are the files they save like that.
+SHELL_SAVES = ["quests/state.txt", "hatch/state.txt", "memory.txt", "log.txt", "med/last.txt",
+               "moekadex/mine.txt", "moekadex/last.txt", "dreams/mine.txt", "dreams/last.txt",
+               "moto/best.txt", "moto/best_crayons.txt", "moto/best_moemoe.txt",
+               "moto/best_glitch.txt", "moto/best_miami.txt"]
+
+
+def recover_shell(yolk_dir):
+    """Finishes a save SHELL froze in the middle of. If only the checked ".new" is left,
+    it becomes the real file; if the real file is still there, the ".new" is a half
+    write and goes. Same rule as YOLK_RECOVER on SHELL. Returns how many it fixed."""
+    n = 0
+    for rel in SHELL_SAVES:
+        path = Path(yolk_dir) / rel
+        new = path.with_name(path.name + ".new")
+        if not new.exists():
+            continue
+        if path.exists():
+            new.unlink()
+        else:
+            os.replace(new, path)
+            n += 1
+    return n

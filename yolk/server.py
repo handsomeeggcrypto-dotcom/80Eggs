@@ -366,14 +366,49 @@ def shell_done():
     else:
         msg = "all synced. eject SHELL in finder before unplugging."
     if real:
-        subprocess.run(["osascript", "-e", 'on run argv\n display notification (item 1 of argv) with title "YOLK" '
-                        'subtitle "SHELL" sound name "Glass"\nend run', msg], capture_output=True, timeout=30)
+        notify(msg)
+
+
+def notify(msg):
+    subprocess.run(["osascript", "-e", 'on run argv\n display notification (item 1 of argv) with title "YOLK" '
+                    'subtitle "SHELL" sound name "Glass"\nend run', msg], capture_output=True, timeout=30)
+
+
+def is_drop(e):
+    """An error from SHELL's drive going away (I/O error, device gone), not some other
+    problem such as the internet being down."""
+    import errno
+    return isinstance(e, OSError) and (e.errno in (errno.EIO, errno.ENXIO, errno.ENODEV)
+                                       or (e.errno == errno.ENOENT and not shell_connected()))
+
+
+def shell_dropped(e):
+    """SHELL's drive stopped answering partway through a sync (a loose connection, or
+    the cable pulled). Say so once per plug-in instead of crashing. Every sync step is
+    safe to repeat, so plugging her back in finishes the job."""
+    print("SHELL: dropped off mid-sync:", e)
+    if _mount.get("dropped") == _mount["id"]:
+        return
+    _mount["dropped"] = _mount["id"]
+    try:
+        with open(DATA / "shell_drops.txt", "a") as f:     # a running count, for spotting hardware trouble
+            f.write(f"{int(time.time())}\t{e}\n")
+    except OSError:
+        pass
+    if not os.environ.get("YOLK_SHELL"):
+        notify("SHELL dropped off partway through the sync. plug her back in and i'll finish.")
 
 
 def sync():
     """Merge memories and hand queued dreams to SHELL. Safe to call often."""
     with _shell_lock:
-        return _sync()
+        try:
+            return _sync()
+        except OSError as e:
+            if not is_drop(e):
+                raise
+            shell_dropped(e)
+            return read_mem(MEMORY), False
 
 
 def _sync():
@@ -383,6 +418,8 @@ def _sync():
     if _mount["id"] != mount_id():                 # just plugged in: not announced yet
         _mount["id"], _mount["announced"] = mount_id(), False
         _trip.clear()
+        import shellio                              # finish any save SHELL froze in the middle of
+        shellio.recover_shell(SHELL)
     shell = read_mem(SHELL / "memory.txt")
     mem = merge(desk, shell, read_mem(MERGED) if MERGED.exists() else None)
     write_mem(MEMORY, mem)
@@ -472,7 +509,10 @@ def deliver_daily():
                         trip("left", "her_dream", 1)
                 shell_done()                        # everything's on SHELL: say what, eject, notify
         except Exception as e:
-            print("YOLK Daily failed:", e)
+            if is_drop(e):
+                shell_dropped(e)
+            else:
+                print("YOLK Daily failed:", e)
         finally:
             _daily_lock.release()
     threading.Thread(target=work, daemon=True).start()
