@@ -89,10 +89,7 @@ local function load()
 end
 
 local function save()
-    local f = io.open(DIR .. "state.txt", "w")
-    if not f then return end
-    f:write("pos=" .. st.pos .. "\nwarm=" .. st.warm .. "\nhatched=" .. st.hatched .. "\nstarted=" .. st.started .. "\n")
-    f:close()
+    YOLK_SAVE(DIR .. "state.txt", "pos=" .. st.pos .. "\nwarm=" .. st.warm .. "\nhatched=" .. st.hatched .. "\nstarted=" .. st.started .. "\n")
 end
 YOLK_ON_USB = save
 

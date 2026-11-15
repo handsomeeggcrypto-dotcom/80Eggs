@@ -247,19 +247,18 @@ local function load_state()
 end
 
 local function save_state()
-    local f = io.open(DIR .. "state.txt", "w")
-    if not f then return end
-    f:write("pk|" .. S.pk .. "\n")
-    for k in pairs(S.done) do f:write("done|" .. k .. "\n") end
-    for k, v in pairs(S.got) do f:write("got|" .. k .. "|" .. v .. "\n") end
-    for k, v in pairs(S.amt) do f:write("amt|" .. k .. "|" .. v .. "\n") end
-    for k, v in pairs(S.start) do f:write("start|" .. k .. "|" .. v .. "\n") end
-    for k in pairs(S.clear) do f:write("clear|" .. k .. "\n") end
-    for k, v in pairs(S.day) do f:write("day|" .. k .. "|" .. v .. "\n") end
-    for k, v in pairs(S.dg) do f:write("dg|" .. k .. "|" .. v .. "\n") end
-    for i, v in ipairs(S.xp) do f:write("xp|" .. i .. "|" .. v .. "\n") end
-    for _, l in ipairs(S.loot) do f:write("loot|" .. l.r .. "|" .. l.power .. "|" .. l.name .. "\n") end
-    f:close()
+    local t = { "pk|" .. S.pk .. "\n" }   -- built in full, then saved safely in one go
+    local function add(s) t[#t + 1] = s .. "\n" end
+    for k in pairs(S.done) do add("done|" .. k) end
+    for k, v in pairs(S.got) do add("got|" .. k .. "|" .. v) end
+    for k, v in pairs(S.amt) do add("amt|" .. k .. "|" .. v) end
+    for k, v in pairs(S.start) do add("start|" .. k .. "|" .. v) end
+    for k in pairs(S.clear) do add("clear|" .. k) end
+    for k, v in pairs(S.day) do add("day|" .. k .. "|" .. v) end
+    for k, v in pairs(S.dg) do add("dg|" .. k .. "|" .. v) end
+    for i, v in ipairs(S.xp) do add("xp|" .. i .. "|" .. v) end
+    for _, l in ipairs(S.loot) do add("loot|" .. l.r .. "|" .. l.power .. "|" .. l.name) end
+    YOLK_SAVE(DIR .. "state.txt", table.concat(t))
 end
 YOLK_ON_USB = save_state
 

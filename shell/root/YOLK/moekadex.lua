@@ -290,11 +290,9 @@ local function toggle_mine(v)
         mine[#mine + 1] = v
         table.sort(mine)
     end
-    local f = io.open(MINE, "w")
-    if f then
-        for _, x in ipairs(mine) do f:write(x .. "\n") end
-        f:close()
-    end
+    local t = {}
+    for _, x in ipairs(mine) do t[#t + 1] = x .. "\n" end
+    YOLK_SAVE(MINE, table.concat(t))
 end
 
 local function mine_list()
@@ -418,8 +416,7 @@ local function load_last()
 end
 
 local function save_last(n)
-    local f = io.open(LAST, "w")
-    if f then f:write(tostring(n) .. "\n"); f:close() end
+    YOLK_SAVE(LAST, tostring(n) .. "\n")
 end
 
 splash()

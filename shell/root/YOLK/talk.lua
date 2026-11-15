@@ -42,10 +42,9 @@ local function load_mem()
 end
 
 local function save_mem()
-    local f = io.open(DIR .. "memory.txt", "w")
-    if not f then return end
-    for k, v in pairs(mem) do f:write(k .. "=" .. tostring(v) .. "\n") end
-    f:close()
+    local t = {}
+    for k, v in pairs(mem) do t[#t + 1] = k .. "=" .. tostring(v) .. "\n" end
+    YOLK_SAVE(DIR .. "memory.txt", table.concat(t))
 end
 
 local function num(k) return tonumber(mem[k]) or 0 end
@@ -711,15 +710,14 @@ local function read_log()
 end
 
 local function write_log(entries)
-    local f = io.open(DIR .. "log.txt", "w")
-    if not f then return end
+    local t = {}
     for _, e in ipairs(entries) do
         local names = {}
         for name in pairs(e.habits) do names[#names + 1] = name end
         table.sort(names)
-        f:write(e.day .. "|" .. e.time .. "|" .. e.mood .. "|" .. table.concat(names, ",") .. "\n")
+        t[#t + 1] = e.day .. "|" .. e.time .. "|" .. e.mood .. "|" .. table.concat(names, ",") .. "\n"
     end
-    f:close()
+    YOLK_SAVE(DIR .. "log.txt", table.concat(t))
 end
 
 local function habit_list()

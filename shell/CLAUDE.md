@@ -22,6 +22,7 @@
 - `os.date` returns nil, so compute dates from `os.time()`. `rb.font_load` fails (no memory), so use `rb.FONT_UI` + pre-rendered title BMPs. `rb.font_getstringsize` returns (width, w, h).
 - Settings: `require "rbsettings"; require "settings"`, then `rb.settings.read/write("global_settings", rb.system.global_settings.<name>, "system", value)` and `rb.settings_save()`. The simulator loses saved settings because `run.sh` kills it.
 - Folders: `luadir.mkdir(path)` (not `rb.mkdir`), `rb.dir_exists(path)`. The hold switch is `rb.button_hold()`. The simulator can't flip it.
+- **Save files with `YOLK_SAVE(path, text)`** (from `usb.lua`), never `io.open(path, "w")`. It writes `<path>.new`, reads it back, then swaps it in, so a freeze mid-save can't wipe the old file. Add new save paths to the recovery list in `usb.lua` and `SHELL_SAVES` in `yolk/shellio.py`. `disktest.lua` (open it from Files) saves 500 times in a row to check the card.
 - Rockbox system events (negative numbers from `get_plugin_action`, a burst at power-on) aren't button presses. Whitelist `PLA_*` buttons in any "press to skip" check.
 - **Lua can't play audio**: the plugin takes the whole audio buffer. To play something, write a one-track `.m3u8` + `/.rockbox/.playlist_control`, reset `global_status` resume fields, then `os.exit(rb.PLUGIN_GOTO_WPS)` (see `meditate.lua`).
 - Full-screen transparent blits are slow on the device. Bake backgrounds into solid images.

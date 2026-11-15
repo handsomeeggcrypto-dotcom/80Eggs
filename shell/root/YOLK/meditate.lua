@@ -95,8 +95,7 @@ local function read_last()
     return math.max(1, math.min(m, #LENGTHS)), math.max(1, math.min(s, #SOUNDS))
 end
 local function save_last(m, s)
-    local f = io.open(DIR .. "med/last.txt", "w")
-    if f then f:write(m .. "|" .. s .. "\n"); f:close() end
+    YOLK_SAVE(DIR .. "med/last.txt", m .. "|" .. s .. "\n")
 end
 
 -- add "meditate" to today's check-in (mood 0 = not rated yet); returns the streak
@@ -128,8 +127,7 @@ local function log_session(minutes)
         lines[#lines + 1] = today .. "|" .. t .. "|0|meditate"
         by_day[today] = "meditate"
     end
-    f = io.open(DIR .. "log.txt", "w")
-    if f then for _, l in ipairs(lines) do f:write(l .. "\n") end; f:close() end
+    YOLK_SAVE(DIR .. "log.txt", table.concat(lines, "\n") .. (#lines > 0 and "\n" or ""))
     -- minutes go in their own file, so nothing about check-ins changes shape
     f = io.open(DIR .. "med/sessions.txt", "a")
     if f then f:write(today .. "|" .. t .. "|" .. minutes .. "\n"); f:close() end

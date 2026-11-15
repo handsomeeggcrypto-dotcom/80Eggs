@@ -122,8 +122,7 @@ local function load_best()
     return b
 end
 local function save_best(b)
-    local f = io.open(DIR .. map.best, "w")
-    if f then f:write(b .. "\n"); f:close() end
+    YOLK_SAVE(DIR .. map.best, b .. "\n")
 end
 
 ---------------------------------------------------------------- YOLK says things
