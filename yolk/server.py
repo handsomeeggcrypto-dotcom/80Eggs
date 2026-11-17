@@ -374,6 +374,38 @@ def notify(msg):
                     'subtitle "SHELL" sound name "Glass"\nend run', msg], capture_output=True, timeout=30)
 
 
+AUTO_BACKUPS = HERE.parent / "shell" / "backup" / "auto"   # git-ignored: it's personal
+KEEP_BACKUPS = 30
+
+
+def backup_progress():
+    """Copies what only exists on SHELL (quest log, hatched Moes, scores, letters, check-ins...)
+    to shell/backup/auto/<date-time>/ on every plug-in, keeping the newest 30. Small (a few
+    KB), so it's quick. The full backup is still tools/backup_shell.py. Never for a test SHELL."""
+    if os.environ.get("YOLK_SHELL"):
+        return 0
+    import shellio
+    import shutil
+    files = shellio.SHELL_SAVES + ["quests/list.txt", "hatch/moes.txt", "med/sessions.txt", "letters/out.txt"]
+    dest = AUTO_BACKUPS / time.strftime("%Y-%m-%d_%H%M%S")
+    n = 0
+    for rel in files:
+        src = SHELL / rel
+        try:
+            if src.is_file():
+                (dest / rel).parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(src, dest / rel)
+                n += 1
+        except OSError as e:
+            if is_drop(e):
+                raise
+            print("SHELL backup skipped", rel, e)
+    for old in sorted(p for p in AUTO_BACKUPS.iterdir() if p.is_dir())[:-KEEP_BACKUPS]:
+        shutil.rmtree(old, ignore_errors=True)
+    print(f"SHELL: backed up {n} progress files to {dest.name}")
+    return n
+
+
 def is_drop(e):
     """An error from SHELL's drive going away (I/O error, device gone), not some other
     problem such as the internet being down."""
@@ -420,6 +452,7 @@ def _sync():
         _trip.clear()
         import shellio                              # finish any save SHELL froze in the middle of
         shellio.recover_shell(SHELL)
+        backup_progress()                           # before the Mac changes anything on her
     shell = read_mem(SHELL / "memory.txt")
     mem = merge(desk, shell, read_mem(MERGED) if MERGED.exists() else None)
     write_mem(MEMORY, mem)
