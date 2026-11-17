@@ -523,6 +523,12 @@ local function brought()
 end
 
 local function greet()
+    local wrong = YOLK_CLOCK_WRONG()
+    if wrong then
+        say(wrong < 2026 and ("my clock got knocked loose. it thinks it's " .. wrong .. ".")
+            or "my clock got knocked loose. it's running behind.", "shock")
+        say("fix it in settings > system > time & date, or my dailies land on the wrong days.", "sus")
+    end
     local visits = num("visits")
     local last = num("last_seen")
     local now = os.time and os.time() or 0

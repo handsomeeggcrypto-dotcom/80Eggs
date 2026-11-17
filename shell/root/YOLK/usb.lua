@@ -53,6 +53,22 @@ for _, p in ipairs({ "/YOLK/quests/state.txt", "/YOLK/hatch/state.txt", "/YOLK/m
     YOLK_RECOVER(p)
 end
 
+---------------------------------------------------------------- the clock
+-- SHELL's clock falls back to Jan 1 2000 when she loses power (a reset or the
+-- battery unplugged), and apps can't set it. The Mac leaves its own time in
+-- /YOLK/clock.txt on every sync (local time, the way Rockbox counts it), so if
+-- her clock is behind that, or before 2026, it's wrong. Returns her year if so.
+function YOLK_CLOCK_WRONG()
+    local now = os.time and os.time() or 0
+    local year = 1970 + math.floor(math.floor(now / 86400) * 4 / 1461)
+    if now < 1767225600 then return year end              -- before 2026
+    local f = io.open("/YOLK/clock.txt", "r")
+    local mac = f and tonumber(f:read("*l"))
+    if f then f:close() end
+    if mac and now < mac - 3600 then return year end      -- behind the last sync
+    return nil
+end
+
 ---------------------------------------------------------------- plugged in
 local read_action = rb.get_plugin_action
 rb.get_plugin_action = function(...)
