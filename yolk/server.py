@@ -480,6 +480,8 @@ def _sync():
         import shellio                              # finish any save SHELL froze in the middle of
         shellio.recover_shell(SHELL)
         backup_progress()                           # before the Mac changes anything on her
+        import calendar                             # the Mac's time, for SHELL to check her clock
+        shellio.text(SHELL / "clock.txt", f"{calendar.timegm(time.localtime())}\n")
     shell = read_mem(SHELL / "memory.txt")
     mem = merge(desk, shell, read_mem(MERGED) if MERGED.exists() else None)
     write_mem(MEMORY, mem)
