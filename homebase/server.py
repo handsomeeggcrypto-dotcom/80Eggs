@@ -97,7 +97,22 @@ def project_info(p):
         info["server"] = {"port": port, "running": port_open(port), "url": f"http://localhost:{port}"}
     if "mount" in p:
         info["mounted"] = os.path.isdir(p["mount"])
+    if p["id"] == "shell":
+        info["drops"] = shell_drops()
     return info
+
+
+def shell_drops():
+    """How often SHELL dropped off mid-sync (YOLK logs each one), to spot hardware trouble."""
+    try:
+        with open(os.path.join(REPO, "yolk", "data", "shell_drops.txt")) as f:
+            times = [int(l.split("\t", 1)[0]) for l in f if l.strip()]
+    except (OSError, ValueError):
+        times = []
+    now = time.time()
+    return {"week": sum(1 for t in times if t > now - 7 * 86400),
+            "month": sum(1 for t in times if t > now - 30 * 86400),
+            "last": max(times) if times else None}
 
 
 def summary():

@@ -330,6 +330,33 @@ def brought_lines():
         out.append("i took " + listed(t) + ".")
     if l:
         out.append("i left you " + listed(l) + ".")
+    out += drop_lines()
+    return out
+
+
+def drop_times():
+    """When SHELL dropped off mid-sync (data/shell_drops.txt, written by shell_dropped)."""
+    try:
+        return [int(l.split("\t", 1)[0]) for l in (DATA / "shell_drops.txt").read_text().splitlines() if l.strip()]
+    except (OSError, ValueError):
+        return []
+
+
+def drop_lines():
+    """If she dropped off since the last finished sync, she says so (once)."""
+    times = drop_times()
+    seen_file = DATA / "shell_drops_seen.txt"
+    try:
+        seen = int(seen_file.read_text().strip() or 0)
+    except (OSError, ValueError):
+        seen = 0
+    if len(times) <= seen:
+        return []
+    seen_file.write_text(str(len(times)))
+    week = sum(1 for t in times if t > time.time() - 7 * 86400)
+    out = ["last time you plugged me in, i dropped off halfway. this time i made it."]
+    if week >= 3:
+        out.append(f"that's {week} times this week. my connection is getting loose.")
     return out
 
 

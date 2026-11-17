@@ -141,6 +141,11 @@ function card(p) {
   if (p.changed) pills.push(`<span class="pill changed">${p.changed} changed</span>`);
   if (p.server) pills.push(p.server.running ? `<span class="pill on">● running :${p.server.port}</span>` : `<span class="pill off">stopped</span>`);
   if ("mounted" in p) pills.push(p.mounted ? `<span class="pill on">● plugged in</span>` : `<span class="pill off">not plugged in</span>`);
+  if (p.drops) {
+    const d = p.drops, tip = d.last ? `last drop-off ${ago(d.last)} · ${d.month} in 30 days` : "no drop-offs logged";
+    pills.push(d.week ? `<span class="pill changed" title="${tip}">${d.week} drop-off${d.week > 1 ? "s" : ""} this week</span>`
+                      : `<span class="pill on" title="${tip}">no drop-offs this week</span>`);
+  }
 
   const btns = [];
   if (p.server) {
