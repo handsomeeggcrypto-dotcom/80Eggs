@@ -11,7 +11,7 @@
    Put <div data-retro-ring></div> where the bar should go, or add data-ring-in=".some-box" to the script tag
    to put it at the end of that box (handy when the page's body is a flex row). Otherwise it goes at the end of the page,
    and <span data-retro-counter></span> anywhere for a counter on its own.
-   The counter is just for fun: it lives in each visitor's browser, it isn't a real count. */
+   The counter is a joke, not a real count: it always says 42069. */
 (function () {
   "use strict";
   var me = document.currentScript;
@@ -36,10 +36,6 @@
     { name: "The Nest", path: "/nest.html", icon: "🪺" }
   ];
 
-  var store = function (k, v) {
-    try { if (v === undefined) return localStorage.getItem(k); localStorage.setItem(k, v); } catch (e) {}
-    return null;
-  };
   var reduced = window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches;
 
   var css = [
@@ -71,12 +67,9 @@
     if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", fn); else fn();
   }
 
-  // ---- visitor counter (pretend, per browser) ----
-  var visits = (+store("retro_visits") || 0) + 1;
-  store("retro_visits", visits);
+  // ---- visitor counter (a joke: everyone is always visitor 42069) ----
   function counterHTML() {
-    var days = Math.floor(Date.now() / 864e5) - 20400;
-    var n = String(4096 + Math.max(0, days) * 13 + visits).padStart(7, "0");
+    var n = "0042069";
     return '<span class="retro-counter" aria-label="visitor number ' + (+n) + '">' +
       n.split("").map(function (d) { return "<b>" + d + "</b>"; }).join("") + "</span>";
   }
