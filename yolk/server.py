@@ -651,6 +651,22 @@ def moe_photo(n):
     return MOE_PHOTOS / f"Moes {lo:04d}-{min(lo + 249, 5250):04d}" / f"Moe {n:04d}.jpg"
 
 
+TAILSCALE = "/Applications/Tailscale.app/Contents/MacOS/Tailscale"
+
+
+def tailscale_name():
+    """This Mac's Tailscale https name (like mac.tail1234.ts.net) if `tailscale serve` is sharing
+    YOLK, else None. The phone app uses it to reach her away from home."""
+    try:
+        status = json.loads(subprocess.run([TAILSCALE, "status", "--json"], capture_output=True,
+                                           text=True, timeout=10).stdout)
+        name = (status.get("Self") or {}).get("DNSName", "").rstrip(".")
+        served = subprocess.run([TAILSCALE, "serve", "status"], capture_output=True, text=True, timeout=10).stdout
+        return name if name and str(PORT) in served else None
+    except Exception:
+        return None
+
+
 def speak_clip(text):
     """Reed (or whatever daily.json says) saying `text`, as a cached m4a."""
     import daily
@@ -777,8 +793,16 @@ class Handler(BaseHTTPRequestHandler):
     # ---- pairing: this Mac is always trusted; anything else needs the token cookie
     PUBLIC = ("/pair", "/pair.html", "/api/pair", "/faces/good.png", "/faces/blink.png")
 
+    def on_mac(self):
+        """Really this Mac. Tailscale's https link (`tailscale serve`) also arrives from 127.0.0.1,
+        but it marks what it forwards, so the phone over Tailscale never counts as the Mac."""
+        if self.client_address[0] not in ("127.0.0.1", "::1"):
+            return False
+        return not any(h.lower().startswith("tailscale-") or h.lower() in ("x-forwarded-for", "forwarded")
+                       for h in self.headers.keys())
+
     def trusted(self):
-        if self.client_address[0] in ("127.0.0.1", "::1"):
+        if self.on_mac():
             return True
         token = station_config()["token"]
         return f"yolk_pair={token}" in (self.headers.get("Cookie") or "")
@@ -827,6 +851,22 @@ class Handler(BaseHTTPRequestHandler):
                 import nudge
                 return self.send(200, {"texts": [{"t": s["t"], "text": s["text"]} for s in nudge.sent()
                                                  if time.time() - s["t"] < 2 * 86400 and s["why"] != "test"]})
+            if rest == "letters":            # her Sunday letters and her replies to SHELL letters
+                import letters
+                import sunday
+                found = sorted(sunday.OUT.glob("*.txt"), reverse=True) if sunday.OUT.is_dir() else []
+                return self.send(200, {"sunday": [{"day": f.stem, "text": f.read_text(encoding="utf-8")}
+                                                  for f in found[:12]],
+                                       "letters": letters.read()[-40:]})
+            if rest == "say":                # her voice reading a reply out loud on the phone
+                from urllib.parse import parse_qs, urlparse
+                text = (parse_qs(urlparse(self.path).query).get("t") or [""])[0].strip()[:2000]
+                if not text:
+                    return self.send(400, {"error": "empty"})
+                try:
+                    return self.send(200, speak_clip(text), "audio/mp4")
+                except Exception as e:
+                    return self.send(500, {"error": str(e)})
             return self.send(200, (STATIC / "phone.html").read_bytes(), TYPES[".html"])
         if path == "/pair":
             path = "/pair.html"
@@ -847,15 +887,15 @@ class Handler(BaseHTTPRequestHandler):
             except Exception as e:
                 return self.send(500, {"error": str(e)})
         if path == "/api/pairing":           # for the desktop terminal ("pair a tablet")
-            if self.client_address[0] not in ("127.0.0.1", "::1"):
+            if not self.on_mac():
                 return self.send(403, {"error": "only on the mac"})
             return self.send(200, {"code": station_config()["code"], "address": lan_address(), "port": PORT})
         if path == "/api/watchkey":          # for setting up the Apple Watch Shortcut; this Mac only
-            if self.client_address[0] not in ("127.0.0.1", "::1"):
+            if not self.on_mac():
                 return self.send(403, {"error": "only on the mac"})
             return self.send(200, {"key": station_config()["watch_key"], "address": lan_address(), "port": PORT})
         if path in ("/finance", "/api/finance"):      # money stays on this Mac, even for paired tablets
-            if self.client_address[0] not in ("127.0.0.1", "::1"):
+            if not self.on_mac():
                 return self.send(403, {"error": "only on the mac"})
             if path == "/finance":
                 return self.send(200, (STATIC / "finance.html").read_bytes(), TYPES[".html"])
@@ -867,12 +907,12 @@ class Handler(BaseHTTPRequestHandler):
             return self.send(200, {"memory": mem, "shell": connected, "queued": len(queued),
                                    "battery": mac_battery(), "now": int(time.time())})
         if path == "/api/letter":             # her newest Sunday letter (sunday.py); this Mac only
-            if self.client_address[0] not in ("127.0.0.1", "::1"):
+            if not self.on_mac():
                 return self.send(403, {"error": "only on the mac"})
             import sunday
             return self.send(200, sunday.latest() or {})
         if path == "/api/journal":            # what she remembers; personal, so this Mac only
-            if self.client_address[0] not in ("127.0.0.1", "::1"):
+            if not self.on_mac():
                 return self.send(403, {"error": "only on the mac"})
             import journal
             return self.send(200, {"notes": [dict(n, when=journal.when(n["t"]),
@@ -904,23 +944,29 @@ class Handler(BaseHTTPRequestHandler):
         if not self.gate(path):
             return
         if path == "/api/phonelink":         # texts the phone app's link (static/phone.html); this Mac only
-            if self.client_address[0] not in ("127.0.0.1", "::1"):
+            if not self.on_mac():
                 return self.send(403, {"error": "only on the mac"})
             import daily
             import nudge
             who = daily.config().get("text_to")
             if not who:
                 return self.send(400, {"error": "no text_to in data/daily.json"})
-            host = subprocess.run(["scutil", "--get", "LocalHostName"], capture_output=True, text=True).stdout.strip()
-            link = f"http://{host}.local:{PORT}/p/{station_config()['watch_key']}/"
+            ts = tailscale_name()
+            if ts:                           # anywhere, over https (so the mic works too)
+                link = f"https://{ts}/p/{station_config()['watch_key']}/"
+                where = "works anywhere tailscale is on."
+            else:
+                host = subprocess.run(["scutil", "--get", "LocalHostName"], capture_output=True, text=True).stdout.strip()
+                link = f"http://{host}.local:{PORT}/p/{station_config()['watch_key']}/"
+                where = "home wi-fi only."
             try:
                 nudge.send(who, "🥚 me, in your pocket. open this in safari, tap share, then add to home screen. "
-                                "home wi-fi only.\n\n" + link)
+                                + where + "\n\n" + link)
             except Exception as e:
                 return self.send(500, {"error": str(e)})
             return self.send(200, {"sent": True})
         if path == "/api/nudge/test":         # nudge.py --test: one text now, sent from here so macOS asks about YOLK
-            if self.client_address[0] not in ("127.0.0.1", "::1"):
+            if not self.on_mac():
                 return self.send(403, {"error": "only on the mac"})
             import nudge
             try:
@@ -938,6 +984,12 @@ class Handler(BaseHTTPRequestHandler):
             except Exception as e:
                 print("YOLK phone chat failed:", e)
                 return self.send(200, {"reply": "my brain glitched. try again in a second."})
+        if path.startswith("/p/") and path.endswith("/talk"):   # the phone page talking out loud (a WAV)
+            import chat
+            n = int(self.headers.get("Content-Length", 0) or 0)
+            if not 0 < n <= 5_000_000:
+                return self.send(413, {"error": "recording too long"})
+            return self.send(200, chat.talk(self.rfile.read(n), new="new=1" in self.path, where="phone"))
         if path.startswith("/w/"):           # the Apple Watch chat page's form
             import chat
             from urllib.parse import parse_qs
@@ -977,7 +1029,7 @@ class Handler(BaseHTTPRequestHandler):
             return self.send(200, chat.talk(self.rfile.read(n), new="new=1" in self.path))
         data = self.body()
         if path == "/api/finance":
-            if self.client_address[0] not in ("127.0.0.1", "::1"):
+            if not self.on_mac():
                 return self.send(403, {"error": "only on the mac"})
             tmp = DATA / "finance.json.tmp"
             tmp.write_text(json.dumps(data, indent=2))
@@ -1022,7 +1074,7 @@ class Handler(BaseHTTPRequestHandler):
             mem, connected = sync()
             return self.send(200, {"memory": mem, "shell": connected})
         if path == "/api/forget":
-            if self.client_address[0] not in ("127.0.0.1", "::1"):
+            if not self.on_mac():
                 return self.send(403, {"error": "only on the mac"})
             import journal
             notes = journal.change(forget=[data.get("id")])
@@ -1030,7 +1082,7 @@ class Handler(BaseHTTPRequestHandler):
             return self.send(200, {"left": len(notes)})
         if path == "/api/numbers":           # the Numbers Station: played / mode / now / decode
             import numberstation
-            if data.get("decode") and self.client_address[0] not in ("127.0.0.1", "::1"):
+            if data.get("decode") and not self.on_mac():
                 data.pop("decode")              # the answer stays on the Mac
             return self.send(200, numberstation.handle(data))
         if path == "/api/meditate":

@@ -11,37 +11,62 @@
 <title>YOLK</title>
 <link rel="apple-touch-icon" href="icon.png">
 <style>
-  /* YOLK on the iPhone: served at /p/<key>/ (yolk/server.py), home Wi-Fi only.
-     "Add to Home Screen" from Safari's share menu makes it an app. */
-  :root { --bg: #0a0806; --panel: #16120c; --yolk: #ffc21a; --dim: #8a6410; --ink: #f2eadb; }
-  * { box-sizing: border-box; }
+  /* YOLK on the iPhone: served at /p/<key>/ (yolk/server.py).
+     "Add to Home Screen" from Safari's share menu makes it an app.
+     Chat (typed or out loud), her letters, and a face that reacts. */
+  :root { --bg: #0a0806; --panel: #16120c; --yolk: #ffc21a; --dim: #8a6410; --ink: #f2eadb; --line: #2a2010; }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   html, body { height: 100%; margin: 0; background: var(--bg); color: var(--ink);
                font: 17px/1.35 ui-monospace, Menlo, monospace; -webkit-text-size-adjust: 100%; }
   body { display: flex; flex-direction: column; padding: env(safe-area-inset-top) 0 env(safe-area-inset-bottom); }
-  header { display: flex; align-items: center; gap: 12px; padding: 12px 16px; border-bottom: 2px solid #2a2010; }
-  header img { width: 52px; height: 52px; image-rendering: pixelated; }
+  header { display: flex; align-items: center; gap: 12px; padding: 10px 14px; border-bottom: 2px solid var(--line); }
+  #face { width: 72px; height: 72px; image-rendering: pixelated; flex: none; transition: transform .15s; }
+  #face.bob { transform: translateY(-3px); }
+  header .who { flex: 1; min-width: 0; }
   header b { color: var(--yolk); letter-spacing: .12em; }
   header small { display: block; color: var(--dim); font-size: 13px; }
-  #log { flex: 1; overflow-y: auto; padding: 14px 16px; }
+  .tab { font: inherit; font-size: 14px; padding: 7px 10px; border: 2px solid var(--dim); border-radius: 4px;
+         background: none; color: var(--yolk); }
+  .tab.on { background: var(--yolk); color: var(--bg); border-color: var(--yolk); }
+  .tab .dot { display: none; width: 8px; height: 8px; border-radius: 50%; background: #ff5a3c; margin-left: 4px; vertical-align: middle; }
+  .tab.new .dot { display: inline-block; }
+  #log, #letters { flex: 1; overflow-y: auto; padding: 14px 16px; }
+  #letters { display: none; }
+  body.reading #log, body.reading form { display: none; }
+  body.reading #letters { display: block; }
   .msg { max-width: 82%; padding: 9px 13px; margin: 0 0 10px; border-radius: 4px; white-space: pre-wrap; word-wrap: break-word; }
   .her { background: var(--panel); border: 2px solid var(--yolk); }
   .you { background: var(--yolk); color: #0a0806; margin-left: auto; }
+  .you.said::before { content: "🎙 "; }
   .when { color: var(--dim); font-size: 12px; text-align: center; margin: 6px 0 10px; }
-  form { display: flex; gap: 8px; padding: 10px 12px; border-top: 2px solid #2a2010; background: var(--bg); }
+  form { display: flex; gap: 8px; padding: 10px 12px; border-top: 2px solid var(--line); background: var(--bg); }
   input { flex: 1; min-width: 0; font: inherit; font-size: 17px; padding: 10px 12px; border-radius: 4px;
           border: 2px solid var(--dim); background: var(--panel); color: var(--ink); }
   input:focus { outline: none; border-color: var(--yolk); }
   button { font: inherit; font-weight: bold; padding: 0 16px; border: 0; border-radius: 4px; background: var(--yolk); color: #0a0806; }
   button:disabled { opacity: .5; }
+  #mic { padding: 0 14px; font-size: 20px; background: var(--panel); border: 2px solid var(--yolk); }
+  #mic.live { background: #ff5a3c; border-color: #ff5a3c; animation: pulse 1s infinite; }
+  @keyframes pulse { 50% { opacity: .6; } }
+  .letter { background: var(--panel); border: 2px solid var(--line); border-radius: 4px; padding: 12px 14px; margin: 0 0 14px; }
+  .letter h3 { margin: 0 0 8px; font-size: 14px; color: var(--yolk); font-weight: normal; letter-spacing: .08em; }
+  .letter p { margin: 0; white-space: pre-wrap; }
+  .letter .mine { color: var(--dim); margin-bottom: 10px; }
+  .letter .read { margin-top: 10px; font-size: 14px; padding: 6px 10px; background: none; color: var(--yolk); border: 2px solid var(--dim); }
+  .empty { color: var(--dim); text-align: center; margin-top: 30px; }
+  .section { color: var(--dim); font-size: 13px; letter-spacing: .1em; margin: 4px 0 10px; }
 </style>
 </head>
 <body>
 <header>
   <img id="face" src="face/good.png" alt="">
-  <div><b>YOLK</b><small id="status">home wi-fi only</small></div>
+  <div class="who"><b>YOLK</b><small id="status">waking up...</small></div>
+  <button class="tab" id="tab">letters<span class="dot"></span></button>
 </header>
 <div id="log"></div>
+<div id="letters"></div>
 <form id="f">
+  <button type="button" id="mic" aria-label="talk out loud">🎙</button>
   <input id="t" placeholder="text yolk" autocomplete="off" enterkeyhint="send">
   <button id="go">send</button>
 </form>
@@ -51,6 +76,7 @@ const KEEP = 40;            // messages remembered on this phone (only here, not
 let saved = [];
 try { saved = JSON.parse(localStorage.getItem("yolk_phone") || "[]"); } catch (e) { saved = []; }
 let lastSent = 0;           // a new conversation after 10 quiet minutes, like everywhere else
+let busy = false;
 
 function remember() { try { localStorage.setItem("yolk_phone", JSON.stringify(saved.slice(-KEEP))); } catch (e) { } }
 function when(t) {
@@ -66,14 +92,71 @@ function draw() {
     if (m.t - prev > 30 * 60) { const w = document.createElement("div"); w.className = "when"; w.textContent = when(m.t); log.appendChild(w); }
     prev = m.t;
     const p = document.createElement("div");
-    p.className = "msg " + m.who;
+    p.className = "msg " + m.who + (m.said ? " said" : "");
     p.textContent = m.text;
     log.appendChild(p);
   }
   log.scrollTop = log.scrollHeight;
 }
-function add(who, text, t) { saved.push({ who, text, t: t || Math.floor(Date.now() / 1000) }); remember(); draw(); }
+function add(who, text, said) {
+  saved.push({ who, text, t: Math.floor(Date.now() / 1000), said: said || undefined });
+  remember(); draw();
+}
+function status(s) { $("status").textContent = s; }
 
+// ------------------------------------------------------------ her face
+// Idle she blinks and glances; listening she perks up; thinking she squints;
+// talking her mouth moves; after a reply she wears the reply's mood for a bit.
+let faceNow = "good", faceHold = 0, mouthT = null;
+function face(name, holdMs) {
+  faceNow = name;
+  faceHold = holdMs ? Date.now() + holdMs : 0;
+  $("face").src = "face/" + name + ".png";
+}
+function rest() { if (!mouthT) face("good"); }
+function moodOf(text) {
+  const t = text.toLowerCase();
+  if (/\b(love|miss(ed)? you|proud|sweet|❤|💛|🥚)/.test(t)) return "love";
+  if (/\b(sleep|tired|nap|bed|exhausted|late)\b/.test(t)) return "tired";
+  if (/\b(dead|dying|doom|cursed|haunt|void)\b/.test(t)) return "dying";
+  if (/\b(what\?|wait|whoa|seriously|really\?)/.test(t)) return "shock";
+  if (/\b(hm+|suspicious|sure\.|lie|lying|sus)\b/.test(t)) return "sus";
+  if (/!/.test(t) || /\b(yes|nice|great|good job|congrat)/.test(t)) return "great";
+  return "good";
+}
+setInterval(() => {                       // the idle life: blink, sometimes look around
+  if (mouthT || busy || (faceHold && Date.now() < faceHold)) return;
+  if (faceHold) { faceHold = 0; face("good"); }
+  const r = Math.random();
+  if (r < .5) { face("blink"); setTimeout(() => { if (faceNow === "blink") face("good"); }, 160); }
+  else if (r < .62) { face(Math.random() < .5 ? "lookl" : "lookr"); setTimeout(() => { if (/^look/.test(faceNow)) face("good"); }, 900); }
+}, 3200);
+function mouth(on) {                      // flap between talk and good while her voice plays
+  clearInterval(mouthT); mouthT = null;
+  if (on) { let open = false; mouthT = setInterval(() => { open = !open; $("face").src = "face/" + (open ? "talk" : "good") + ".png";
+                                                           $("face").classList.toggle("bob", open); }, 170); }
+  else $("face").classList.remove("bob");
+}
+
+// ------------------------------------------------------------ her voice
+// iPhones only let a page play sound it was tapped into, so one player is
+// "unlocked" on the tap and reused for her reply when it comes back.
+const player = new Audio();
+player.playsInline = true;
+player.onplay = () => mouth(true);
+player.onended = player.onpause = player.onerror = () => { mouth(false); face(faceNow === "talk" ? "good" : faceNow); };
+function unlock() {
+  try { player.src = "data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAIA+AAACABAAZGF0YQAAAAA="; player.play().catch(() => {}); } catch (e) { }
+}
+function speak(text, mood) {
+  if (!text) return;
+  player.pause();
+  player.src = "say?t=" + encodeURIComponent(text);
+  player.play().then(() => {}, () => { mouth(false); face(mood || "good", 5000); });
+  player.onended = () => { mouth(false); face(mood || "good", 5000); };
+}
+
+// ------------------------------------------------------------ chat
 async function recent() {                 // texts she sent first show up here too
   try {
     const r = await (await fetch("recent", { cache: "no-store" })).json();
@@ -82,38 +165,208 @@ async function recent() {                 // texts she sent first show up here t
     }
     saved.sort((a, b) => a.t - b.t);
     remember();
-    $("status").textContent = "awake";
-  } catch (e) { $("status").textContent = "can't reach her. home wi-fi?"; }
+    status("awake");
+  } catch (e) { status("can't reach her right now"); face("tired"); }
   draw();
+}
+
+function fresh() { const f = Date.now() - lastSent > 10 * 60000; lastSent = Date.now(); return f; }
+function thinking(on) {
+  busy = on;
+  $("go").disabled = $("mic").disabled = on;
+  if (on) { face("sus"); status("thinking..."); }
 }
 
 $("f").onsubmit = async e => {
   e.preventDefault();
   const text = $("t").value.trim();
-  if (!text) return;
+  if (!text || busy) return;
   $("t").value = "";
   add("you", text);
-  $("go").disabled = true;
-  $("face").src = "face/talk.png";
-  $("status").textContent = "typing...";
-  const fresh = Date.now() - lastSent > 10 * 60000;
-  lastSent = Date.now();
+  thinking(true);
   try {
     const r = await (await fetch("chat", { method: "POST", headers: { "Content-Type": "application/json" },
-                                          body: JSON.stringify({ text, new: fresh }) })).json();
-    add("her", r.reply || "...");
-    $("status").textContent = "awake";
+                                          body: JSON.stringify({ text, new: fresh() }) })).json();
+    const reply = r.reply || "...";
+    add("her", reply);
+    status("awake");
+    face(moodOf(reply), 5000);
   } catch (err) {
-    add("her", "i can't reach the mac from here. are you home?");
-    $("status").textContent = "can't reach her. home wi-fi?";
+    add("her", "i can't reach the mac from here. is it asleep?");
+    status("can't reach her right now");
+    face("dying", 5000);
   }
-  $("face").src = "face/good.png";
-  $("go").disabled = false;
+  thinking(false);
+};
+
+// ------------------------------------------------------------ talking out loud
+// Tap the mic, talk, and it stops by itself when you go quiet (or tap again).
+// The Mac turns it into words (Whisper, on the Mac) and she answers out loud.
+// Phones only allow the mic on a secure (https) address, so it needs Tailscale's link.
+let rec = null;
+$("mic").onclick = () => {
+  if (busy) return;
+  if (rec) return rec.stop();
+  unlock();
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+    add("her", location.protocol === "https:" ? "your phone won't give me the mic. check safari's settings."
+                                              : "i can only hear you on the https link. use the tailscale one.");
+    face("sus", 4000);
+    return;
+  }
+  navigator.mediaDevices.getUserMedia({ audio: true }).then(listen, () => {
+    add("her", "you didn't let me hear you. tap allow next time.");
+    face("sus", 4000);
+  });
+};
+
+function listen(stream) {
+  const AC = window.AudioContext || window.webkitAudioContext;
+  const ctx = new AC();
+  const src = ctx.createMediaStreamSource(stream), node = ctx.createScriptProcessor(4096, 1, 1);
+  const chunks = [], start = Date.now();
+  let lastLoud = 0, floor = 1, heard = false, done = false;
+  $("mic").classList.add("live");
+  status("listening...");
+  face("lookup");
+  function stop() {
+    if (done) return;
+    done = true; rec = null;
+    node.disconnect(); src.disconnect();
+    stream.getTracks().forEach(t => t.stop());   // let go of the mic so her voice plays out loud, not in the earpiece
+    const rate = ctx.sampleRate;
+    ctx.close();
+    $("mic").classList.remove("live");
+    if (!heard) { status("awake"); face("sus", 3000); return; }
+    send(wav(chunks, rate));
+  }
+  node.onaudioprocess = e => {
+    const d = e.inputBuffer.getChannelData(0);
+    let sum = 0;
+    chunks.push(new Float32Array(d));
+    for (let i = 0; i < d.length; i++) sum += d[i] * d[i];
+    const rms = Math.sqrt(sum / d.length), now = Date.now();
+    if (now - start < 400) { floor = Math.min(floor, rms); return; }      // learn the room's hum first
+    const loud = rms > Math.max(0.015, floor * 3);
+    if (loud) { heard = true; lastLoud = now; }
+    $("face").src = "face/" + (loud ? "great" : "lookup") + ".png";
+    if ((heard && now - lastLoud > 1400) || now - start > 30000 || (!heard && now - start > 8000)) stop();
+  };
+  src.connect(node);
+  node.connect(ctx.destination);
+  rec = { stop };
+}
+
+async function send(blob) {
+  thinking(true);
+  status("hearing you...");
+  try {
+    const r = await (await fetch("talk" + (fresh() ? "?new=1" : ""), { method: "POST", headers: { "Content-Type": "audio/wav" }, body: blob })).json();
+    if (r.heard) add("you", r.heard, true);
+    const reply = r.reply || "...";
+    add("her", reply);
+    status("awake");
+    thinking(false);
+    const mood = moodOf(reply);
+    face(mood, 5000);
+    speak(reply, mood);
+  } catch (err) {
+    add("her", "i can't reach the mac from here. is it asleep?");
+    status("can't reach her right now");
+    thinking(false);
+    face("dying", 5000);
+  }
+}
+
+function wav(chunks, rate) {                // 16kHz mono WAV, the way Whisper likes it
+  let n = 0;
+  for (const c of chunks) n += c.length;
+  const all = new Float32Array(n);
+  let at = 0;
+  for (const c of chunks) { all.set(c, at); at += c.length; }
+  const ratio = rate / 16000, out = new Int16Array(Math.floor(n / ratio));
+  for (let i = 0; i < out.length; i++) {
+    const a = Math.floor(i * ratio), b = Math.min(n, Math.floor((i + 1) * ratio));
+    let sum = 0;
+    for (let j = a; j < b; j++) sum += all[j];
+    const v = Math.max(-1, Math.min(1, sum / Math.max(1, b - a)));
+    out[i] = v < 0 ? v * 0x8000 : v * 0x7fff;
+  }
+  const dv = new DataView(new ArrayBuffer(44 + out.length * 2));
+  const str = (o, s) => { for (let k = 0; k < s.length; k++) dv.setUint8(o + k, s.charCodeAt(k)); };
+  str(0, "RIFF"); dv.setUint32(4, 36 + out.length * 2, true); str(8, "WAVE"); str(12, "fmt ");
+  dv.setUint32(16, 16, true); dv.setUint16(20, 1, true); dv.setUint16(22, 1, true);
+  dv.setUint32(24, 16000, true); dv.setUint32(28, 32000, true); dv.setUint16(32, 2, true); dv.setUint16(34, 16, true);
+  str(36, "data"); dv.setUint32(40, out.length * 2, true);
+  for (let i = 0; i < out.length; i++) dv.setInt16(44 + i * 2, out[i], true);
+  return new Blob([dv], { type: "audio/wav" });
+}
+
+// ------------------------------------------------------------ letters
+// Her Sunday letters, and her replies to the letters you spell on SHELL.
+let seenLetter = "";
+try { seenLetter = localStorage.getItem("yolk_phone_letter") || ""; } catch (e) { }
+
+function day(s) {
+  const d = new Date(s + "T12:00:00");
+  return d.toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric" }).toLowerCase();
+}
+function letterCard(title, mine, text) {
+  const c = document.createElement("div");
+  c.className = "letter";
+  const h = document.createElement("h3"); h.textContent = title; c.appendChild(h);
+  if (mine) { const m = document.createElement("p"); m.className = "mine"; m.textContent = "you: " + mine; c.appendChild(m); }
+  const p = document.createElement("p"); p.textContent = text; c.appendChild(p);
+  const b = document.createElement("button"); b.className = "read"; b.textContent = "▶ read it to me";
+  b.onclick = () => { if (!player.paused && b.dataset.on) { player.pause(); return; }
+                      document.querySelectorAll(".read").forEach(x => { x.textContent = "▶ read it to me"; delete x.dataset.on; });
+                      unlock(); speak(text, "love"); b.textContent = "■ stop"; b.dataset.on = "1";
+                      player.addEventListener("pause", () => { b.textContent = "▶ read it to me"; delete b.dataset.on; }, { once: true }); };
+  c.appendChild(b);
+  return c;
+}
+async function letters() {
+  const box = $("letters");
+  try {
+    const r = await (await fetch("letters", { cache: "no-store" })).json();
+    box.innerHTML = "";
+    const sunday = r.sunday || [];
+    if (sunday.length) {
+      const s = document.createElement("div"); s.className = "section"; s.textContent = "SUNDAY LETTERS"; box.appendChild(s);
+      for (const l of sunday) box.appendChild(letterCard("🥚 " + day(l.day), "", l.text));
+    }
+    // SHELL letters: yours and her reply share an id
+    const byId = {};
+    for (const l of r.letters || []) (byId[l.id] = byId[l.id] || {})[l.from === "yolk" ? "her" : "you"] = l;
+    const pairs = Object.values(byId).filter(p => p.her).sort((a, b) => b.her.t - a.her.t);
+    if (pairs.length) {
+      const s = document.createElement("div"); s.className = "section"; s.textContent = "LETTERS FROM SHELL"; box.appendChild(s);
+      for (const p of pairs) box.appendChild(letterCard("✉ " + when(p.her.t), p.you ? p.you.text : "", p.her.text));
+    }
+    if (!sunday.length && !pairs.length) box.innerHTML = '<div class="empty">no letters yet. she writes one every sunday evening.</div>';
+    const newest = sunday.length ? sunday[0].day : "";
+    $("tab").classList.toggle("new", !!newest && newest !== seenLetter && !document.body.classList.contains("reading"));
+    return newest;
+  } catch (e) {
+    box.innerHTML = '<div class="empty">can\'t reach her letters right now.</div>';
+    return "";
+  }
+}
+$("tab").onclick = async () => {
+  const reading = document.body.classList.toggle("reading");
+  $("tab").classList.toggle("on", reading);
+  $("tab").firstChild.textContent = reading ? "chat" : "letters";
+  if (reading) {
+    $("tab").classList.remove("new");
+    const newest = await letters();
+    if (newest) { seenLetter = newest; try { localStorage.setItem("yolk_phone_letter", newest); } catch (e) { } }
+  } else { player.pause(); draw(); }
 };
 
 draw();
 recent();
-document.addEventListener("visibilitychange", () => { if (!document.hidden) recent(); });
+letters();
+document.addEventListener("visibilitychange", () => { if (!document.hidden) { recent(); letters(); } });
 </script>
 </body>
 </html>

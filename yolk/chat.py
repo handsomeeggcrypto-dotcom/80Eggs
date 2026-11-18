@@ -348,12 +348,12 @@ def transcribe(wav):
     return re.sub(r"\[[^\]]*\]|\([^)]*\)", "", text).strip()
 
 
-def talk(wav, new=False):
+def talk(wav, new=False, where=None):
     heard = transcribe(wav)
     if not heard:
         return {"heard": "", "reply": "i didn't catch that. tap me and say it again."}
     try:
-        answer = reply(heard, new)
+        answer = reply(heard, new, where=where) if where else reply(heard, new)
     except Exception as e:
         print("YOLK talk failed:", e)
         answer = "my brain glitched. the mac's fine, i think. try again in a second."
