@@ -667,6 +667,16 @@ def tailscale_name():
         return None
 
 
+_ts = {"at": 0, "name": None}
+
+
+def _ts_name():
+    """tailscale_name(), asked at most every 10 minutes (it runs the Tailscale app twice)."""
+    if time.time() - _ts["at"] > 600:
+        _ts["name"], _ts["at"] = tailscale_name(), time.time()
+    return _ts["name"]
+
+
 def speak_clip(text):
     """Reed (or whatever daily.json says) saying `text`, as a cached m4a."""
     import daily
@@ -849,8 +859,10 @@ class Handler(BaseHTTPRequestHandler):
                 return self.send(200, f.read_bytes(), "image/png") if f.is_file() else self.send(404, {})
             if rest == "recent":             # her texts from the last two days, so the page reads like a thread
                 import nudge
+                ts = _ts_name()
                 return self.send(200, {"texts": [{"t": s["t"], "text": s["text"]} for s in nudge.sent()
-                                                 if time.time() - s["t"] < 2 * 86400 and s["why"] != "test"]})
+                                                 if time.time() - s["t"] < 2 * 86400 and s["why"] != "test"],
+                                       "secure": f"https://{ts}/p/{station_config()['watch_key']}/" if ts else ""})
             if rest == "letters":            # her Sunday letters and her replies to SHELL letters
                 import letters
                 import sunday

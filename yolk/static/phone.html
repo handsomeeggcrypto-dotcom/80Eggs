@@ -30,6 +30,7 @@
   .tab.on { background: var(--yolk); color: var(--bg); border-color: var(--yolk); }
   .tab .dot { display: none; width: 8px; height: 8px; border-radius: 50%; background: #ff5a3c; margin-left: 4px; vertical-align: middle; }
   .tab.new .dot { display: inline-block; }
+  #move { display: none; background: var(--yolk); color: var(--bg); padding: 10px 16px; font-size: 14px; text-decoration: none; font-weight: bold; }
   #log, #letters { flex: 1; overflow-y: auto; padding: 14px 16px; }
   #letters { display: none; }
   body.reading #log, body.reading form { display: none; }
@@ -63,6 +64,7 @@
   <div class="who"><b>YOLK</b><small id="status">waking up...</small></div>
   <button class="tab" id="tab">letters<span class="dot"></span></button>
 </header>
+<a id="move">📍 this is the old home-wi-fi version. tap here to open the new one (works anywhere, and i can hear you). then add that one to your home screen and delete this icon.</a>
 <div id="log"></div>
 <div id="letters"></div>
 <form id="f">
@@ -77,6 +79,7 @@ let saved = [];
 try { saved = JSON.parse(localStorage.getItem("yolk_phone") || "[]"); } catch (e) { saved = []; }
 let lastSent = 0;           // a new conversation after 10 quiet minutes, like everywhere else
 let busy = false;
+let secure = "";            // the Tailscale https link, when the Mac has one
 
 function remember() { try { localStorage.setItem("yolk_phone", JSON.stringify(saved.slice(-KEEP))); } catch (e) { } }
 function when(t) {
@@ -166,6 +169,9 @@ async function recent() {                 // texts she sent first show up here t
     saved.sort((a, b) => a.t - b.t);
     remember();
     status("awake");
+    secure = r.secure || "";
+    $("move").style.display = secure && location.protocol !== "https:" ? "block" : "none";
+    $("move").href = secure;
   } catch (e) { status("can't reach her right now"); face("tired"); }
   draw();
 }
@@ -210,7 +216,7 @@ $("mic").onclick = () => {
   unlock();
   if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
     add("her", location.protocol === "https:" ? "your phone won't give me the mic. check safari's settings."
-                                              : "i can only hear you on the https link. use the tailscale one.");
+                                              : "i can't hear you on this old link. tap the yellow bar up top to move me to the new one.");
     face("sus", 4000);
     return;
   }
