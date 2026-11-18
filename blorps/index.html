@@ -288,7 +288,7 @@
             <p style="margin:8px 0 0"><button class="bevel" style="display:inline-block;width:auto" type="submit">Sign it!</button></p>
           </form>
         </div>
-        <p class="note">Your entries are saved in your own browser (for now).</p>
+        <p class="note" id="gbNote">Loading the guestbook…</p>
         <div class="entries" id="gbEntries"></div>
       </section>
     </main>
@@ -507,20 +507,45 @@
   $("addBtn").addEventListener("click", addMine);
   $("addNum").addEventListener("keydown", e => { if (e.key === "Enter") addMine(); });
 
-  // ---- guestbook (this browser only) ----
+  // ---- guestbook (shared through /api/guestbook; this browser only if that can't be reached) ----
+  const GB_API = "/api/guestbook", GB_BOOK = "blorps";
   const SEED = [
     { name: "xX_blorpfan_Xx", msg: "first!!! cool site. the blue ones r the best ones", when: "this museum's opening day" },
     { name: "the curator", msg: "Welcome to the Blorp Museum. Please do not lick the paintings.", when: "this museum's opening day" },
   ];
+  let gbShared = null, gbOnline = false;
   const loadGb = () => { try { return JSON.parse(store("blorp_guestbook") || "[]") || []; } catch (e) { return []; } };
+  const gbNote = (t, bad) => { $("gbNote").textContent = t; $("gbNote").style.color = bad ? "var(--yellow)" : ""; };
   function renderGb() {
-    const all = [...loadGb().slice().reverse(), ...SEED];
-    $("gbEntries").innerHTML = all.map(e => `<div class="entry"><span class="who">${esc(e.name)}</span> <span class="when">wrote on ${esc(e.when)}:</span><div>${esc(e.msg)}</div></div>`).join("");
+    const mine = gbOnline ? (gbShared || []).map(e => ({ name: e.name, msg: e.msg, when: new Date(e.t * 1000).toLocaleDateString() }))
+                          : loadGb().slice().reverse();
+    $("gbEntries").innerHTML = [...mine, ...SEED].map(e => `<div class="entry"><span class="who">${esc(e.name)}</span> <span class="when">wrote on ${esc(e.when)}:</span><div>${esc(e.msg)}</div></div>`).join("");
   }
-  $("gbForm").addEventListener("submit", e => {
+  async function gbCall(opts) {
+    const r = await fetch(opts ? GB_API : `${GB_API}?book=${GB_BOOK}`, opts || {});
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) throw Object.assign(new Error(j.error || "can't reach the guestbook"), { status: r.status });
+    return j.entries || [];
+  }
+  async function fetchGb() {
+    try { gbShared = await gbCall(); gbOnline = true; gbNote("Everyone who visits can read these. Be nice to the Blorps!"); }
+    catch (e) { gbOnline = false; gbNote("The shared guestbook can't be reached right now, so entries are saved in your own browser only."); }
+    renderGb();
+  }
+  $("gbForm").addEventListener("submit", async e => {
     e.preventDefault();
-    const name = $("gbName").value.trim(), msg = $("gbMsg").value.trim();
+    const name = $("gbName").value.trim(), msg = $("gbMsg").value.trim(), btn = $("gbForm").querySelector("button");
     if (!name || !msg) return;
+    if (gbOnline) {
+      btn.disabled = true;
+      try {
+        gbShared = await gbCall({ method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ book: GB_BOOK, name, msg }) });
+        $("gbMsg").value = ""; gbNote("Thanks for signing! Everyone who visits can read these.");
+        renderGb();
+      } catch (err) { gbNote(err.message, true); }
+      btn.disabled = false;
+      return;
+    }
     const list = loadGb(); list.push({ name, msg, when: new Date().toLocaleDateString() });
     store("blorp_guestbook", JSON.stringify(list.slice(-50)));
     $("gbMsg").value = ""; renderGb();
@@ -592,7 +617,7 @@
   // Blorp Patrol is Mac-only for now (it isn't on the website), so only show its button here
   if (/^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname)) $("patrolLink").hidden = false;
 
-  renderMine(); renderGb(); route();
+  renderMine(); renderGb(); fetchGb(); route();
 })();
 </script>
 </body>
